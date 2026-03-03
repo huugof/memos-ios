@@ -7,6 +7,7 @@ enum AppSettings {
         static let keepTextAfterSend = "keepTextAfterSend"
         static let markSentOnSuccess = "markSentOnSuccess"
         static let clearErrorOnEdit = "clearErrorOnEdit"
+        static let recentAcceptedTags = "recentAcceptedTags"
         static let newNoteAfterOption = "newNoteAfterOption"
         static let newNoteDelaySecondsLegacy = "newNoteDelaySeconds"
         static let lastBackgroundAt = "lastBackgroundAt"
@@ -94,6 +95,11 @@ enum AppSettings {
     static var clearErrorOnEdit: Bool {
         get { defaults.object(forKey: Keys.clearErrorOnEdit) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Keys.clearErrorOnEdit) }
+    }
+
+    static var recentAcceptedTags: [String] {
+        get { defaults.stringArray(forKey: Keys.recentAcceptedTags) ?? [] }
+        set { defaults.set(Array(newValue.prefix(100)), forKey: Keys.recentAcceptedTags) }
     }
 
     static var newNoteDelay: NewNoteDelay {

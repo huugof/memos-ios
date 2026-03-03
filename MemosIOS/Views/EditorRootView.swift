@@ -4,6 +4,7 @@ import SwiftData
 struct EditorRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     @State private var activeDraftID: UUID?
@@ -11,6 +12,7 @@ struct EditorRootView: View {
     @State private var isResolvingRoute = true
     @State private var didBootstrap = false
     @State private var hasOpenedForCurrentActivation = false
+    @State private var menuWasOpenWhenBackgrounded = false
 
     var body: some View {
         ZStack {
@@ -33,7 +35,17 @@ struct EditorRootView: View {
                 .id(draft.id)
                 .opacity(isResolvingRoute ? 0 : 1)
             }
+
+            if showingMenu, colorScheme == .dark {
+                Color.white.opacity(0.12)
+                    .blendMode(.screen)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
+        .compositingGroup()
+        .animation(.easeInOut(duration: 0.2), value: showingMenu)
         .sheet(isPresented: $showingMenu, onDismiss: {
             ensureActiveDraftAfterMenuDismiss()
         }) {
@@ -53,6 +65,7 @@ struct EditorRootView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 DraftResumeCoordinator.markAppBackgrounded()
+                menuWasOpenWhenBackgrounded = showingMenu
                 hasOpenedForCurrentActivation = false
                 isResolvingRoute = true
                 return
@@ -61,6 +74,17 @@ struct EditorRootView: View {
             if newPhase == .active {
                 if !didBootstrap {
                     bootstrapIfNeeded()
+                    return
+                }
+
+                if menuWasOpenWhenBackgrounded {
+                    menuWasOpenWhenBackgrounded = false
+                    showingMenu = false
+                }
+
+                if showingMenu {
+                    hasOpenedForCurrentActivation = true
+                    isResolvingRoute = false
                     return
                 }
 
@@ -124,7 +148,9 @@ struct EditorRootView: View {
             activeDraftID = nil
             DraftResumeCoordinator.markActiveDraft(nil)
         }
-        showingMenu = true
+        createAndActivateNewDraft(from: nil)
+        showingMenu = false
+        isResolvingRoute = false
     }
 
     private func ensureActiveDraftAfterMenuDismiss() {

@@ -96,6 +96,7 @@ final class DraftBehaviorTests: XCTestCase {
         AppSettings.keepTextAfterSend = true
         AppSettings.markSentOnSuccess = true
         AppSettings.clearErrorOnEdit = true
+        AppSettings.recentAcceptedTags = []
         AppSettings.newNoteDelay = .immediately
         AppSettings.lastBackgroundAt = nil
         AppSettings.lastActiveDraftID = nil
@@ -109,6 +110,7 @@ private struct AppSettingsSnapshot {
     let keepTextAfterSend: Bool
     let markSentOnSuccess: Bool
     let clearErrorOnEdit: Bool
+    let recentAcceptedTags: [String]
     let newNoteDelay: AppSettings.NewNoteDelay
     let lastBackgroundAt: Date?
     let lastActiveDraftID: UUID?
@@ -121,6 +123,7 @@ private struct AppSettingsSnapshot {
             keepTextAfterSend: AppSettings.keepTextAfterSend,
             markSentOnSuccess: AppSettings.markSentOnSuccess,
             clearErrorOnEdit: AppSettings.clearErrorOnEdit,
+            recentAcceptedTags: AppSettings.recentAcceptedTags,
             newNoteDelay: AppSettings.newNoteDelay,
             lastBackgroundAt: AppSettings.lastBackgroundAt,
             lastActiveDraftID: AppSettings.lastActiveDraftID,
@@ -134,6 +137,7 @@ private struct AppSettingsSnapshot {
         AppSettings.keepTextAfterSend = keepTextAfterSend
         AppSettings.markSentOnSuccess = markSentOnSuccess
         AppSettings.clearErrorOnEdit = clearErrorOnEdit
+        AppSettings.recentAcceptedTags = recentAcceptedTags
         AppSettings.newNoteDelay = newNoteDelay
         AppSettings.lastBackgroundAt = lastBackgroundAt
         AppSettings.lastActiveDraftID = lastActiveDraftID

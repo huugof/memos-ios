@@ -4,6 +4,8 @@ import SwiftData
 struct DraftEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
+    @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     @Bindable var draft: Draft
 
@@ -13,8 +15,13 @@ struct DraftEditorView: View {
 
     @State private var draftText: String
     @State private var autosaveTask: Task<Void, Never>?
+    @State private var remoteTagTask: Task<Void, Never>?
+    @State private var sendConfirmationTask: Task<Void, Never>?
     @State private var isEditorFocused = true
     @State private var focusRequestID = UUID()
+    @State private var remoteTags: [String] = []
+    @State private var tagSuggestions: [String] = []
+    @State private var isShowingSendConfirmation = false
 
     init(
         draft: Draft,
@@ -55,84 +62,41 @@ struct DraftEditorView: View {
                 .padding(.top, 6)
             }
 
-            NoteTextView(text: $draftText, isFocused: $isEditorFocused, focusRequestID: focusRequestID)
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .onChange(of: draftText) { _, _ in
-                    scheduleAutosave()
+            NoteTextView(
+                text: $draftText,
+                isFocused: $isEditorFocused,
+                focusRequestID: focusRequestID,
+                tagSuggestions: tagSuggestions,
+                onTagAccepted: { tag in
+                    rememberAcceptedTag(tag)
                 }
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .onChange(of: draftText) { _, _ in
+                scheduleAutosave()
+                refreshTagSuggestions()
+            }
         }
+        .opacity(isShowingSendConfirmation ? 0 : 1)
+        .animation(.easeInOut(duration: 0.2), value: isShowingSendConfirmation)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .safeAreaInset(edge: .bottom) {
-            HStack {
-                Spacer()
-
-                HStack(spacing: 0) {
-                    Button {
-                        sendDraft()
-                    } label: {
-                        if draft.sendState == .sending {
-                            ProgressView()
-                                .tint(.primary)
-                                .frame(width: 44, height: 44)
-                        } else {
-                            Image(systemName: "paperplane")
-                                .font(.system(size: 17, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                        }
-                    }
-                    .foregroundStyle(canSendCurrentText ? .primary : .secondary)
-                    .disabled(!canSendCurrentText)
-                    .accessibilityLabel("Send")
-
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.12))
-                        .frame(width: 1, height: 22)
-
-                    Button {
-                        handleNewNote()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                    }
-                    .foregroundStyle(.primary)
-                    .accessibilityLabel("New Note")
-
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.12))
-                        .frame(width: 1, height: 22)
-
-                    Button {
-                        handleBack()
-                    } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                    }
-                    .foregroundStyle(.primary)
-                    .accessibilityLabel("Menu")
-                }
-                .padding(4)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color(uiColor: .secondarySystemBackground))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
-                .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 4)
+            if isShowingSendConfirmation {
+                confirmationControls
+            } else {
+                quickCaptureControls
             }
-            .padding(.leading, 24)
-            .padding(.trailing, 10)
-            .padding(.top, 8)
-            .padding(.bottom, 6)
         }
         .onAppear {
             isEditorFocused = true
             focusRequestID = UUID()
+            refreshTagSuggestions()
+            fetchRemoteTagsOnce()
+        }
+        .onChange(of: drafts.map { "\($0.id.uuidString)-\($0.updatedAt.timeIntervalSince1970)" }) { _, _ in
+            refreshTagSuggestions()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
@@ -140,18 +104,112 @@ struct DraftEditorView: View {
             }
         }
         .onChange(of: draft.id) { _, _ in
-            // Reset local editor buffer when navigation switches to a different draft.
             autosaveTask?.cancel()
+            sendConfirmationTask?.cancel()
+            remoteTagTask?.cancel()
             draftText = draft.text
+            remoteTags = []
+            isShowingSendConfirmation = false
             isEditorFocused = true
             focusRequestID = UUID()
+            refreshTagSuggestions()
+            fetchRemoteTagsOnce()
         }
         .onDisappear {
             flushPendingAutosave()
+            remoteTagTask?.cancel()
+            sendConfirmationTask?.cancel()
         }
     }
 
+    private var quickCaptureControls: some View {
+        HStack(spacing: 0) {
+            Button {
+                handleBack()
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: sideButtonWidth, height: controlHeight)
+            }
+            .foregroundStyle(controlForegroundColor)
+            .accessibilityLabel("Menu")
+
+            divider
+
+            Button {
+                sendDraft()
+            } label: {
+                if draft.sendState == .sending {
+                    ProgressView()
+                        .tint(primaryActionColor)
+                        .frame(width: middleButtonWidth, height: controlHeight)
+                } else {
+                    Image(systemName: sendIcon)
+                        .font(.system(size: 21, weight: .bold))
+                        .contentTransition(.symbolEffect(.replace))
+                        .frame(width: middleButtonWidth, height: controlHeight)
+                }
+            }
+            .foregroundStyle(canSendCurrentText ? primaryActionColor : controlForegroundColor.opacity(0.45))
+            .disabled(!canSendCurrentText)
+            .accessibilityLabel("Send")
+        }
+        .padding(6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(controlFillColor)
+        )
+        .shadow(color: controlShadowColor, radius: controlShadowRadius, x: 0, y: controlShadowY)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+    }
+
+    private var confirmationControls: some View {
+        HStack {
+            Button {
+            } label: {
+                Image(systemName: sendIcon)
+                    .font(.system(size: 21, weight: .bold))
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: middleButtonWidth, height: controlHeight)
+            }
+            .disabled(true)
+            .foregroundStyle(primaryActionColor)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(controlFillColor)
+            )
+            .shadow(color: controlShadowColor, radius: controlShadowRadius, x: 0, y: controlShadowY)
+            .accessibilityLabel("Sent")
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(controlSeparatorColor)
+            .frame(width: 1, height: 22)
+    }
+
+    private var controlHeight: CGFloat { 40 }
+    private var sideButtonWidth: CGFloat { 72 }
+    private var middleButtonWidth: CGFloat { 188 }
+
+    private var sendIcon: String {
+        if isShowingSendConfirmation {
+            return "checkmark.circle.fill"
+        }
+        return "paperplane.fill"
+    }
+
     private var canSendCurrentText: Bool {
+        if isShowingSendConfirmation {
+            return false
+        }
+
         if draft.sendState == .sending {
             return false
         }
@@ -165,6 +223,46 @@ struct DraftEditorView: View {
         }
 
         return true
+    }
+
+    private var controlFillColor: Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(0.16)
+        }
+        return Color.black.opacity(0.08)
+    }
+
+    private var controlForegroundColor: Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(0.92)
+        }
+        return Color.black.opacity(0.88)
+    }
+
+    private var controlShadowColor: Color {
+        if colorScheme == .dark {
+            return Color.black.opacity(0.12)
+        }
+        return Color.black.opacity(0.14)
+    }
+
+    private var controlShadowRadius: CGFloat {
+        6
+    }
+
+    private var controlShadowY: CGFloat {
+        2
+    }
+
+    private var controlSeparatorColor: Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(0.12)
+        }
+        return Color.black.opacity(0.10)
+    }
+
+    private var primaryActionColor: Color {
+        .blue
     }
 
     private func scheduleAutosave() {
@@ -205,28 +303,125 @@ struct DraftEditorView: View {
     }
 
     private func handleBack() {
+        guard !isShowingSendConfirmation else { return }
         flushPendingAutosave()
         isEditorFocused = false
         onBack(draft)
     }
 
     private func handleNewNote() {
+        guard !isShowingSendConfirmation else { return }
         flushPendingAutosave()
         isEditorFocused = false
         onNewNote(draft)
     }
 
     private func sendDraft() {
-        flushPendingAutosave()
+        guard canSendCurrentText else { return }
 
-        Task {
+        flushPendingAutosave()
+        sendConfirmationTask?.cancel()
+
+        Task { @MainActor in
             let outcome = await DraftSendService.send(draft: draft, in: modelContext)
             draftText = draft.text
 
             if case .success = outcome {
                 isEditorFocused = false
-                onSendSuccess(draft)
+                withAnimation(.easeInOut(duration: 0.20)) {
+                    isShowingSendConfirmation = true
+                }
+
+                sendConfirmationTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    onSendSuccess(draft)
+                }
             }
         }
+    }
+
+    private func fetchRemoteTagsOnce() {
+        remoteTagTask?.cancel()
+        remoteTagTask = Task { @MainActor in
+            do {
+                let tags = try await MemosClient().fetchTags(
+                    baseURLString: AppSettings.endpointBaseURL,
+                    token: KeychainTokenStore.getToken(),
+                    allowInsecureHTTP: AppSettings.allowInsecureHTTP
+                )
+                guard !Task.isCancelled else { return }
+                remoteTags = tags
+                refreshTagSuggestions()
+            } catch {
+                // Best-effort only; autocomplete remains available from local tags.
+            }
+        }
+    }
+
+    private func refreshTagSuggestions() {
+        let localTags = extractTags(in: drafts.map(\.text) + [draftText])
+
+        var canonicalByLowercase: [String: String] = [:]
+        for tag in localTags + remoteTags {
+            let normalized = normalizedTag(tag)
+            guard !normalized.isEmpty else { continue }
+            let key = normalized.lowercased()
+            if canonicalByLowercase[key] == nil {
+                canonicalByLowercase[key] = normalized
+            }
+        }
+
+        let recentRanking = Dictionary(
+            uniqueKeysWithValues: AppSettings.recentAcceptedTags.enumerated().map { ($0.element.lowercased(), $0.offset) }
+        )
+
+        tagSuggestions = canonicalByLowercase.values.sorted { lhs, rhs in
+            let lhsRank = recentRanking[lhs.lowercased()] ?? Int.max
+            let rhsRank = recentRanking[rhs.lowercased()] ?? Int.max
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+        }
+    }
+
+    private func rememberAcceptedTag(_ tag: String) {
+        let normalized = normalizedTag(tag)
+        guard !normalized.isEmpty else { return }
+
+        var current = AppSettings.recentAcceptedTags
+        current.removeAll { $0.compare(normalized, options: .caseInsensitive) == .orderedSame }
+        current.insert(normalized, at: 0)
+        AppSettings.recentAcceptedTags = Array(current.prefix(100))
+        refreshTagSuggestions()
+    }
+
+    private func extractTags(in texts: [String]) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: #"#([A-Za-z0-9_-]+)"#) else {
+            return []
+        }
+
+        var results: [String] = []
+        for text in texts {
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            for match in regex.matches(in: text, options: [], range: range) {
+                guard match.numberOfRanges > 1,
+                      let swiftRange = Range(match.range(at: 1), in: text) else { continue }
+                results.append(String(text[swiftRange]))
+            }
+        }
+
+        return results
+    }
+
+    private func normalizedTag(_ raw: String) -> String {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("#") {
+            value.removeFirst()
+        }
+
+        let filtered = value.filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }
+        return filtered
     }
 }
