@@ -1,0 +1,61 @@
+name: MemosIOS
+options:
+  minimumXcodeGenVersion: 2.44.0
+  deploymentTarget:
+    iOS: 17.0
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemosIOS
+    SWIFT_VERSION: 5.0
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0
+    DEVELOPMENT_TEAM: ""
+    TARGETED_DEVICE_FAMILY: "1,2"
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+    INFOPLIST_KEY_CFBundleDisplayName: Memos
+    INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
+targets:
+  MemosIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: MemosIOS
+    settings:
+      base:
+        PRODUCT_NAME: Memos
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        DEVELOPMENT_ASSET_PATHS: '"MemosIOS/Resources"'
+        SUPPORTS_MACCATALYST: NO
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UIRequiresFullScreen: NO
+  MemosIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    hostApplication: MemosIOS
+    sources:
+      - path: MemosIOSTests
+    dependencies:
+      - target: MemosIOS
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Memos.app/Memos"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  MemosIOS:
+    build:
+      targets:
+        MemosIOS: all
+        MemosIOSTests: [test]
+    test:
+      config: Debug
+      targets:
+        - MemosIOSTests
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,552 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1D833A11047D6729EF727151 /* DraftScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56E674E187D15452F772A9A /* DraftScope.swift */; };
+		252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795498BBE4F9490E869AF36A /* DraftEditorView.swift */; };
+		36629055536B015DB077F63D /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */; };
+		40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C74472076055012EE6D937 /* ModelContext+Persist.swift */; };
+		5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */; };
+		5C3475A24B6C88DD24557384 /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
+		5D158C156E2A0A3E96FF6AD3 /* DraftMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462609D7254A1C734443FA1E /* DraftMenuView.swift */; };
+		67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1892E90367D19C014B5DB91C /* MemosApp.swift */; };
+		6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D30B906F7228E420B8DC94 /* MemosClient.swift */; };
+		767F98B8A19FE571D96CF82B /* NoteTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */; };
+		792A65BCCA8A44D95564C267 /* Draft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5A046FC50AFCF6336577 /* Draft.swift */; };
+		89B064F33AFD9D0D765D5EA8 /* DraftResumeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */; };
+		8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */; };
+		99FAE97B62CD88078E691131 /* EditorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6895619A12B12EA5CC18252 /* EditorRootView.swift */; };
+		A9119D2DE985DA2AC9D2B1B3 /* AppModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD9B2CC0C009355AB37BA83 /* AppModelContainer.swift */; };
+		AE30260C561A4FE72753309B /* DraftRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ECB4F2EAD8776C91E4DD58 /* DraftRowView.swift */; };
+		B5C13EE23598EA086DF608D8 /* StatusBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */; };
+		CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
+		D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */; };
+		D53F700E978952815B588F23 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B819270F50541F328E16E01 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		06220D55D623A838F3A50F04 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 712AC64D7826C5D2C791F455 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 463C6BD1F97229A71A4EF4AA;
+			remoteInfo = MemosIOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1892E90367D19C014B5DB91C /* MemosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosApp.swift; sourceTree = "<group>"; };
+		408248FB2E3B112C1F77B118 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		462609D7254A1C734443FA1E /* DraftMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftMenuView.swift; sourceTree = "<group>"; };
+		5C5F5A046FC50AFCF6336577 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
+		65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
+		6CC9CDDFC830112053304B30 /* DraftSendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftSendService.swift; sourceTree = "<group>"; };
+		795498BBE4F9490E869AF36A /* DraftEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftEditorView.swift; sourceTree = "<group>"; };
+		8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeView.swift; sourceTree = "<group>"; };
+		84D0FBD92F134FFBE4CAD41C /* Memos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Memos.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		9B819270F50541F328E16E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1ECB4F2EAD8776C91E4DD58 /* DraftRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftRowView.swift; sourceTree = "<group>"; };
+		C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftResumeCoordinator.swift; sourceTree = "<group>"; };
+		C3D30B906F7228E420B8DC94 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
+		CEF288C63232381A9D25194B /* MemosIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MemosIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextView.swift; sourceTree = "<group>"; };
+		DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftBehaviorTests.swift; sourceTree = "<group>"; };
+		E5C74472076055012EE6D937 /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
+		E6895619A12B12EA5CC18252 /* EditorRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorRootView.swift; sourceTree = "<group>"; };
+		F56E674E187D15452F772A9A /* DraftScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftScope.swift; sourceTree = "<group>"; };
+		FBD9B2CC0C009355AB37BA83 /* AppModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelContainer.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		04B457164DABCE12A0DCD885 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				408248FB2E3B112C1F77B118 /* AppSettings.swift */,
+				852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */,
+				E5C74472076055012EE6D937 /* ModelContext+Persist.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		15756E40DDDDB75361A37819 /* MemosIOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
+			);
+			path = MemosIOSTests;
+			sourceTree = "<group>";
+		};
+		382EF2740A4A8AD2E6D8E3C0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				9B819270F50541F328E16E01 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		4D3AF44D18781760A1BFD7A3 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				5C5F5A046FC50AFCF6336577 /* Draft.swift */,
+				F56E674E187D15452F772A9A /* DraftScope.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		576ADF521F6AA1AC710B5891 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				84D0FBD92F134FFBE4CAD41C /* Memos.app */,
+				CEF288C63232381A9D25194B /* MemosIOSTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5E8C1ECA2548B4AE4F3E6826 = {
+			isa = PBXGroup;
+			children = (
+				8CC47FFD8F73893B30760108 /* MemosIOS */,
+				15756E40DDDDB75361A37819 /* MemosIOSTests */,
+				576ADF521F6AA1AC710B5891 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6CC8E39E7596280A67198BCD /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				795498BBE4F9490E869AF36A /* DraftEditorView.swift */,
+				462609D7254A1C734443FA1E /* DraftMenuView.swift */,
+				E6895619A12B12EA5CC18252 /* EditorRootView.swift */,
+				0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */,
+				E5B3C330936DA697AB739B31 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		8CC47FFD8F73893B30760108 /* MemosIOS */ = {
+			isa = PBXGroup;
+			children = (
+				95D6AA4E4858EA686E4D867B /* App */,
+				4D3AF44D18781760A1BFD7A3 /* Models */,
+				382EF2740A4A8AD2E6D8E3C0 /* Resources */,
+				A5AD44B6997C483819D716AA /* Services */,
+				04B457164DABCE12A0DCD885 /* Storage */,
+				6CC8E39E7596280A67198BCD /* Views */,
+			);
+			path = MemosIOS;
+			sourceTree = "<group>";
+		};
+		95D6AA4E4858EA686E4D867B /* App */ = {
+			isa = PBXGroup;
+			children = (
+				FBD9B2CC0C009355AB37BA83 /* AppModelContainer.swift */,
+				1892E90367D19C014B5DB91C /* MemosApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A5AD44B6997C483819D716AA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */,
+				6CC9CDDFC830112053304B30 /* DraftSendService.swift */,
+				65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */,
+				C3D30B906F7228E420B8DC94 /* MemosClient.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		E5B3C330936DA697AB739B31 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				A1ECB4F2EAD8776C91E4DD58 /* DraftRowView.swift */,
+				D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */,
+				8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		463C6BD1F97229A71A4EF4AA /* MemosIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 43533E64405CF2A46C2A8DF8 /* Build configuration list for PBXNativeTarget "MemosIOS" */;
+			buildPhases = (
+				B3882045AF9897C9900E923F /* Sources */,
+				9F9FD7FB457E40E3516B31E4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MemosIOS;
+			packageProductDependencies = (
+			);
+			productName = MemosIOS;
+			productReference = 84D0FBD92F134FFBE4CAD41C /* Memos.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F0917677DA15D7A40394C170 /* MemosIOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 432FE1C7D3F0689CFE170D80 /* Build configuration list for PBXNativeTarget "MemosIOSTests" */;
+			buildPhases = (
+				DCEA58CA821ABE24D7BBE383 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A68F6DA66F24B2F0D9D61249 /* PBXTargetDependency */,
+			);
+			name = MemosIOSTests;
+			packageProductDependencies = (
+			);
+			productName = MemosIOSTests;
+			productReference = CEF288C63232381A9D25194B /* MemosIOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		712AC64D7826C5D2C791F455 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					F0917677DA15D7A40394C170 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 5C461FD227F429604E580913 /* Build configuration list for PBXProject "MemosIOS" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5E8C1ECA2548B4AE4F3E6826;
+			minimizedProjectReferenceProxies = 1;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				463C6BD1F97229A71A4EF4AA /* MemosIOS */,
+				F0917677DA15D7A40394C170 /* MemosIOSTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9F9FD7FB457E40E3516B31E4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D53F700E978952815B588F23 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B3882045AF9897C9900E923F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A9119D2DE985DA2AC9D2B1B3 /* AppModelContainer.swift in Sources */,
+				CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */,
+				792A65BCCA8A44D95564C267 /* Draft.swift in Sources */,
+				252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */,
+				5D158C156E2A0A3E96FF6AD3 /* DraftMenuView.swift in Sources */,
+				89B064F33AFD9D0D765D5EA8 /* DraftResumeCoordinator.swift in Sources */,
+				AE30260C561A4FE72753309B /* DraftRowView.swift in Sources */,
+				1D833A11047D6729EF727151 /* DraftScope.swift in Sources */,
+				5C3475A24B6C88DD24557384 /* DraftSendService.swift in Sources */,
+				36629055536B015DB077F63D /* DraftStore.swift in Sources */,
+				99FAE97B62CD88078E691131 /* EditorRootView.swift in Sources */,
+				5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */,
+				67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */,
+				6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */,
+				40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */,
+				767F98B8A19FE571D96CF82B /* NoteTextView.swift in Sources */,
+				D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */,
+				B5C13EE23598EA086DF608D8 /* StatusBadgeView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCEA58CA821ABE24D7BBE383 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A68F6DA66F24B2F0D9D61249 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 463C6BD1F97229A71A4EF4AA /* MemosIOS */;
+			targetProxy = 06220D55D623A838F3A50F04 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0A32F19ABB50223CE4D8C5C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Memos;
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.MemosIOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7190827AE2F6FACBDEBE6EA8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Memos.app/Memos";
+			};
+			name = Debug;
+		};
+		A30850ECF7899F97D9ED262A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_ASSET_PATHS = "\"MemosIOS/Resources\"";
+				DEVELOPMENT_TEAM = 58RDU34A2M;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = Memos;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C3AFD42EA55F4B7A7B4DDBCD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_ASSET_PATHS = "\"MemosIOS/Resources\"";
+				DEVELOPMENT_TEAM = 58RDU34A2M;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = Memos;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		DDF2B209AD7E72B3BE4F4357 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Memos;
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.MemosIOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F454D4AC588557565D2076BB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Memos.app/Memos";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		432FE1C7D3F0689CFE170D80 /* Build configuration list for PBXNativeTarget "MemosIOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7190827AE2F6FACBDEBE6EA8 /* Debug */,
+				F454D4AC588557565D2076BB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		43533E64405CF2A46C2A8DF8 /* Build configuration list for PBXNativeTarget "MemosIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A30850ECF7899F97D9ED262A /* Debug */,
+				C3AFD42EA55F4B7A7B4DDBCD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5C461FD227F429604E580913 /* Build configuration list for PBXProject "MemosIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A32F19ABB50223CE4D8C5C9 /* Debug */,
+				DDF2B209AD7E72B3BE4F4357 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 712AC64D7826C5D2C791F455 /* Project object */;
+}
