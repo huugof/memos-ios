@@ -84,6 +84,13 @@ struct DraftEditorView: View {
         .overlay(alignment: .bottomTrailing) {
             sendButtonOverlay
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !keyboard.isVisible {
+                topBar
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.20), value: keyboard.isVisible)
         .onAppear {
             isEditorFocused = true
             focusRequestID = UUID()
@@ -140,37 +147,43 @@ struct DraftEditorView: View {
     }
 
     private var sendButtonOverlay: some View {
-        VStack(spacing: 12) {
-            openDraftsButton
-
-            RoundCaptureButton(
-                content: sendButtonContent,
-                isEnabled: canSendCurrentText,
-                action: sendDraft,
-                accessibilityLabel: sendAccessibilityLabel
-            )
-        }
+        RoundCaptureButton(
+            content: sendButtonContent,
+            isEnabled: canSendCurrentText,
+            action: sendDraft,
+            accessibilityLabel: sendAccessibilityLabel
+        )
         .padding(.trailing, 20)
         .padding(.bottom, keyboard.isVisible ? 8 : 12)
         .animation(.easeInOut(duration: 0.20), value: keyboard.isVisible)
         .animation(.easeInOut(duration: 0.20), value: isShowingSendConfirmation)
     }
 
+    private var topBar: some View {
+        HStack(spacing: 0) {
+            Text("Memos")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 12)
+            openDraftsButton
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+        .background(.clear)
+    }
+
     private var openDraftsButton: some View {
         Button(action: handleOpenDraftsSheet) {
-            Image(systemName: "chevron.up")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(
-                    Circle()
-                        .fill(Color.blue)
-                )
-                .contentShape(Circle())
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open Drafts")
-        .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 2)
+        .accessibilityLabel("Drafts")
     }
 
     private var canSendCurrentText: Bool {
