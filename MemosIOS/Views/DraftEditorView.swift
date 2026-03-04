@@ -81,9 +81,6 @@ struct DraftEditorView: View {
         .animation(.easeInOut(duration: 0.2), value: isShowingSendConfirmation)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            titleBarButtonRow
-        }
         .overlay(alignment: .bottomTrailing) {
             sendButtonOverlay
         }
@@ -143,40 +140,37 @@ struct DraftEditorView: View {
     }
 
     private var sendButtonOverlay: some View {
-        Group {
+        VStack(spacing: 12) {
+            openDraftsButton
+
             RoundCaptureButton(
                 content: sendButtonContent,
                 isEnabled: canSendCurrentText,
                 action: sendDraft,
                 accessibilityLabel: sendAccessibilityLabel
             )
-            .padding(.trailing, 20)
-            .padding(.bottom, keyboard.isVisible ? 8 : 12)
         }
+        .padding(.trailing, 20)
+        .padding(.bottom, keyboard.isVisible ? 8 : 12)
         .animation(.easeInOut(duration: 0.20), value: keyboard.isVisible)
         .animation(.easeInOut(duration: 0.20), value: isShowingSendConfirmation)
     }
 
-    private var draftMenuButton: some View {
+    private var openDraftsButton: some View {
         Button(action: handleOpenDraftsSheet) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color(uiColor: .label))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+            Image(systemName: "chevron.up")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle()
+                        .fill(Color.blue)
+                )
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open Drafts")
-    }
-
-    private var titleBarButtonRow: some View {
-        HStack {
-            Spacer()
-            draftMenuButton
-                .padding(.trailing, 16)
-        }
-        .frame(height: 44)
-        .background(Color.clear)
+        .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 2)
     }
 
     private var canSendCurrentText: Bool {
