@@ -4,13 +4,11 @@ import SwiftData
 struct DraftEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     @Bindable var draft: Draft
 
-    let onBack: (Draft) -> Void
-    let onNewNote: (Draft) -> Void
+    let onOpenDraftsSheet: (Draft) -> Void
     let onSendSuccess: (Draft) -> Void
 
     @State private var draftText: String
@@ -22,72 +20,72 @@ struct DraftEditorView: View {
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
     @State private var isShowingSendConfirmation = false
+    @StateObject private var keyboard = KeyboardStateObserver()
 
     init(
         draft: Draft,
-        onBack: @escaping (Draft) -> Void = { _ in },
-        onNewNote: @escaping (Draft) -> Void = { _ in },
+        onOpenDraftsSheet: @escaping (Draft) -> Void = { _ in },
         onSendSuccess: @escaping (Draft) -> Void = { _ in }
     ) {
         self.draft = draft
-        self.onBack = onBack
-        self.onNewNote = onNewNote
+        self.onOpenDraftsSheet = onOpenDraftsSheet
         self.onSendSuccess = onSendSuccess
         _draftText = State(initialValue: draft.text)
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let error = draft.lastError, !error.isEmpty {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+        ZStack {
+            VStack(spacing: 0) {
+                if let error = draft.lastError, !error.isEmpty {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundStyle(.primary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.primary)
 
-                        Button("Retry Send") {
-                            sendDraft()
+                            Button("Retry Send") {
+                                sendDraft()
+                            }
+                            .font(.footnote.weight(.semibold))
                         }
-                        .font(.footnote.weight(.semibold))
+
+                        Spacer()
                     }
-
-                    Spacer()
+                    .padding(12)
+                    .background(Color.orange.opacity(0.12))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
                 }
-                .padding(12)
-                .background(Color.orange.opacity(0.12))
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-            }
 
-            NoteTextView(
-                text: $draftText,
-                isFocused: $isEditorFocused,
-                focusRequestID: focusRequestID,
-                tagSuggestions: tagSuggestions,
-                onTagAccepted: { tag in
-                    rememberAcceptedTag(tag)
+                NoteTextView(
+                    text: $draftText,
+                    isFocused: $isEditorFocused,
+                    focusRequestID: focusRequestID,
+                    tagSuggestions: tagSuggestions,
+                    onTagAccepted: { tag in
+                        rememberAcceptedTag(tag)
+                    }
+                )
+                .padding(.horizontal, 24)
+                .padding(.top, 0)
+                .onChange(of: draftText) { _, _ in
+                    scheduleAutosave()
+                    refreshTagSuggestions()
                 }
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .onChange(of: draftText) { _, _ in
-                scheduleAutosave()
-                refreshTagSuggestions()
             }
         }
         .opacity(isShowingSendConfirmation ? 0 : 1)
         .animation(.easeInOut(duration: 0.2), value: isShowingSendConfirmation)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
-        .safeAreaInset(edge: .bottom) {
-            if isShowingSendConfirmation {
-                confirmationControls
-            } else {
-                quickCaptureControls
-            }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            titleBarButtonRow
+        }
+        .overlay(alignment: .bottomTrailing) {
+            sendButtonOverlay
         }
         .onAppear {
             isEditorFocused = true
@@ -122,87 +120,63 @@ struct DraftEditorView: View {
         }
     }
 
-    private var quickCaptureControls: some View {
-        HStack(spacing: 0) {
-            Button {
-                handleBack()
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: sideButtonWidth, height: controlHeight)
-            }
-            .foregroundStyle(controlForegroundColor)
-            .accessibilityLabel("Menu")
-
-            divider
-
-            Button {
-                sendDraft()
-            } label: {
-                if draft.sendState == .sending {
-                    ProgressView()
-                        .tint(primaryActionColor)
-                        .frame(width: middleButtonWidth, height: controlHeight)
-                } else {
-                    Image(systemName: sendIcon)
-                        .font(.system(size: 21, weight: .bold))
-                        .contentTransition(.symbolEffect(.replace))
-                        .frame(width: middleButtonWidth, height: controlHeight)
-                }
-            }
-            .foregroundStyle(canSendCurrentText ? primaryActionColor : controlForegroundColor.opacity(0.45))
-            .disabled(!canSendCurrentText)
-            .accessibilityLabel("Send")
-        }
-        .padding(6)
-        .background(
-            Capsule(style: .continuous)
-                .fill(controlFillColor)
-        )
-        .shadow(color: controlShadowColor, radius: controlShadowRadius, x: 0, y: controlShadowY)
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
-    }
-
-    private var confirmationControls: some View {
-        HStack {
-            Button {
-            } label: {
-                Image(systemName: sendIcon)
-                    .font(.system(size: 21, weight: .bold))
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: middleButtonWidth, height: controlHeight)
-            }
-            .disabled(true)
-            .foregroundStyle(primaryActionColor)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(controlFillColor)
-            )
-            .shadow(color: controlShadowColor, radius: controlShadowRadius, x: 0, y: controlShadowY)
-            .accessibilityLabel("Sent")
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(controlSeparatorColor)
-            .frame(width: 1, height: 22)
-    }
-
-    private var controlHeight: CGFloat { 40 }
-    private var sideButtonWidth: CGFloat { 72 }
-    private var middleButtonWidth: CGFloat { 188 }
-
-    private var sendIcon: String {
+    private var sendButtonContent: RoundCaptureButtonContent {
         if isShowingSendConfirmation {
-            return "checkmark.circle.fill"
+            return .symbol("checkmark")
         }
-        return "paperplane.fill"
+
+        if draft.sendState == .sending {
+            return .progress
+        }
+
+        return .symbol("paperplane.fill")
+    }
+
+    private var sendAccessibilityLabel: String {
+        if isShowingSendConfirmation {
+            return "Sent"
+        }
+        if draft.sendState == .sending {
+            return "Sending"
+        }
+        return "Send"
+    }
+
+    private var sendButtonOverlay: some View {
+        Group {
+            RoundCaptureButton(
+                content: sendButtonContent,
+                isEnabled: canSendCurrentText,
+                action: sendDraft,
+                accessibilityLabel: sendAccessibilityLabel
+            )
+            .padding(.trailing, 20)
+            .padding(.bottom, keyboard.isVisible ? 8 : 12)
+        }
+        .animation(.easeInOut(duration: 0.20), value: keyboard.isVisible)
+        .animation(.easeInOut(duration: 0.20), value: isShowingSendConfirmation)
+    }
+
+    private var draftMenuButton: some View {
+        Button(action: handleOpenDraftsSheet) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color(uiColor: .label))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Drafts")
+    }
+
+    private var titleBarButtonRow: some View {
+        HStack {
+            Spacer()
+            draftMenuButton
+                .padding(.trailing, 16)
+        }
+        .frame(height: 44)
+        .background(Color.clear)
     }
 
     private var canSendCurrentText: Bool {
@@ -223,46 +197,6 @@ struct DraftEditorView: View {
         }
 
         return true
-    }
-
-    private var controlFillColor: Color {
-        if colorScheme == .dark {
-            return Color.white.opacity(0.16)
-        }
-        return Color.black.opacity(0.08)
-    }
-
-    private var controlForegroundColor: Color {
-        if colorScheme == .dark {
-            return Color.white.opacity(0.92)
-        }
-        return Color.black.opacity(0.88)
-    }
-
-    private var controlShadowColor: Color {
-        if colorScheme == .dark {
-            return Color.black.opacity(0.12)
-        }
-        return Color.black.opacity(0.14)
-    }
-
-    private var controlShadowRadius: CGFloat {
-        6
-    }
-
-    private var controlShadowY: CGFloat {
-        2
-    }
-
-    private var controlSeparatorColor: Color {
-        if colorScheme == .dark {
-            return Color.white.opacity(0.12)
-        }
-        return Color.black.opacity(0.10)
-    }
-
-    private var primaryActionColor: Color {
-        .blue
     }
 
     private func scheduleAutosave() {
@@ -302,18 +236,11 @@ struct DraftEditorView: View {
         modelContext.saveOrAssert()
     }
 
-    private func handleBack() {
+    private func handleOpenDraftsSheet() {
         guard !isShowingSendConfirmation else { return }
         flushPendingAutosave()
         isEditorFocused = false
-        onBack(draft)
-    }
-
-    private func handleNewNote() {
-        guard !isShowingSendConfirmation else { return }
-        flushPendingAutosave()
-        isEditorFocused = false
-        onNewNote(draft)
+        onOpenDraftsSheet(draft)
     }
 
     private func sendDraft() {

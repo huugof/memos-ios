@@ -50,8 +50,4 @@ enum DraftStore {
         delete(draft, in: modelContext)
         return true
     }
-
-    static func filteredDrafts(_ drafts: [Draft], scope: DraftScope) -> [Draft] {
-        drafts.filter { scope.includes($0) }
-    }
 }

@@ -26,6 +26,34 @@ enum MemosError: LocalizedError {
     }
 }
 
+struct ServerMemoSummary: Identifiable, Equatable {
+    let id: String
+    let content: String
+    let updatedAt: Date?
+
+    var title: String {
+        let firstLine = content
+            .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: true)
+            .first
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        return firstLine.flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled"
+    }
+
+    var preview: String {
+        let condensed = content
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !condensed.isEmpty else { return "" }
+        return String(condensed.prefix(140))
+    }
+}
+
+struct ServerMemoPage: Equatable {
+    let memos: [ServerMemoSummary]
+    let nextPageToken: String?
+}
+
 struct MemosClient {
     var session: URLSession = .shared
 
@@ -108,6 +136,71 @@ struct MemosClient {
         }
     }
 
+    func fetchMemos(
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool,
+        pageSize: Int = 100
+    ) async throws -> [ServerMemoSummary] {
+        let page = try await fetchMemosPage(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP,
+            pageSize: pageSize,
+            pageToken: nil
+        )
+        return page.memos
+    }
+
+    func fetchMemosPage(
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool,
+        pageSize: Int = 30,
+        pageToken: String?
+    ) async throws -> ServerMemoPage {
+        let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+
+        guard var components = URLComponents(url: baseURL.appendingPathComponent("api/v1/memos"), resolvingAgainstBaseURL: false) else {
+            throw MemosError.badURL
+        }
+        var queryItems: [URLQueryItem] = [URLQueryItem(name: "pageSize", value: String(max(1, pageSize)))]
+        if let pageToken, !pageToken.isEmpty {
+            queryItems.append(URLQueryItem(name: "pageToken", value: pageToken))
+        }
+        components.queryItems = queryItems
+        guard let endpoint = components.url else {
+            throw MemosError.badURL
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MemosError.badURL
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+
+            return Self.extractMemosPage(from: data)
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
     private func validatedBaseURLAndToken(
         baseURLString: String,
         token: String,
@@ -158,6 +251,161 @@ struct MemosClient {
         collectTags(from: payload, into: &tags)
         return tags
     }
+
+    private static func extractMemosPage(from data: Data) -> ServerMemoPage {
+        guard let payload = try? JSONSerialization.jsonObject(with: data) else {
+            return ServerMemoPage(memos: [], nextPageToken: nil)
+        }
+
+        let memoObjects: [[String: Any]]
+        let nextPageToken: String?
+        if let dict = payload as? [String: Any] {
+            if let memos = dict["memos"] as? [[String: Any]] {
+                memoObjects = memos
+            } else if let memos = dict["data"] as? [[String: Any]] {
+                memoObjects = memos
+            } else {
+                memoObjects = []
+            }
+            nextPageToken = (dict["nextPageToken"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if let array = payload as? [[String: Any]] {
+            memoObjects = array
+            nextPageToken = nil
+        } else {
+            memoObjects = []
+            nextPageToken = nil
+        }
+
+        var summaries: [ServerMemoSummary] = []
+        summaries.reserveCapacity(memoObjects.count)
+
+        for (index, memo) in memoObjects.enumerated() {
+            let content = memoContent(from: memo)
+            guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            let identifier = memoIdentifier(from: memo, fallbackIndex: index)
+            let updatedAt = memoUpdatedAt(from: memo)
+            summaries.append(ServerMemoSummary(id: identifier, content: content, updatedAt: updatedAt))
+        }
+
+        let sorted = summaries.sorted { lhs, rhs in
+            switch (lhs.updatedAt, rhs.updatedAt) {
+            case let (l?, r?):
+                if l != r { return l > r }
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                break
+            }
+            return lhs.id < rhs.id
+        }
+        let token = nextPageToken.flatMap { $0.isEmpty ? nil : $0 }
+        return ServerMemoPage(memos: sorted, nextPageToken: token)
+    }
+
+    private static func memoContent(from memo: [String: Any]) -> String {
+        if let content = memo["content"] as? String {
+            return content
+        }
+        if let content = memo["memo"] as? String {
+            return content
+        }
+        return ""
+    }
+
+    private static func memoIdentifier(from memo: [String: Any], fallbackIndex: Int) -> String {
+        if let name = memo["name"] as? String, !name.isEmpty {
+            return name
+        }
+        if let uid = memo["uid"] as? String, !uid.isEmpty {
+            return uid
+        }
+        if let id = memo["id"] as? String, !id.isEmpty {
+            return id
+        }
+        if let idInt = memo["id"] as? Int {
+            return String(idInt)
+        }
+        return "memo-\(fallbackIndex)"
+    }
+
+    private static func memoUpdatedAt(from memo: [String: Any]) -> Date? {
+        let candidates: [Any?] = [
+            memo["updateTime"],
+            memo["updatedAt"],
+            memo["displayTime"],
+            memo["createTime"],
+            memo["createdAt"],
+            memo["updatedTs"],
+            memo["createdTs"]
+        ]
+
+        for value in candidates {
+            if let date = decodeDate(value) {
+                return date
+            }
+        }
+
+        return nil
+    }
+
+    private static func decodeDate(_ raw: Any?) -> Date? {
+        guard let raw else { return nil }
+
+        if let date = raw as? Date {
+            return date
+        }
+
+        if let numeric = raw as? NSNumber {
+            return decodeUnixTimestamp(numeric.doubleValue)
+        }
+
+        if let intValue = raw as? Int {
+            return decodeUnixTimestamp(Double(intValue))
+        }
+
+        if let doubleValue = raw as? Double {
+            return decodeUnixTimestamp(doubleValue)
+        }
+
+        if let stringValue = raw as? String {
+            if let iso = isoDateWithFractionalSeconds.date(from: stringValue) {
+                return iso
+            }
+            if let iso = isoDate.date(from: stringValue) {
+                return iso
+            }
+            if let numeric = Double(stringValue) {
+                return decodeUnixTimestamp(numeric)
+            }
+        }
+
+        return nil
+    }
+
+    private static func decodeUnixTimestamp(_ value: Double) -> Date? {
+        guard value.isFinite else { return nil }
+        if value > 1_000_000_000_000 {
+            return Date(timeIntervalSince1970: value / 1_000)
+        }
+        if value > 0 {
+            return Date(timeIntervalSince1970: value)
+        }
+        return nil
+    }
+
+    private static let isoDateWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let isoDate: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     private static func collectTags(from value: Any, into tags: inout Set<String>) {
         switch value {

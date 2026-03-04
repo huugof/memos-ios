@@ -13,6 +13,7 @@ enum AppSettings {
         static let lastBackgroundAt = "lastBackgroundAt"
         static let lastActiveDraftID = "lastActiveDraftID"
         static let resumeDeadlineAt = "resumeDeadlineAt"
+        static let lastRouteRaw = "lastRouteRaw"
     }
 
     private static let defaults = UserDefaults.standard
@@ -172,6 +173,17 @@ enum AppSettings {
                 defaults.set(newValue.timeIntervalSince1970, forKey: Keys.resumeDeadlineAt)
             } else {
                 defaults.removeObject(forKey: Keys.resumeDeadlineAt)
+            }
+        }
+    }
+
+    static var lastRouteRaw: String? {
+        get { defaults.string(forKey: Keys.lastRouteRaw) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: Keys.lastRouteRaw)
+            } else {
+                defaults.removeObject(forKey: Keys.lastRouteRaw)
             }
         }
     }

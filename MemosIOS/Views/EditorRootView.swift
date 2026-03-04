@@ -4,15 +4,28 @@ import SwiftData
 struct EditorRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     @State private var activeDraftID: UUID?
-    @State private var showingMenu = false
-    @State private var isResolvingRoute = true
+    @State private var isSheetPresented = false
+    @State private var sheetSurface: PanelSurface = .drafts
     @State private var didBootstrap = false
-    @State private var hasOpenedForCurrentActivation = false
-    @State private var menuWasOpenWhenBackgrounded = false
+
+    init() {
+        if let rawRoute = AppSettings.lastRouteRaw {
+            if let restoredSurface = PanelSurface(rawValue: rawRoute) {
+                _sheetSurface = State(initialValue: restoredSurface)
+                _isSheetPresented = State(initialValue: true)
+            } else {
+                // Backward compatibility for removed routes (e.g. "notes").
+                _sheetSurface = State(initialValue: .drafts)
+                _isSheetPresented = State(initialValue: true)
+            }
+        } else {
+            _sheetSurface = State(initialValue: .drafts)
+            _isSheetPresented = State(initialValue: false)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -22,52 +35,52 @@ struct EditorRootView: View {
             if let draft = activeDraft {
                 DraftEditorView(
                     draft: draft,
-                    onBack: { current in
-                        openMenu(from: current)
-                    },
-                    onNewNote: { current in
-                        createAndActivateNewDraft(from: current)
+                    onOpenDraftsSheet: { current in
+                        openDrafts(from: current)
                     },
                     onSendSuccess: { sentDraft in
                         handleSendSuccess(from: sentDraft)
                     }
                 )
                 .id(draft.id)
-                .opacity(isResolvingRoute ? 0 : 1)
-            }
-
-            if showingMenu, colorScheme == .dark {
-                Color.white.opacity(0.12)
-                    .blendMode(.screen)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
+            } else {
+                ProgressView()
+                    .onAppear {
+                        ensureEditorHasDraft()
+                    }
             }
         }
-        .compositingGroup()
-        .animation(.easeInOut(duration: 0.2), value: showingMenu)
-        .sheet(isPresented: $showingMenu, onDismiss: {
-            ensureActiveDraftAfterMenuDismiss()
-        }) {
-            DraftMenuView(
+        .sheet(isPresented: $isSheetPresented) {
+            SheetSurfaceShellView(
+                surface: $sheetSurface,
                 currentDraftID: activeDraftID,
                 onSelectDraft: { draft in
                     activate(draft)
+                    isSheetPresented = false
                 },
                 onCreateNewDraft: {
                     createAndActivateNewDraft(from: nil)
                 }
             )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onAppear {
             bootstrapIfNeeded()
         }
+        .onChange(of: isSheetPresented) { _, isPresented in
+            if !isPresented {
+                ensureEditorHasDraft()
+            }
+            persistSheetState()
+        }
+        .onChange(of: sheetSurface) { _, _ in
+            persistSheetState()
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 DraftResumeCoordinator.markAppBackgrounded()
-                menuWasOpenWhenBackgrounded = showingMenu
-                hasOpenedForCurrentActivation = false
-                isResolvingRoute = true
+                persistSheetState()
                 return
             }
 
@@ -76,24 +89,7 @@ struct EditorRootView: View {
                     bootstrapIfNeeded()
                     return
                 }
-
-                if menuWasOpenWhenBackgrounded {
-                    menuWasOpenWhenBackgrounded = false
-                    showingMenu = false
-                }
-
-                if showingMenu {
-                    hasOpenedForCurrentActivation = true
-                    isResolvingRoute = false
-                    return
-                }
-
-                if !hasOpenedForCurrentActivation {
-                    resolvePreferredDraft()
-                    hasOpenedForCurrentActivation = true
-                }
-
-                isResolvingRoute = false
+                ensureEditorHasDraft()
             }
         }
         .onChange(of: drafts.map(\.id)) { _, ids in
@@ -101,7 +97,9 @@ struct EditorRootView: View {
             guard !ids.contains(activeDraftID) else { return }
 
             self.activeDraftID = nil
-            resolvePreferredDraft()
+            if !isSheetPresented {
+                resolvePreferredDraft()
+            }
         }
     }
 
@@ -114,9 +112,8 @@ struct EditorRootView: View {
         guard !didBootstrap else { return }
         didBootstrap = true
 
-        resolvePreferredDraft()
-        hasOpenedForCurrentActivation = true
-        isResolvingRoute = false
+        persistSheetState()
+        ensureEditorHasDraft()
     }
 
     private func resolvePreferredDraft() {
@@ -129,9 +126,16 @@ struct EditorRootView: View {
         DraftResumeCoordinator.markActiveDraft(draft)
     }
 
-    private func openMenu(from draft: Draft) {
+    private func ensureEditorHasDraft() {
+        guard !isSheetPresented else { return }
+        guard activeDraft == nil else { return }
+        resolvePreferredDraft()
+    }
+
+    private func openDrafts(from draft: Draft) {
         deleteTransientBlankIfNeeded(draft)
-        showingMenu = true
+        sheetSurface = .drafts
+        isSheetPresented = true
     }
 
     private func createAndActivateNewDraft(from currentDraft: Draft?) {
@@ -141,6 +145,7 @@ struct EditorRootView: View {
 
         let draft = DraftStore.createDraft(in: modelContext)
         activate(draft)
+        isSheetPresented = false
     }
 
     private func handleSendSuccess(from draft: Draft) {
@@ -149,15 +154,10 @@ struct EditorRootView: View {
             DraftResumeCoordinator.markActiveDraft(nil)
         }
         createAndActivateNewDraft(from: nil)
-        showingMenu = false
-        isResolvingRoute = false
     }
 
-    private func ensureActiveDraftAfterMenuDismiss() {
-        if activeDraft == nil {
-            resolvePreferredDraft()
-        }
-        isResolvingRoute = false
+    private func persistSheetState() {
+        AppSettings.lastRouteRaw = isSheetPresented ? sheetSurface.rawValue : nil
     }
 
     private func deleteTransientBlankIfNeeded(_ draft: Draft) {

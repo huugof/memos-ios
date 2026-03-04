@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
+    let onBack: () -> Void
 
     @State private var endpointBaseURL = AppSettings.endpointBaseURL
     @State private var token = KeychainTokenStore.getToken()
@@ -14,85 +14,103 @@ struct SettingsView: View {
     @State private var tokenStatus = ""
     @State private var showingDeleteTokenConfirmation = false
 
+    init(onBack: @escaping () -> Void = {}) {
+        self.onBack = onBack
+    }
+
     var body: some View {
-        Form {
-            Section("Memos") {
-                TextField("https://example.com", text: $endpointBaseURL)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
-                    .onChange(of: endpointBaseURL) { _, value in
-                        AppSettings.endpointBaseURL = value
-                    }
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Text("Settings")
+                    .font(.title2.weight(.bold))
 
-                if let endpointMessage {
-                    Text(endpointMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.orange)
-                }
-            }
+                Spacer()
 
-            Section("API Token") {
-                SecureField("Token", text: $token)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
-
-                Button("Save Token") {
-                    saveToken()
-                }
-                .disabled(trimmedToken.isEmpty)
-
-                Button("Delete Token", role: .destructive) {
-                    showingDeleteTokenConfirmation = true
-                }
-
-                if !tokenStatus.isEmpty {
-                    Text(tokenStatus)
-                        .font(.footnote)
+                Button(action: onBack) {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
 
-            Section("Behavior") {
-                Picker("New Note After", selection: $newNoteDelay) {
-                    ForEach(AppSettings.NewNoteDelay.allCases) { delay in
-                        Text(delay.label).tag(delay)
+            Form {
+                Section("Memos") {
+                    TextField("https://example.com", text: $endpointBaseURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .onChange(of: endpointBaseURL) { _, value in
+                            AppSettings.endpointBaseURL = value
+                        }
+
+                    if let endpointMessage {
+                        Text(endpointMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
                     }
                 }
-                .onChange(of: newNoteDelay) { _, value in
-                    AppSettings.newNoteDelay = value
+
+                Section("API Token") {
+                    SecureField("Token", text: $token)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+
+                    Button("Save Token") {
+                        saveToken()
+                    }
+                    .disabled(trimmedToken.isEmpty)
+
+                    Button("Delete Token", role: .destructive) {
+                        showingDeleteTokenConfirmation = true
+                    }
+
+                    if !tokenStatus.isEmpty {
+                        Text(tokenStatus)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                Toggle("Allow insecure HTTP", isOn: $allowInsecureHTTP)
-                    .onChange(of: allowInsecureHTTP) { _, value in
-                        AppSettings.allowInsecureHTTP = value
+                Section("Behavior") {
+                    Picker("New Note After", selection: $newNoteDelay) {
+                        ForEach(AppSettings.NewNoteDelay.allCases) { delay in
+                            Text(delay.label).tag(delay)
+                        }
+                    }
+                    .onChange(of: newNoteDelay) { _, value in
+                        AppSettings.newNoteDelay = value
                     }
 
-                Toggle("Keep text after successful send", isOn: $keepTextAfterSend)
-                    .onChange(of: keepTextAfterSend) { _, value in
-                        AppSettings.keepTextAfterSend = value
-                    }
+                    Toggle("Allow insecure HTTP", isOn: $allowInsecureHTTP)
+                        .onChange(of: allowInsecureHTTP) { _, value in
+                            AppSettings.allowInsecureHTTP = value
+                        }
 
-                Toggle("Mark as Sent on success", isOn: $markSentOnSuccess)
-                    .onChange(of: markSentOnSuccess) { _, value in
-                        AppSettings.markSentOnSuccess = value
-                    }
+                    Toggle("Keep text after successful send", isOn: $keepTextAfterSend)
+                        .onChange(of: keepTextAfterSend) { _, value in
+                            AppSettings.keepTextAfterSend = value
+                        }
 
-                Toggle("Clear error state on edit", isOn: $clearErrorOnEdit)
-                    .onChange(of: clearErrorOnEdit) { _, value in
-                        AppSettings.clearErrorOnEdit = value
-                    }
+                    Toggle("Mark as Sent on success", isOn: $markSentOnSuccess)
+                        .onChange(of: markSentOnSuccess) { _, value in
+                            AppSettings.markSentOnSuccess = value
+                        }
+
+                    Toggle("Clear error state on edit", isOn: $clearErrorOnEdit)
+                        .onChange(of: clearErrorOnEdit) { _, value in
+                            AppSettings.clearErrorOnEdit = value
+                        }
+                }
             }
         }
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") {
-                    dismiss()
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .confirmationDialog(
             "Delete saved API token?",
             isPresented: $showingDeleteTokenConfirmation,
