@@ -11,6 +11,7 @@ struct SheetSurfaceShellView: View {
     let currentDraftID: UUID?
     let onSelectDraft: (Draft) -> Void
     let onCreateNewDraft: () -> Void
+    let onSendDraft: (Draft) -> Void
 
     var body: some View {
         surfaceContent
@@ -28,6 +29,7 @@ struct SheetSurfaceShellView: View {
                     onSelectDraft(draft)
                 },
                 onCreateNewDraft: onCreateNewDraft,
+                onSendDraft: onSendDraft,
                 onOpenSettings: {
                     surface = .settings
                 }

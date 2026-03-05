@@ -17,6 +17,8 @@ struct StatusBadgeView: View {
         switch state {
         case .idle:
             return .gray
+        case .pending:
+            return .orange
         case .sending:
             return .blue
         case .sent:

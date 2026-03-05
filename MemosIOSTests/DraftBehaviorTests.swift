@@ -86,6 +86,40 @@ final class DraftBehaviorTests: XCTestCase {
         XCTAssertTrue(preferred.isBlank)
     }
 
+    func testEnqueueMarksDraftPending() throws {
+        let draft = DraftStore.createDraft(in: modelContext, text: "Queued send")
+
+        let didQueue = DraftSendService.enqueue(draft: draft, in: modelContext)
+
+        XCTAssertTrue(didQueue)
+        XCTAssertEqual(draft.sendState, .pending)
+        XCTAssertFalse(draft.canSend)
+        XCTAssertEqual(draft.displayState, .pending)
+    }
+
+    func testEnqueueRejectsBlankDraft() throws {
+        let draft = DraftStore.createDraft(in: modelContext, text: "   \n")
+
+        let didQueue = DraftSendService.enqueue(draft: draft, in: modelContext)
+
+        XCTAssertFalse(didQueue)
+        XCTAssertEqual(draft.sendState, .failed)
+    }
+
+    func testAttemptQueuedSendFailureReturnsPendingWithError() async throws {
+        let draft = DraftStore.createDraft(in: modelContext, text: "Needs config")
+        _ = DraftSendService.enqueue(draft: draft, in: modelContext)
+
+        let outcome = await DraftSendService.attemptQueuedSend(draft: draft, in: modelContext)
+
+        if case .failure = outcome {
+            XCTAssertEqual(draft.sendState, .pending)
+            XCTAssertFalse((draft.lastError ?? "").isEmpty)
+        } else {
+            XCTFail("Expected queued send to fail without endpoint/token configuration.")
+        }
+    }
+
     private func allDrafts() throws -> [Draft] {
         try modelContext.fetch(FetchDescriptor<Draft>())
     }

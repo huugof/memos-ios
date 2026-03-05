@@ -25,14 +25,17 @@ final class Draft {
 
     enum SendState: Int, CaseIterable {
         case idle = 0
-        case sending
-        case sent
-        case failed
+        case sending = 1
+        case sent = 2
+        case failed = 3
+        case pending = 4
 
         var label: String {
             switch self {
             case .idle:
                 return "Unsent"
+            case .pending:
+                return "Pending"
             case .sending:
                 return "Sending"
             case .sent:
@@ -71,15 +74,15 @@ final class Draft {
     }
 
     var isTransientBlankUnsent: Bool {
-        isBlank && !isArchived && lastSentAt == nil && sendState != .sending
+        isBlank && !isArchived && lastSentAt == nil && sendState != .sending && sendState != .pending
     }
 
     var canSend: Bool {
-        hasStartedText && !isSentAndUnedited && sendState != .sending
+        hasStartedText && !isSentAndUnedited && sendState != .sending && sendState != .pending
     }
 
     var displayState: SendState {
-        if sendState == .sending || sendState == .failed {
+        if sendState == .sending || sendState == .failed || sendState == .pending {
             return sendState
         }
         return isSentAndUnedited ? .sent : .idle

@@ -10,6 +10,8 @@ struct EditorRootView: View {
     @State private var isSheetPresented = false
     @State private var sheetSurface: PanelSurface = .drafts
     @State private var didBootstrap = false
+    @StateObject private var sendQueue = DraftSendQueueController()
+    @StateObject private var serverMemosStore = ServerMemosStore()
 
     init() {
         if let rawRoute = AppSettings.lastRouteRaw {
@@ -38,8 +40,8 @@ struct EditorRootView: View {
                     onOpenDraftsSheet: { current in
                         openDrafts(from: current)
                     },
-                    onSendSuccess: { sentDraft in
-                        handleSendSuccess(from: sentDraft)
+                    onSendQueued: { queuedDraft in
+                        handleSendQueued(from: queuedDraft)
                     }
                 )
                 .id(draft.id)
@@ -60,13 +62,20 @@ struct EditorRootView: View {
                 },
                 onCreateNewDraft: {
                     createAndActivateNewDraft(from: nil)
+                },
+                onSendDraft: { draft in
+                    _ = queueDraftForSend(draft)
                 }
             )
+            .environmentObject(serverMemosStore)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         .onAppear {
             bootstrapIfNeeded()
+            sendQueue.startProcessing(in: modelContext)
+            sendQueue.retryNow(in: modelContext)
+            triggerServerRefreshAfterEditorAppears()
         }
         .onChange(of: isSheetPresented) { _, isPresented in
             if !isPresented {
@@ -81,15 +90,22 @@ struct EditorRootView: View {
             if newPhase == .background {
                 DraftResumeCoordinator.markAppBackgrounded()
                 persistSheetState()
+                sendQueue.stopProcessing()
                 return
             }
 
             if newPhase == .active {
                 if !didBootstrap {
                     bootstrapIfNeeded()
+                    sendQueue.startProcessing(in: modelContext)
+                    sendQueue.retryNow(in: modelContext)
+                    triggerServerRefreshAfterEditorAppears()
                     return
                 }
                 ensureEditorHasDraft()
+                sendQueue.startProcessing(in: modelContext)
+                sendQueue.retryNow(in: modelContext)
+                triggerServerRefreshAfterEditorAppears()
             }
         }
         .onChange(of: drafts.map(\.id)) { _, ids in
@@ -148,12 +164,28 @@ struct EditorRootView: View {
         isSheetPresented = false
     }
 
-    private func handleSendSuccess(from draft: Draft) {
-        if draft.isArchived, activeDraftID == draft.id {
+    private func handleSendQueued(from draft: Draft) {
+        let wasPending = draft.sendState == .pending
+        guard queueDraftForSend(draft) else { return }
+        guard !wasPending else { return }
+
+        if activeDraftID == draft.id {
             activeDraftID = nil
             DraftResumeCoordinator.markActiveDraft(nil)
         }
         createAndActivateNewDraft(from: nil)
+    }
+
+    @discardableResult
+    private func queueDraftForSend(_ draft: Draft) -> Bool {
+        return sendQueue.enqueue(draft, in: modelContext)
+    }
+
+    private func triggerServerRefreshAfterEditorAppears() {
+        Task { @MainActor in
+            await Task.yield()
+            await serverMemosStore.refreshIfStale(maxAge: 60)
+        }
     }
 
     private func persistSheetState() {

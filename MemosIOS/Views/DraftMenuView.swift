@@ -10,11 +10,13 @@ private enum DraftMenuTab: String, CaseIterable, Identifiable {
 
 struct DraftMenuView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var serverMemosStore: ServerMemosStore
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     let currentDraftID: UUID?
     let onSelectDraft: (Draft) -> Void
     let onCreateNewDraft: () -> Void
+    let onSendDraft: (Draft) -> Void
     let onOpenSettings: () -> Void
 
     @State private var tab: DraftMenuTab = .active
@@ -71,6 +73,26 @@ struct DraftMenuView: View {
                     .foregroundStyle(.primary)
 
                 Spacer()
+
+                if tab == .server {
+                    Button {
+                        Task {
+                            await serverMemosStore.refresh(force: true)
+                        }
+                    } label: {
+                        if serverMemosStore.isLoading {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Refresh Server Notes")
+                }
 
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape")
@@ -135,9 +157,7 @@ struct DraftMenuView: View {
                     }
 
                     Button {
-                        Task {
-                            _ = await DraftSendService.send(draft: draft, in: modelContext)
-                        }
+                        onSendDraft(draft)
                     } label: {
                         Label("Send", systemImage: "paperplane.fill")
                     }

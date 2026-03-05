@@ -28,8 +28,13 @@ enum MemosError: LocalizedError {
 
 struct ServerMemoSummary: Identifiable, Equatable {
     let id: String
+    let resourceName: String?
     let content: String
     let updatedAt: Date?
+
+    var isEditable: Bool {
+        resourceName != nil
+    }
 
     var title: String {
         let firstLine = content
@@ -201,6 +206,68 @@ struct MemosClient {
         }
     }
 
+    func updateMemoContent(
+        resourceName: String,
+        content: String,
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool
+    ) async throws -> ServerMemoSummary {
+        let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+
+        let normalizedResourceName = Self.normalizedResourceName(from: resourceName)
+        var endpoint = baseURL.appendingPathComponent("api/v1")
+        for segment in normalizedResourceName.split(separator: "/") {
+            endpoint.appendPathComponent(String(segment))
+        }
+
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw MemosError.badURL
+        }
+        components.queryItems = [URLQueryItem(name: "updateMask", value: "content")]
+        guard let finalURL = components.url else {
+            throw MemosError.badURL
+        }
+
+        var request = URLRequest(url: finalURL)
+        request.httpMethod = "PATCH"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["content": content], options: [])
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MemosError.badURL
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+
+            if let memo = Self.extractMemoSummary(from: data, fallbackIndex: 0) {
+                return memo
+            }
+
+            return ServerMemoSummary(
+                id: normalizedResourceName,
+                resourceName: normalizedResourceName,
+                content: content,
+                updatedAt: Date()
+            )
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
     private func validatedBaseURLAndToken(
         baseURLString: String,
         token: String,
@@ -280,11 +347,10 @@ struct MemosClient {
         summaries.reserveCapacity(memoObjects.count)
 
         for (index, memo) in memoObjects.enumerated() {
-            let content = memoContent(from: memo)
-            guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            let identifier = memoIdentifier(from: memo, fallbackIndex: index)
-            let updatedAt = memoUpdatedAt(from: memo)
-            summaries.append(ServerMemoSummary(id: identifier, content: content, updatedAt: updatedAt))
+            guard let summary = extractMemoSummary(from: memo, fallbackIndex: index) else {
+                continue
+            }
+            summaries.append(summary)
         }
 
         let sorted = summaries.sorted { lhs, rhs in
@@ -314,20 +380,84 @@ struct MemosClient {
         return ""
     }
 
-    private static func memoIdentifier(from memo: [String: Any], fallbackIndex: Int) -> String {
+    private static func extractMemoSummary(from data: Data, fallbackIndex: Int) -> ServerMemoSummary? {
+        guard let payload = try? JSONSerialization.jsonObject(with: data) else {
+            return nil
+        }
+
+        guard let memo = unwrapMemoObject(from: payload) else {
+            return nil
+        }
+
+        return extractMemoSummary(from: memo, fallbackIndex: fallbackIndex)
+    }
+
+    private static func extractMemoSummary(from memo: [String: Any], fallbackIndex: Int) -> ServerMemoSummary? {
+        let content = memoContent(from: memo)
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        let identifier = memoIdentifiers(from: memo, fallbackIndex: fallbackIndex)
+        let updatedAt = memoUpdatedAt(from: memo)
+        return ServerMemoSummary(
+            id: identifier.id,
+            resourceName: identifier.resourceName,
+            content: content,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func unwrapMemoObject(from payload: Any) -> [String: Any]? {
+        if let memo = payload as? [String: Any] {
+            if let nested = memo["memo"] as? [String: Any] {
+                return nested
+            }
+            if let nested = memo["data"] as? [String: Any] {
+                return nested
+            }
+            return memo
+        }
+        return nil
+    }
+
+    private static func memoIdentifiers(from memo: [String: Any], fallbackIndex: Int) -> (id: String, resourceName: String?) {
         if let name = memo["name"] as? String, !name.isEmpty {
-            return name
+            let resourceName = normalizedResourceName(from: name)
+            return (resourceName, resourceName)
         }
+
         if let uid = memo["uid"] as? String, !uid.isEmpty {
-            return uid
+            let resourceName = normalizedResourceName(from: uid)
+            return (resourceName, resourceName)
         }
+
         if let id = memo["id"] as? String, !id.isEmpty {
-            return id
+            let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                let resourceName = normalizedResourceName(from: trimmed)
+                return (resourceName, resourceName)
+            }
         }
+
         if let idInt = memo["id"] as? Int {
-            return String(idInt)
+            let resourceName = normalizedResourceName(from: String(idInt))
+            return (resourceName, resourceName)
         }
-        return "memo-\(fallbackIndex)"
+
+        let fallback = "memo-\(fallbackIndex)"
+        return (fallback, nil)
+    }
+
+    private static func normalizedResourceName(from raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "memos/unknown"
+        }
+        if trimmed.hasPrefix("memos/") {
+            return trimmed
+        }
+        return "memos/\(trimmed)"
     }
 
     private static func memoUpdatedAt(from memo: [String: Any]) -> Date? {

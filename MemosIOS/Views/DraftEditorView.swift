@@ -9,7 +9,7 @@ struct DraftEditorView: View {
     @Bindable var draft: Draft
 
     let onOpenDraftsSheet: (Draft) -> Void
-    let onSendSuccess: (Draft) -> Void
+    let onSendQueued: (Draft) -> Void
 
     @State private var draftText: String
     @State private var autosaveTask: Task<Void, Never>?
@@ -25,11 +25,11 @@ struct DraftEditorView: View {
     init(
         draft: Draft,
         onOpenDraftsSheet: @escaping (Draft) -> Void = { _ in },
-        onSendSuccess: @escaping (Draft) -> Void = { _ in }
+        onSendQueued: @escaping (Draft) -> Void = { _ in }
     ) {
         self.draft = draft
         self.onOpenDraftsSheet = onOpenDraftsSheet
-        self.onSendSuccess = onSendSuccess
+        self.onSendQueued = onSendQueued
         _draftText = State(initialValue: draft.text)
     }
 
@@ -47,7 +47,11 @@ struct DraftEditorView: View {
                                 .foregroundStyle(.primary)
 
                             Button("Retry Send") {
-                                sendDraft()
+                                if draft.sendState == .pending {
+                                    onSendQueued(draft)
+                                } else {
+                                    sendDraft()
+                                }
                             }
                             .font(.footnote.weight(.semibold))
                         }
@@ -143,6 +147,9 @@ struct DraftEditorView: View {
         if draft.sendState == .sending {
             return "Sending"
         }
+        if draft.sendState == .pending {
+            return "Pending"
+        }
         return "Send"
     }
 
@@ -177,9 +184,9 @@ struct DraftEditorView: View {
     private var openDraftsButton: some View {
         Button(action: handleOpenDraftsSheet) {
             Image(systemName: "line.3.horizontal")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
-                .frame(width: 28, height: 28)
+                .frame(width: 34, height: 34)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -191,7 +198,7 @@ struct DraftEditorView: View {
             return false
         }
 
-        if draft.sendState == .sending {
+        if draft.sendState == .sending || draft.sendState == .pending {
             return false
         }
 
@@ -235,6 +242,10 @@ struct DraftEditorView: View {
             draft.lastError = nil
         }
 
+        if draft.sendState == .pending || draft.sendState == .failed {
+            draft.sendState = .idle
+        }
+
         if draft.lastSentAt != nil {
             draft.sendState = .idle
             draft.isArchived = false
@@ -255,23 +266,17 @@ struct DraftEditorView: View {
 
         flushPendingAutosave()
         sendConfirmationTask?.cancel()
+        draftText = draft.text
+        isEditorFocused = false
 
-        Task { @MainActor in
-            let outcome = await DraftSendService.send(draft: draft, in: modelContext)
-            draftText = draft.text
+        withAnimation(.easeInOut(duration: 0.20)) {
+            isShowingSendConfirmation = true
+        }
 
-            if case .success = outcome {
-                isEditorFocused = false
-                withAnimation(.easeInOut(duration: 0.20)) {
-                    isShowingSendConfirmation = true
-                }
-
-                sendConfirmationTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    onSendSuccess(draft)
-                }
-            }
+        sendConfirmationTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            onSendQueued(draft)
         }
     }
 
