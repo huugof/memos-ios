@@ -9,6 +9,8 @@ final class ServerMemosStore: ObservableObject {
     @Published var errorMessage: String?
     @Published private(set) var isEditingSupported = true
     @Published private(set) var lastRefreshAt: Date?
+    @Published private(set) var openingMemoID: String?
+    @Published private(set) var openingErrorByMemoID: [String: String] = [:]
 
     private var hasLoaded = false
     private var nextPageToken: String?
@@ -125,7 +127,56 @@ final class ServerMemosStore: ObservableObject {
         }
 
         errorMessage = nil
+        openingErrorByMemoID[memo.id] = nil
         lastRefreshAt = Date()
+    }
+
+    func openingError(for memoID: String) -> String? {
+        openingErrorByMemoID[memoID]
+    }
+
+    func memoForEditing(_ memo: ServerMemoSummary) async -> ServerMemoSummary? {
+        openingErrorByMemoID[memo.id] = nil
+
+        if memo.hasFullContent {
+            return memo
+        }
+
+        guard let resourceName = memo.resourceName, !resourceName.isEmpty else {
+            openingErrorByMemoID[memo.id] = "Unable to open this note."
+            return nil
+        }
+
+        if openingMemoID == memo.id {
+            return nil
+        }
+
+        openingMemoID = memo.id
+        defer {
+            if openingMemoID == memo.id {
+                openingMemoID = nil
+            }
+        }
+
+        do {
+            let refreshed = try await MemosClient().fetchMemo(
+                resourceName: resourceName,
+                baseURLString: AppSettings.endpointBaseURL,
+                token: KeychainTokenStore.getToken(),
+                allowInsecureHTTP: AppSettings.allowInsecureHTTP
+            )
+
+            guard refreshed.hasFullContent else {
+                openingErrorByMemoID[memo.id] = "Full note content is unavailable for editing."
+                return nil
+            }
+
+            upsertMemo(refreshed)
+            return refreshed
+        } catch {
+            openingErrorByMemoID[memo.id] = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return nil
+        }
     }
 }
 
@@ -250,14 +301,27 @@ struct ServerMemosSheetView: View {
             let row = rowData(for: baseMemo)
 
             VStack(alignment: .leading, spacing: 8) {
+                if let timestamp = row.timestampText {
+                    Text(timestamp)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 Text(row.content)
                     .font(.body)
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: 8) {
-                    if let updatedAt = row.updatedAt {
-                        Text(updatedAt, style: .relative)
+                    if row.isOpening {
+                        Text("Opening")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if row.attachmentCount > 0 {
+                        Text(row.attachmentLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -270,12 +334,6 @@ struct ServerMemosSheetView: View {
 
                     if row.isSaving {
                         Text("Saving")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if row.canEdit {
-                        Text("Tap to edit")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -292,7 +350,10 @@ struct ServerMemosSheetView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 guard row.canEdit else { return }
-                onSelectMemo(baseMemo)
+                Task {
+                    guard let openMemo = await store.memoForEditing(baseMemo) else { return }
+                    onSelectMemo(openMemo)
+                }
             }
             .onAppear {
                 guard index >= store.memos.count - 5 else { return }
@@ -317,17 +378,21 @@ struct ServerMemosSheetView: View {
     private func rowData(for memo: ServerMemoSummary) -> RowData {
         guard let draft = editDraftByMemoID[memo.id] else {
             return RowData(
-                content: memo.content,
+                content: displayContent(for: memo.content, fallback: memo),
                 updatedAt: memo.updatedAt,
                 isPending: false,
                 isSaving: false,
-                errorMessage: nil,
-                canEdit: store.canEdit(memo)
+                isOpening: store.openingMemoID == memo.id,
+                attachmentCount: memo.attachmentCount,
+                errorMessage: store.openingError(for: memo.id),
+                canEdit: store.canEdit(memo) && store.openingMemoID != memo.id
             )
         }
 
         let showingLocal = draft.hasLocalChanges || draft.saveState != .idle
-        let content = showingLocal ? draft.localContent : memo.content
+        let content = showingLocal
+            ? displayContent(for: draft.localContent, fallback: memo)
+            : displayContent(for: memo.content, fallback: memo)
         let updatedAt = showingLocal ? draft.updatedAt : memo.updatedAt
 
         return RowData(
@@ -335,9 +400,29 @@ struct ServerMemosSheetView: View {
             updatedAt: updatedAt,
             isPending: draft.saveState == .pending,
             isSaving: draft.saveState == .saving,
-            errorMessage: draft.lastError,
-            canEdit: store.canEdit(memo)
+            isOpening: store.openingMemoID == memo.id,
+            attachmentCount: memo.attachmentCount,
+            errorMessage: draft.lastError ?? store.openingError(for: memo.id),
+            canEdit: store.canEdit(memo) && store.openingMemoID != memo.id
         )
+    }
+
+    private func displayContent(for content: String, fallback memo: ServerMemoSummary) -> String {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return content
+        }
+
+        let snippet = memo.snippet?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !snippet.isEmpty {
+            return memo.snippet ?? snippet
+        }
+
+        if memo.attachmentCount > 0 {
+            return "(Attachment note)"
+        }
+
+        return "(Empty note)"
     }
 
     private var editDraftByMemoID: [String: ServerMemoEditDraft] {
@@ -362,7 +447,31 @@ struct ServerMemosSheetView: View {
         let updatedAt: Date?
         let isPending: Bool
         let isSaving: Bool
+        let isOpening: Bool
+        let attachmentCount: Int
         let errorMessage: String?
         let canEdit: Bool
+
+        var attachmentLabel: String {
+            if attachmentCount == 1 {
+                return "Attachment"
+            }
+            return "Attachments \(attachmentCount)"
+        }
+
+        var timestampText: String? {
+            guard let updatedAt else { return nil }
+            let now = Date()
+            let age = now.timeIntervalSince(updatedAt)
+            if age >= 24 * 60 * 60 {
+                return updatedAt.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+            }
+
+            let fullHours = max(1, Int(age / 3600))
+            if fullHours == 1 {
+                return "1 hour ago"
+            }
+            return "\(fullHours) hours ago"
+        }
     }
 }

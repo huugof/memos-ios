@@ -9,6 +9,7 @@ struct ServerMemoEditorView: View {
     @Bindable var editDraft: ServerMemoEditDraft
 
     let saveQueue: ServerMemoSaveQueueController
+    let onCreateNewDraft: () -> Void
     let onOpenDraftsSheet: () -> Void
     let onSaveSucceeded: (ServerMemoSummary) -> Void
 
@@ -25,11 +26,13 @@ struct ServerMemoEditorView: View {
     init(
         editDraft: ServerMemoEditDraft,
         saveQueue: ServerMemoSaveQueueController,
+        onCreateNewDraft: @escaping () -> Void = {},
         onOpenDraftsSheet: @escaping () -> Void = {},
         onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in }
     ) {
         self.editDraft = editDraft
         self.saveQueue = saveQueue
+        self.onCreateNewDraft = onCreateNewDraft
         self.onOpenDraftsSheet = onOpenDraftsSheet
         self.onSaveSucceeded = onSaveSucceeded
         _draftText = State(initialValue: editDraft.localContent)
@@ -157,12 +160,27 @@ struct ServerMemoEditorView: View {
                 .foregroundStyle(.primary)
 
             Spacer(minLength: 12)
-            openDraftsButton
+            HStack(spacing: 8) {
+                newDraftButton
+                openDraftsButton
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 6)
         .padding(.bottom, 6)
         .background(.clear)
+    }
+
+    private var newDraftButton: some View {
+        Button(action: handleCreateNewDraft) {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New note")
     }
 
     private var openDraftsButton: some View {
@@ -210,6 +228,12 @@ struct ServerMemoEditorView: View {
         persistWorkingCopy()
         isEditorFocused = false
         onOpenDraftsSheet()
+    }
+
+    private func handleCreateNewDraft() {
+        persistWorkingCopy()
+        isEditorFocused = false
+        onCreateNewDraft()
     }
 
     private func saveNote() {

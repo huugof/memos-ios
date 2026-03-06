@@ -31,13 +31,38 @@ struct ServerMemoSummary: Identifiable, Equatable {
     let resourceName: String?
     let content: String
     let updatedAt: Date?
+    let snippet: String?
+    let attachmentCount: Int
+    let hasFullContent: Bool
+
+    init(
+        id: String,
+        resourceName: String?,
+        content: String,
+        updatedAt: Date?,
+        snippet: String? = nil,
+        attachmentCount: Int = 0,
+        hasFullContent: Bool? = nil
+    ) {
+        self.id = id
+        self.resourceName = resourceName
+        self.content = content
+        self.updatedAt = updatedAt
+        self.snippet = snippet
+        self.attachmentCount = max(0, attachmentCount)
+        if let hasFullContent {
+            self.hasFullContent = hasFullContent
+        } else {
+            self.hasFullContent = !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
 
     var isEditable: Bool {
         resourceName != nil
     }
 
     var title: String {
-        let firstLine = content
+        let firstLine = preferredDisplayText
             .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: true)
             .first
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -46,11 +71,23 @@ struct ServerMemoSummary: Identifiable, Equatable {
     }
 
     var preview: String {
-        let condensed = content
+        let condensed = preferredDisplayText
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !condensed.isEmpty else { return "" }
         return String(condensed.prefix(140))
+    }
+
+    var hasAttachments: Bool {
+        attachmentCount > 0
+    }
+
+    var preferredDisplayText: String {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContent.isEmpty {
+            return content
+        }
+        return snippet ?? ""
     }
 }
 
@@ -206,6 +243,57 @@ struct MemosClient {
         }
     }
 
+    func fetchMemo(
+        resourceName: String,
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool
+    ) async throws -> ServerMemoSummary {
+        let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+
+        let normalizedResourceName = Self.normalizedResourceName(from: resourceName)
+        var endpoint = baseURL.appendingPathComponent("api/v1")
+        for segment in normalizedResourceName.split(separator: "/") {
+            endpoint.appendPathComponent(String(segment))
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MemosError.badURL
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+
+            if let memo = Self.extractMemoSummary(from: data, fallbackIndex: 0, includeWhenContentMissing: true) {
+                return memo
+            }
+
+            return ServerMemoSummary(
+                id: normalizedResourceName,
+                resourceName: normalizedResourceName,
+                content: "",
+                updatedAt: Date()
+            )
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
     func updateMemoContent(
         resourceName: String,
         content: String,
@@ -251,7 +339,7 @@ struct MemosClient {
                 throw MemosError.badResponse(http.statusCode, body)
             }
 
-            if let memo = Self.extractMemoSummary(from: data, fallbackIndex: 0) {
+            if let memo = Self.extractMemoSummary(from: data, fallbackIndex: 0, includeWhenContentMissing: false) {
                 return memo
             }
 
@@ -346,8 +434,12 @@ struct MemosClient {
         var summaries: [ServerMemoSummary] = []
         summaries.reserveCapacity(memoObjects.count)
 
-        for (index, memo) in memoObjects.enumerated() {
-            guard let summary = extractMemoSummary(from: memo, fallbackIndex: index) else {
+        for (index, memoEnvelope) in memoObjects.enumerated() {
+            guard let summary = extractMemoSummary(
+                from: memoEnvelope,
+                fallbackIndex: index,
+                includeWhenContentMissing: true
+            ) else {
                 continue
             }
             summaries.append(summary)
@@ -370,58 +462,153 @@ struct MemosClient {
         return ServerMemoPage(memos: sorted, nextPageToken: token)
     }
 
-    private static func memoContent(from memo: [String: Any]) -> String {
-        if let content = memo["content"] as? String {
-            return content
-        }
-        if let content = memo["memo"] as? String {
-            return content
-        }
-        return ""
+    private static func memoContent(from memo: [String: Any], fallback: [String: Any]) -> String {
+        firstNonEmptyString(keys: ["content", "memo"], in: memo)
+            ?? firstNonEmptyString(keys: ["content", "memo"], in: fallback)
+            ?? ""
     }
 
-    private static func extractMemoSummary(from data: Data, fallbackIndex: Int) -> ServerMemoSummary? {
+    private static func extractMemoSummary(
+        from data: Data,
+        fallbackIndex: Int,
+        includeWhenContentMissing: Bool = false
+    ) -> ServerMemoSummary? {
         guard let payload = try? JSONSerialization.jsonObject(with: data) else {
             return nil
         }
 
-        guard let memo = unwrapMemoObject(from: payload) else {
+        guard let memoEnvelope = payload as? [String: Any] else {
             return nil
         }
 
-        return extractMemoSummary(from: memo, fallbackIndex: fallbackIndex)
+        return extractMemoSummary(
+            from: memoEnvelope,
+            fallbackIndex: fallbackIndex,
+            includeWhenContentMissing: includeWhenContentMissing
+        )
     }
 
-    private static func extractMemoSummary(from memo: [String: Any], fallbackIndex: Int) -> ServerMemoSummary? {
-        let content = memoContent(from: memo)
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
+    private static func extractMemoSummary(
+        from memoEnvelope: [String: Any],
+        fallbackIndex: Int,
+        includeWhenContentMissing: Bool
+    ) -> ServerMemoSummary? {
+        let memo = unwrappedMemoObject(from: memoEnvelope)
+        let content = memoContent(from: memo, fallback: memoEnvelope)
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snippet = memoSnippet(from: memo, fallback: memoEnvelope)
+        let trimmedSnippet = snippet?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let attachmentCount = memoAttachmentCount(from: memo, fallback: memoEnvelope)
+        let hasFullContent = !trimmedContent.isEmpty
+        if !hasFullContent {
+            let hasDisplayFallback = !trimmedSnippet.isEmpty || attachmentCount > 0
+            guard includeWhenContentMissing, hasDisplayFallback else {
+                return nil
+            }
         }
 
-        let identifier = memoIdentifiers(from: memo, fallbackIndex: fallbackIndex)
-        let updatedAt = memoUpdatedAt(from: memo)
+        let identifier = memoIdentifiers(from: memo, fallback: memoEnvelope, fallbackIndex: fallbackIndex)
+        let updatedAt = memoUpdatedAt(from: memo) ?? memoUpdatedAt(from: memoEnvelope)
         return ServerMemoSummary(
             id: identifier.id,
             resourceName: identifier.resourceName,
             content: content,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            snippet: snippet,
+            attachmentCount: attachmentCount,
+            hasFullContent: hasFullContent
         )
     }
 
-    private static func unwrapMemoObject(from payload: Any) -> [String: Any]? {
-        if let memo = payload as? [String: Any] {
-            if let nested = memo["memo"] as? [String: Any] {
-                return nested
+    private static func unwrappedMemoObject(from payload: [String: Any]) -> [String: Any] {
+        if let nested = payload["memo"] as? [String: Any] {
+            return nested
+        }
+        if let nested = payload["data"] as? [String: Any] {
+            return nested
+        }
+        return payload
+    }
+
+    private static func memoSnippet(from memo: [String: Any], fallback: [String: Any]) -> String? {
+        firstNonEmptyString(keys: ["snippet", "excerpt"], in: memo)
+            ?? firstNonEmptyString(keys: ["snippet", "excerpt"], in: fallback)
+    }
+
+    private static func firstNonEmptyString(keys: [String], in dictionary: [String: Any]) -> String? {
+        for key in keys {
+            guard let value = dictionary[key] as? String else { continue }
+            if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return value
             }
-            if let nested = memo["data"] as? [String: Any] {
-                return nested
-            }
-            return memo
         }
         return nil
     }
 
-    private static func memoIdentifiers(from memo: [String: Any], fallbackIndex: Int) -> (id: String, resourceName: String?) {
+    private static func memoAttachmentCount(from memo: [String: Any], fallback: [String: Any]) -> Int {
+        let payload = memo["payload"] as? [String: Any]
+        let fallbackPayload = fallback["payload"] as? [String: Any]
+        let candidates: [Any?] = [
+            memo["resources"],
+            memo["resourceList"],
+            memo["attachments"],
+            payload?["resources"],
+            payload?["resourceList"],
+            payload?["attachments"],
+            fallback["resources"],
+            fallback["resourceList"],
+            fallback["attachments"],
+            fallbackPayload?["resources"],
+            fallbackPayload?["resourceList"],
+            fallbackPayload?["attachments"]
+        ]
+
+        var maxCount = 0
+        for candidate in candidates {
+            maxCount = max(maxCount, attachmentCount(from: candidate))
+        }
+        return maxCount
+    }
+
+    private static func attachmentCount(from raw: Any?) -> Int {
+        guard let raw else { return 0 }
+        if let array = raw as? [Any] {
+            return array.count
+        }
+        if let number = raw as? NSNumber {
+            return max(0, number.intValue)
+        }
+        if let dict = raw as? [String: Any] {
+            let nestedKeys = ["resources", "resourceList", "attachments", "items"]
+            for key in nestedKeys {
+                if let array = dict[key] as? [Any] {
+                    return array.count
+                }
+                if let number = dict[key] as? NSNumber {
+                    return max(0, number.intValue)
+                }
+            }
+        }
+        return 0
+    }
+
+    private static func memoIdentifiers(
+        from memo: [String: Any],
+        fallback: [String: Any],
+        fallbackIndex: Int
+    ) -> (id: String, resourceName: String?) {
+        if let identifier = memoIdentifier(from: memo) {
+            return identifier
+        }
+        if let identifier = memoIdentifier(from: fallback) {
+            return identifier
+        }
+
+        let fallback = "memo-\(fallbackIndex)"
+        return (fallback, nil)
+    }
+
+    private static func memoIdentifier(from memo: [String: Any]) -> (id: String, resourceName: String?)? {
         if let name = memo["name"] as? String, !name.isEmpty {
             let resourceName = normalizedResourceName(from: name)
             return (resourceName, resourceName)
@@ -445,8 +632,7 @@ struct MemosClient {
             return (resourceName, resourceName)
         }
 
-        let fallback = "memo-\(fallbackIndex)"
-        return (fallback, nil)
+        return nil
     }
 
     private static func normalizedResourceName(from raw: String) -> String {

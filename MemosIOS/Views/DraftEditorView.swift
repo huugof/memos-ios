@@ -9,6 +9,7 @@ struct DraftEditorView: View {
     @Bindable var draft: Draft
 
     let onOpenDraftsSheet: (Draft) -> Void
+    let onCreateNewDraft: (Draft) -> Void
     let onSendQueued: (Draft) -> Void
 
     @State private var draftText: String
@@ -26,10 +27,12 @@ struct DraftEditorView: View {
     init(
         draft: Draft,
         onOpenDraftsSheet: @escaping (Draft) -> Void = { _ in },
+        onCreateNewDraft: @escaping (Draft) -> Void = { _ in },
         onSendQueued: @escaping (Draft) -> Void = { _ in }
     ) {
         self.draft = draft
         self.onOpenDraftsSheet = onOpenDraftsSheet
+        self.onCreateNewDraft = onCreateNewDraft
         self.onSendQueued = onSendQueued
         _draftText = State(initialValue: draft.text)
     }
@@ -182,12 +185,27 @@ struct DraftEditorView: View {
                 .foregroundStyle(.primary)
 
             Spacer(minLength: 12)
-            openDraftsButton
+            HStack(spacing: 8) {
+                newDraftButton
+                openDraftsButton
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 6)
         .padding(.bottom, 6)
         .background(.clear)
+    }
+
+    private var newDraftButton: some View {
+        Button(action: handleCreateNewDraft) {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New note")
     }
 
     private var openDraftsButton: some View {
@@ -274,6 +292,13 @@ struct DraftEditorView: View {
         flushPendingAutosave()
         isEditorFocused = false
         onOpenDraftsSheet(draft)
+    }
+
+    private func handleCreateNewDraft() {
+        guard !isShowingSendConfirmation else { return }
+        flushPendingAutosave()
+        isEditorFocused = false
+        onCreateNewDraft(draft)
     }
 
     private func sendDraft() {

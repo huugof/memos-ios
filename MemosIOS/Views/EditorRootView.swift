@@ -146,6 +146,9 @@ struct EditorRootView: View {
                         onOpenDraftsSheet: { current in
                             openDrafts(from: current)
                         },
+                        onCreateNewDraft: { current in
+                            createAndActivateNewDraft(from: current)
+                        },
                         onSendQueued: { queuedDraft in
                             handleSendQueued(from: queuedDraft)
                         }
@@ -162,6 +165,9 @@ struct EditorRootView: View {
                     ServerMemoEditorView(
                         editDraft: editDraft,
                         saveQueue: serverSaveQueue,
+                        onCreateNewDraft: {
+                            createAndActivateNewDraft(from: nil)
+                        },
                         onOpenDraftsSheet: {
                             openDraftsFromServerEditor()
                         },

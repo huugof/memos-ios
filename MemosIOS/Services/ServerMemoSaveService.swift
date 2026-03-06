@@ -12,7 +12,7 @@ enum ServerMemoSaveService {
     static func upsertEditDraft(for memo: ServerMemoSummary, in modelContext: ModelContext) -> ServerMemoEditDraft {
         if let existing = draft(memoID: memo.id, in: modelContext) {
             existing.resourceName = memo.resourceName ?? existing.resourceName
-            if existing.saveState == .idle && !existing.hasLocalChanges {
+            if memo.hasFullContent && existing.saveState == .idle && !existing.hasLocalChanges {
                 existing.serverContent = memo.content
                 existing.localContent = memo.content
                 existing.updatedAt = Date()
@@ -25,11 +25,12 @@ enum ServerMemoSaveService {
         }
 
         let resourceName = memo.resourceName ?? memo.id
+        let initialContent = memo.hasFullContent ? memo.content : ""
         let created = ServerMemoEditDraft(
             memoID: memo.id,
             resourceName: resourceName,
-            serverContent: memo.content,
-            localContent: memo.content
+            serverContent: initialContent,
+            localContent: initialContent
         )
         modelContext.insert(created)
         modelContext.saveOrAssert()
