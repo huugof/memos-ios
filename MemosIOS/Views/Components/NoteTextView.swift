@@ -18,7 +18,7 @@ struct NoteTextView: UIViewRepresentable {
         textView.font = UIFont.preferredFont(forTextStyle: .body)
         textView.backgroundColor = .clear
         textView.alwaysBounceVertical = true
-        textView.keyboardDismissMode = .onDrag
+        textView.keyboardDismissMode = .interactive
         textView.textContainerInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         textView.textContainer.lineFragmentPadding = 0
         textView.isSelectable = true

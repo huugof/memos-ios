@@ -100,7 +100,9 @@ struct ServerMemoEditorView: View {
         }
         .onChange(of: keyboard.isVisible) { _, isVisible in
             var transaction = Transaction()
-            transaction.animation = .easeInOut(duration: 0.24)
+            transaction.animation = isVisible
+                ? .easeInOut(duration: 0.24)
+                : .easeInOut(duration: 0.34)
             withTransaction(transaction) {
                 isTopBarHidden = isVisible
             }
