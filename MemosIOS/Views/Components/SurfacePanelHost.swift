@@ -7,11 +7,13 @@ enum PanelSurface: String {
 
 struct SheetSurfaceShellView: View {
     @Binding var surface: PanelSurface
+    @Binding var selectedDraftMenuTab: DraftMenuTab
 
     let currentDraftID: UUID?
     let onSelectDraft: (Draft) -> Void
     let onCreateNewDraft: () -> Void
     let onSendDraft: (Draft) -> Void
+    let onSelectServerMemo: (ServerMemoSummary) -> Void
 
     var body: some View {
         surfaceContent
@@ -24,12 +26,14 @@ struct SheetSurfaceShellView: View {
         switch surface {
         case .drafts:
             DraftMenuView(
+                tab: $selectedDraftMenuTab,
                 currentDraftID: currentDraftID,
                 onSelectDraft: { draft in
                     onSelectDraft(draft)
                 },
                 onCreateNewDraft: onCreateNewDraft,
                 onSendDraft: onSendDraft,
+                onSelectServerMemo: onSelectServerMemo,
                 onOpenSettings: {
                     surface = .settings
                 }

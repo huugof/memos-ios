@@ -9,12 +9,15 @@
 /* Begin PBXBuildFile section */
 		252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795498BBE4F9490E869AF36A /* DraftEditorView.swift */; };
 		36629055536B015DB077F63D /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */; };
+		3909908E13390CB272845F49 /* ServerMemoSaveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */; };
 		40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C74472076055012EE6D937 /* ModelContext+Persist.swift */; };
+		54990FB1A1717C9A8D392155 /* MarkdownLiteFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */; };
 		5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */; };
 		5C3475A24B6C88DD24557384 /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
 		5D158C156E2A0A3E96FF6AD3 /* DraftMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462609D7254A1C734443FA1E /* DraftMenuView.swift */; };
 		67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1892E90367D19C014B5DB91C /* MemosApp.swift */; };
 		6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D30B906F7228E420B8DC94 /* MemosClient.swift */; };
+		72F978A40DE08141F7E1743D /* ServerMemoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */; };
 		767F98B8A19FE571D96CF82B /* NoteTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */; };
 		792A65BCCA8A44D95564C267 /* Draft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5F5A046FC50AFCF6336577 /* Draft.swift */; };
 		874614767398617B21C82CBF /* ServerMemosSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442F422A0920215ABAB5393A /* ServerMemosSheetView.swift */; };
@@ -26,10 +29,13 @@
 		B5C13EE23598EA086DF608D8 /* StatusBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */; };
 		B94D8E40304985063B0C7255 /* KeyboardStateObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD497BA035F4A820707BEB8 /* KeyboardStateObserver.swift */; };
 		BAA78C6C78D1DD94429EEFE3 /* BottomCaptureNavBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB493967A621D8386947642 /* BottomCaptureNavBar.swift */; };
+		BB95A94621252B88E3F65F5D /* MarkdownLiteFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50EB456021D8FCFDCBA2AC4 /* MarkdownLiteFormatter.swift */; };
 		C7CCC03C5F545463665CEFBC /* SurfacePanelHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDBB605D40EF5E44DC19029 /* SurfacePanelHost.swift */; };
 		CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
 		D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */; };
+		D4B5E64BA90AAE346A06B8A2 /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */; };
 		D53F700E978952815B588F23 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9B819270F50541F328E16E01 /* Assets.xcassets */; };
+		EBE2D06DA7ED48916DA3B4BD /* ServerMemoSaveQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */; };
 		F670D6E9CAD40BCDE1ED95A4 /* FloatingSendPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2ECCCD3EA075B1CE23F87C7 /* FloatingSendPill.swift */; };
 /* End PBXBuildFile section */
 
@@ -44,25 +50,31 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditorView.swift; sourceTree = "<group>"; };
 		0CD497BA035F4A820707BEB8 /* KeyboardStateObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardStateObserver.swift; sourceTree = "<group>"; };
 		0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1892E90367D19C014B5DB91C /* MemosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosApp.swift; sourceTree = "<group>"; };
 		1FDBB605D40EF5E44DC19029 /* SurfacePanelHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePanelHost.swift; sourceTree = "<group>"; };
+		2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
 		408248FB2E3B112C1F77B118 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		442F422A0920215ABAB5393A /* ServerMemosSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemosSheetView.swift; sourceTree = "<group>"; };
 		462609D7254A1C734443FA1E /* DraftMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftMenuView.swift; sourceTree = "<group>"; };
+		53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatterTests.swift; sourceTree = "<group>"; };
 		5C5F5A046FC50AFCF6336577 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
 		65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
 		6CC9CDDFC830112053304B30 /* DraftSendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftSendService.swift; sourceTree = "<group>"; };
 		795498BBE4F9490E869AF36A /* DraftEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftEditorView.swift; sourceTree = "<group>"; };
+		7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
 		8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeView.swift; sourceTree = "<group>"; };
 		84D0FBD92F134FFBE4CAD41C /* Memos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Memos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		9B819270F50541F328E16E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1ECB4F2EAD8776C91E4DD58 /* DraftRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftRowView.swift; sourceTree = "<group>"; };
 		A2ECCCD3EA075B1CE23F87C7 /* FloatingSendPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingSendPill.swift; sourceTree = "<group>"; };
+		C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveService.swift; sourceTree = "<group>"; };
 		C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftResumeCoordinator.swift; sourceTree = "<group>"; };
 		C3D30B906F7228E420B8DC94 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
+		C50EB456021D8FCFDCBA2AC4 /* MarkdownLiteFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatter.swift; sourceTree = "<group>"; };
 		CEF288C63232381A9D25194B /* MemosIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MemosIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextView.swift; sourceTree = "<group>"; };
 		DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftBehaviorTests.swift; sourceTree = "<group>"; };
@@ -87,6 +99,8 @@
 			isa = PBXGroup;
 			children = (
 				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
+				53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */,
+				7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */,
 			);
 			path = MemosIOSTests;
 			sourceTree = "<group>";
@@ -103,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				5C5F5A046FC50AFCF6336577 /* Draft.swift */,
+				2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -131,6 +146,7 @@
 				795498BBE4F9490E869AF36A /* DraftEditorView.swift */,
 				462609D7254A1C734443FA1E /* DraftMenuView.swift */,
 				E6895619A12B12EA5CC18252 /* EditorRootView.swift */,
+				07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */,
 				442F422A0920215ABAB5393A /* ServerMemosSheetView.swift */,
 				0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */,
 				E5B3C330936DA697AB739B31 /* Components */,
@@ -167,6 +183,7 @@
 				6CC9CDDFC830112053304B30 /* DraftSendService.swift */,
 				65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */,
 				C3D30B906F7228E420B8DC94 /* MemosClient.swift */,
+				C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -178,6 +195,7 @@
 				A1ECB4F2EAD8776C91E4DD58 /* DraftRowView.swift */,
 				A2ECCCD3EA075B1CE23F87C7 /* FloatingSendPill.swift */,
 				0CD497BA035F4A820707BEB8 /* KeyboardStateObserver.swift */,
+				C50EB456021D8FCFDCBA2AC4 /* MarkdownLiteFormatter.swift */,
 				D140EA9E893E1E3C08EFB7A5 /* NoteTextView.swift */,
 				8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */,
 				1FDBB605D40EF5E44DC19029 /* SurfacePanelHost.swift */,
@@ -287,10 +305,14 @@
 				F670D6E9CAD40BCDE1ED95A4 /* FloatingSendPill.swift in Sources */,
 				B94D8E40304985063B0C7255 /* KeyboardStateObserver.swift in Sources */,
 				5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */,
+				BB95A94621252B88E3F65F5D /* MarkdownLiteFormatter.swift in Sources */,
 				67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */,
 				6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */,
 				40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */,
 				767F98B8A19FE571D96CF82B /* NoteTextView.swift in Sources */,
+				D4B5E64BA90AAE346A06B8A2 /* ServerMemoEditDraft.swift in Sources */,
+				72F978A40DE08141F7E1743D /* ServerMemoEditorView.swift in Sources */,
+				3909908E13390CB272845F49 /* ServerMemoSaveService.swift in Sources */,
 				874614767398617B21C82CBF /* ServerMemosSheetView.swift in Sources */,
 				D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */,
 				B5C13EE23598EA086DF608D8 /* StatusBadgeView.swift in Sources */,
@@ -303,6 +325,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
+				54990FB1A1717C9A8D392155 /* MarkdownLiteFormatterTests.swift in Sources */,
+				EBE2D06DA7ED48916DA3B4BD /* ServerMemoSaveQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

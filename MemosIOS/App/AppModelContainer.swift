@@ -2,7 +2,7 @@ import SwiftData
 
 enum AppModelContainer {
     static func make() -> ModelContainer {
-        let schema = Schema([Draft.self])
+        let schema = Schema([Draft.self, ServerMemoEditDraft.self])
         let configuration = ModelConfiguration()
 
         do {

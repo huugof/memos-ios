@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @MainActor
 final class ServerMemosStore: ObservableObject {
@@ -7,11 +8,11 @@ final class ServerMemosStore: ObservableObject {
     @Published private(set) var isLoadingNextPage = false
     @Published var errorMessage: String?
     @Published private(set) var isEditingSupported = true
+    @Published private(set) var lastRefreshAt: Date?
 
     private var hasLoaded = false
     private var nextPageToken: String?
     private var reachedEnd = false
-    private var lastRefreshAt: Date?
 
     func ensureInitialLoad() async {
         guard !hasLoaded else { return }
@@ -98,46 +99,52 @@ final class ServerMemosStore: ObservableObject {
         isEditingSupported && memo.isEditable
     }
 
-    func updateMemoContent(memoID: String, newContent: String) async throws {
-        guard let index = memos.firstIndex(where: { $0.id == memoID }) else { return }
-        let memo = memos[index]
-        guard let resourceName = memo.resourceName else {
-            throw MemosError.badResponse(400, "This note cannot be edited on this server.")
+    func memo(memoID: String) -> ServerMemoSummary? {
+        memos.first(where: { $0.id == memoID })
+    }
+
+    func upsertMemo(_ memo: ServerMemoSummary) {
+        if let index = memos.firstIndex(where: { $0.id == memo.id }) {
+            memos[index] = memo
+        } else {
+            memos.insert(memo, at: 0)
         }
 
-        do {
-            let updated = try await MemosClient().updateMemoContent(
-                resourceName: resourceName,
-                content: newContent,
-                baseURLString: AppSettings.endpointBaseURL,
-                token: KeychainTokenStore.getToken(),
-                allowInsecureHTTP: AppSettings.allowInsecureHTTP
-            )
-            memos[index] = updated
-            errorMessage = nil
-            lastRefreshAt = Date()
-        } catch let MemosError.badResponse(status, _) where status == 404 || status == 405 {
-            isEditingSupported = false
-            throw MemosError.badResponse(status, "This server does not support note editing.")
-        } catch {
-            throw error
+        memos.sort { lhs, rhs in
+            switch (lhs.updatedAt, rhs.updatedAt) {
+            case let (l?, r?):
+                if l != r { return l > r }
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                break
+            }
+            return lhs.id < rhs.id
         }
+
+        errorMessage = nil
+        lastRefreshAt = Date()
     }
 }
 
 struct ServerMemosSheetView: View {
     let showsHeader: Bool
     let topContentInset: CGFloat
+    let onSelectMemo: (ServerMemoSummary) -> Void
 
     @EnvironmentObject private var store: ServerMemosStore
-    @State private var editingMemo: ServerMemoSummary?
-    @State private var editingContent = ""
-    @State private var isSavingEdit = false
-    @State private var editErrorMessage: String?
+    @Query(sort: \ServerMemoEditDraft.updatedAt, order: .reverse) private var editDrafts: [ServerMemoEditDraft]
 
-    init(showsHeader: Bool = true, topContentInset: CGFloat = 0) {
+    init(
+        showsHeader: Bool = true,
+        topContentInset: CGFloat = 0,
+        onSelectMemo: @escaping (ServerMemoSummary) -> Void = { _ in }
+    ) {
         self.showsHeader = showsHeader
         self.topContentInset = topContentInset
+        self.onSelectMemo = onSelectMemo
     }
 
     var body: some View {
@@ -198,41 +205,6 @@ struct ServerMemosSheetView: View {
                 await store.ensureInitialLoad()
             }
         }
-        .sheet(item: $editingMemo) { memo in
-            NavigationStack {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextEditor(text: $editingContent)
-                        .padding(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                        .frame(maxHeight: .infinity)
-
-                    if let editErrorMessage, !editErrorMessage.isEmpty {
-                        Text(editErrorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                }
-                .padding(16)
-                .navigationTitle("Edit Note")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            dismissEditing()
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(isSavingEdit ? "Saving…" : "Save") {
-                            saveEdit(memoID: memo.id)
-                        }
-                        .disabled(!canSaveEdit(for: memo))
-                    }
-                }
-            }
-        }
     }
 
     private var loadingStateView: some View {
@@ -274,33 +246,53 @@ struct ServerMemosSheetView: View {
     @ViewBuilder
     private var memoRows: some View {
         ForEach(store.memos.indices, id: \.self) { index in
+            let baseMemo = store.memos[index]
+            let row = rowData(for: baseMemo)
+
             VStack(alignment: .leading, spacing: 8) {
-                Text(store.memos[index].content)
+                Text(row.content)
                     .font(.body)
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 6) {
-                    if let updatedAt = store.memos[index].updatedAt {
+                HStack(spacing: 8) {
+                    if let updatedAt = row.updatedAt {
                         Text(updatedAt, style: .relative)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
-                    if store.canEdit(store.memos[index]) {
+                    if row.isPending {
+                        Text("Pending")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+
+                    if row.isSaving {
+                        Text("Saving")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if row.canEdit {
                         Text("Tap to edit")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                if let error = row.errorMessage, !error.isEmpty {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
             .onTapGesture {
-                let memo = store.memos[index]
-                guard store.canEdit(memo) else { return }
-                beginEditing(memo)
+                guard row.canEdit else { return }
+                onSelectMemo(baseMemo)
             }
             .onAppear {
                 guard index >= store.memos.count - 5 else { return }
@@ -322,42 +314,40 @@ struct ServerMemosSheetView: View {
         }
     }
 
-    private func beginEditing(_ memo: ServerMemoSummary) {
-        editingMemo = memo
-        editingContent = memo.content
-        editErrorMessage = nil
+    private func rowData(for memo: ServerMemoSummary) -> RowData {
+        guard let draft = editDraftByMemoID[memo.id] else {
+            return RowData(
+                content: memo.content,
+                updatedAt: memo.updatedAt,
+                isPending: false,
+                isSaving: false,
+                errorMessage: nil,
+                canEdit: store.canEdit(memo)
+            )
+        }
+
+        let showingLocal = draft.hasLocalChanges || draft.saveState != .idle
+        let content = showingLocal ? draft.localContent : memo.content
+        let updatedAt = showingLocal ? draft.updatedAt : memo.updatedAt
+
+        return RowData(
+            content: content,
+            updatedAt: updatedAt,
+            isPending: draft.saveState == .pending,
+            isSaving: draft.saveState == .saving,
+            errorMessage: draft.lastError,
+            canEdit: store.canEdit(memo)
+        )
     }
 
-    private func dismissEditing() {
-        editingMemo = nil
-        editingContent = ""
-        editErrorMessage = nil
-        isSavingEdit = false
-    }
-
-    private func canSaveEdit(for memo: ServerMemoSummary) -> Bool {
-        guard !isSavingEdit else { return false }
-        let trimmed = editingContent.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        return trimmed != memo.content.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func saveEdit(memoID: String) {
-        let trimmed = editingContent.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        isSavingEdit = true
-        editErrorMessage = nil
-
-        Task {
-            do {
-                try await store.updateMemoContent(memoID: memoID, newContent: trimmed)
-                dismissEditing()
-            } catch {
-                isSavingEdit = false
-                editErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    private var editDraftByMemoID: [String: ServerMemoEditDraft] {
+        var map: [String: ServerMemoEditDraft] = [:]
+        for draft in editDrafts {
+            if map[draft.memoID] == nil {
+                map[draft.memoID] = draft
             }
         }
+        return map
     }
 
     private var contentTopInset: CGFloat {
@@ -365,5 +355,14 @@ struct ServerMemosSheetView: View {
             return 0
         }
         return max(0, topContentInset)
+    }
+
+    private struct RowData {
+        let content: String
+        let updatedAt: Date?
+        let isPending: Bool
+        let isSaving: Bool
+        let errorMessage: String?
+        let canEdit: Bool
     }
 }

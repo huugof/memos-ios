@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-private enum DraftMenuTab: String, CaseIterable, Identifiable {
+enum DraftMenuTab: String, CaseIterable, Identifiable {
     case active = "Local"
     case server = "Server"
 
@@ -12,14 +12,16 @@ struct DraftMenuView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var serverMemosStore: ServerMemosStore
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
+    @Query(sort: \ServerMemoEditDraft.updatedAt, order: .reverse) private var serverEditDrafts: [ServerMemoEditDraft]
+
+    @Binding var tab: DraftMenuTab
 
     let currentDraftID: UUID?
     let onSelectDraft: (Draft) -> Void
     let onCreateNewDraft: () -> Void
     let onSendDraft: (Draft) -> Void
+    let onSelectServerMemo: (ServerMemoSummary) -> Void
     let onOpenSettings: () -> Void
-
-    @State private var tab: DraftMenuTab = .active
 
     var body: some View {
         Group {
@@ -34,7 +36,10 @@ struct DraftMenuView: View {
                 ZStack(alignment: .top) {
                     ServerMemosSheetView(
                         showsHeader: false,
-                        topContentInset: serverContentTopInset
+                        topContentInset: serverContentTopInset,
+                        onSelectMemo: { memo in
+                            onSelectServerMemo(memo)
+                        }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -59,11 +64,50 @@ struct DraftMenuView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            guard tab == .server else { return }
+            Task {
+                await serverMemosStore.refreshIfStale(maxAge: 10)
+            }
+        }
+        .onChange(of: tab) { _, newTab in
+            guard newTab == .server else { return }
+            Task {
+                await serverMemosStore.refreshIfStale(maxAge: 10)
+            }
+        }
     }
 
     private var topChromeTopPadding: CGFloat { 26 }
     private var serverContentTopInset: CGFloat { 120 }
     private var serverHeaderGradientHeight: CGFloat { 170 }
+    private var hasPendingServerSyncWork: Bool {
+        serverEditDrafts.contains { $0.saveState == .pending || $0.saveState == .saving }
+    }
+    private var isServerSyncing: Bool {
+        serverMemosStore.isLoading
+            || serverMemosStore.isLoadingNextPage
+            || hasPendingServerSyncWork
+            || (serverMemosStore.lastRefreshAt == nil && serverMemosStore.errorMessage == nil)
+    }
+    private var serverSyncStatusLabel: String {
+        if isServerSyncing {
+            return "Syncing"
+        }
+        if serverMemosStore.errorMessage != nil {
+            return "Out of date"
+        }
+        return "Up to date"
+    }
+    private var serverSyncStatusColor: Color {
+        if isServerSyncing {
+            return .secondary
+        }
+        if serverMemosStore.errorMessage != nil {
+            return .orange
+        }
+        return .green
+    }
 
     private var topChrome: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -75,6 +119,13 @@ struct DraftMenuView: View {
                 Spacer()
 
                 if tab == .server {
+                    Text(serverSyncStatusLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(serverSyncStatusColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(serverSyncStatusColor.opacity(0.14), in: Capsule())
+
                     Button {
                         Task {
                             await serverMemosStore.refresh(force: true)

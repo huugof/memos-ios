@@ -42,7 +42,7 @@ enum DraftResumeCoordinator {
         AppSettings.lastActiveDraftID = draft?.id
     }
 
-    private static func shouldResumePreviousDraft(now: Date) -> Bool {
+    static func shouldResumePreviousDraft(now: Date) -> Bool {
         if AppSettings.newNoteDelay == .never {
             return true
         }

@@ -18,11 +18,18 @@ struct NoteTextView: UIViewRepresentable {
         textView.font = UIFont.preferredFont(forTextStyle: .body)
         textView.backgroundColor = .clear
         textView.alwaysBounceVertical = true
-        textView.keyboardDismissMode = .interactive
+        textView.keyboardDismissMode = .onDrag
         textView.textContainerInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         textView.textContainer.lineFragmentPadding = 0
+        textView.isSelectable = true
+        textView.isEditable = true
+        textView.allowsEditingTextAttributes = false
         textView.text = text
+
         context.coordinator.configureCompletionLabel(in: textView)
+        context.coordinator.configureMarkdownInteractions(in: textView)
+        context.coordinator.applyMarkdownStyling(in: textView, forceFullPass: true)
+
         return textView
     }
 
@@ -30,8 +37,10 @@ struct NoteTextView: UIViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.updateTagSuggestions(tagSuggestions)
 
-        if uiView.text != text {
+        let didReplaceText = uiView.text != text
+        if didReplaceText {
             uiView.text = text
+            context.coordinator.clearPendingEditContext()
         }
 
         if context.coordinator.lastFocusRequestID != focusRequestID {
@@ -48,15 +57,36 @@ struct NoteTextView: UIViewRepresentable {
             uiView.resignFirstResponder()
         }
 
+        if didReplaceText || context.coordinator.needsRestyle(for: uiView.text ?? "") {
+            context.coordinator.applyMarkdownStyling(in: uiView, forceFullPass: true)
+        }
+
         context.coordinator.refreshTagPreview(in: uiView)
     }
 
-    final class Coordinator: NSObject, UITextViewDelegate {
+    final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var parent: NoteTextView
         var lastFocusRequestID: UUID?
 
+        private enum NewlineAction {
+            case insert(String)
+            case exitList(lineRange: NSRange, replacementLine: String)
+        }
+
         private let completionLabel = UILabel()
         private var normalizedTagSuggestions: [String] = []
+
+        private var interactiveRanges: [MarkdownLiteFormatter.InteractiveRange] = []
+        private var pendingEditContext: MarkdownLiteFormatter.EditContext?
+        private(set) var lastStyledText: String = ""
+
+        private weak var markdownTextView: UITextView?
+        private lazy var markdownTapRecognizer: UITapGestureRecognizer = {
+            let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleMarkdownTap(_:)))
+            recognizer.delegate = self
+            recognizer.cancelsTouchesInView = true
+            return recognizer
+        }()
 
         init(_ parent: NoteTextView) {
             self.parent = parent
@@ -71,6 +101,14 @@ struct NoteTextView: UIViewRepresentable {
             textView.addSubview(completionLabel)
         }
 
+        func configureMarkdownInteractions(in textView: UITextView) {
+            markdownTextView = textView
+            let hasRecognizer = textView.gestureRecognizers?.contains(where: { $0 === markdownTapRecognizer }) ?? false
+            if !hasRecognizer {
+                textView.addGestureRecognizer(markdownTapRecognizer)
+            }
+        }
+
         func updateTagSuggestions(_ tags: [String]) {
             var seen: Set<String> = []
             normalizedTagSuggestions = tags.compactMap { sanitizeTag($0) }.filter { tag in
@@ -79,6 +117,14 @@ struct NoteTextView: UIViewRepresentable {
                 seen.insert(key)
                 return true
             }
+        }
+
+        func clearPendingEditContext() {
+            pendingEditContext = nil
+        }
+
+        func needsRestyle(for text: String) -> Bool {
+            lastStyledText != text
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -92,7 +138,9 @@ struct NoteTextView: UIViewRepresentable {
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            parent.text = textView.text ?? ""
+            let newText = textView.text ?? ""
+            parent.text = newText
+            applyMarkdownStyling(in: textView, forceFullPass: false)
             refreshTagPreview(in: textView)
         }
 
@@ -119,32 +167,34 @@ struct NoteTextView: UIViewRepresentable {
                         textView,
                         text: completedText,
                         insertionLocation: completedCaretLocation,
-                        insertion: " "
+                        insertion: " ",
+                        oldText: currentText
                     )
                     return false
                 }
 
-                let insertion = newlineInsertion(for: completedText, at: completedCaretLocation) ?? "\n"
-                applyManualInsertion(
-                    textView,
+                let action = newlineAction(for: completedText, at: completedCaretLocation) ?? .insert("\n")
+                applyNewlineAction(
+                    action,
+                    in: textView,
                     text: completedText,
-                    insertionLocation: completedCaretLocation,
-                    insertion: insertion
+                    oldText: currentText,
+                    insertionLocation: completedCaretLocation
                 )
                 return false
             }
 
             guard replacement == "\n", range.length == 0, textView.markedTextRange == nil else {
+                pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: currentText, range: range, replacement: replacement)
                 return true
             }
 
-            guard let insertion = newlineInsertion(for: currentText, at: range.location) else {
+            guard let action = newlineAction(for: currentText, at: range.location) else {
+                pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: currentText, range: range, replacement: replacement)
                 return true
             }
 
-            let newText = currentText.replacingCharacters(in: swiftRange, with: insertion)
-            let cursorOffset = range.location + (insertion as NSString).length
-            applyManualReplacement(textView, newText: newText, cursorOffset: cursorOffset)
+            applyNewlineAction(action, in: textView, text: currentText, oldText: currentText, insertionLocation: range.location)
             return false
         }
 
@@ -182,26 +232,124 @@ struct NoteTextView: UIViewRepresentable {
             completionLabel.isHidden = true
         }
 
+        func applyMarkdownStyling(in textView: UITextView, forceFullPass: Bool) {
+            guard textView.markedTextRange == nil else {
+                return
+            }
+
+            let text = textView.text ?? ""
+            let nsText = text as NSString
+            let theme = MarkdownLiteFormatter.Theme.default(for: textView)
+            let baseAttributes = MarkdownLiteFormatter.baseAttributes(theme: theme)
+            let fullRange = NSRange(location: 0, length: nsText.length)
+
+            let selectedRange = textView.selectedRange
+            let shouldUsePlainMode = MarkdownLiteFormatter.shouldUsePlainMode(for: text)
+
+            if shouldUsePlainMode {
+                textView.textStorage.beginEditing()
+                textView.textStorage.setAttributes(baseAttributes, range: fullRange)
+                textView.textStorage.endEditing()
+                textView.typingAttributes = baseAttributes
+                interactiveRanges = []
+                lastStyledText = text
+                pendingEditContext = nil
+                restoreSelection(selectedRange, in: textView)
+                return
+            }
+
+            let shouldFullPass = forceFullPass || MarkdownLiteFormatter.shouldUseFullPass(edit: pendingEditContext)
+            let targetRange = shouldFullPass
+                ? fullRange
+                : MarkdownLiteFormatter.expandedLineRange(in: nsText, around: pendingEditContext)
+
+            let renderResult = shouldFullPass
+                ? MarkdownLiteFormatter.fullRender(text: text, theme: theme)
+                : MarkdownLiteFormatter.partialRender(text: text, range: targetRange, theme: theme)
+
+            textView.textStorage.beginEditing()
+            textView.textStorage.setAttributes(baseAttributes, range: targetRange)
+            for run in renderResult.runs {
+                textView.textStorage.addAttributes(run.attributes, range: run.range)
+            }
+            textView.textStorage.endEditing()
+            textView.typingAttributes = baseAttributes
+
+            if shouldFullPass {
+                interactiveRanges = renderResult.interactiveRanges
+            } else {
+                interactiveRanges = mergeInteractiveRanges(
+                    existing: interactiveRanges,
+                    replacing: targetRange,
+                    with: renderResult.interactiveRanges
+                )
+            }
+
+            lastStyledText = text
+            pendingEditContext = nil
+            restoreSelection(selectedRange, in: textView)
+        }
+
+        private func restoreSelection(_ selection: NSRange, in textView: UITextView) {
+            let length = (textView.text as NSString?)?.length ?? 0
+            let clampedLocation = min(max(0, selection.location), length)
+            let clampedLength = min(max(0, selection.length), max(0, length - clampedLocation))
+            textView.selectedRange = NSRange(location: clampedLocation, length: clampedLength)
+        }
+
+        private func mergeInteractiveRanges(
+            existing: [MarkdownLiteFormatter.InteractiveRange],
+            replacing range: NSRange,
+            with fresh: [MarkdownLiteFormatter.InteractiveRange]
+        ) -> [MarkdownLiteFormatter.InteractiveRange] {
+            var merged = existing.filter { NSIntersectionRange($0.range, range).length == 0 }
+            merged.append(contentsOf: fresh)
+            merged.sort { lhs, rhs in
+                if lhs.range.location != rhs.range.location {
+                    return lhs.range.location < rhs.range.location
+                }
+                return lhs.range.length < rhs.range.length
+            }
+            return merged
+        }
+
         private func applyManualInsertion(
             _ textView: UITextView,
             text: String,
             insertionLocation: Int,
-            insertion: String
+            insertion: String,
+            oldText: String
         ) {
             let nsText = text as NSString
             let inserted = nsText.replacingCharacters(in: NSRange(location: insertionLocation, length: 0), with: insertion)
             let cursorOffset = insertionLocation + (insertion as NSString).length
-            applyManualReplacement(textView, newText: inserted, cursorOffset: cursorOffset)
+            applyManualReplacement(
+                textView,
+                newText: inserted,
+                cursorOffset: cursorOffset,
+                oldText: oldText,
+                changedRange: NSRange(location: insertionLocation, length: 0),
+                replacement: insertion
+            )
         }
 
-        private func applyManualReplacement(_ textView: UITextView, newText: String, cursorOffset: Int) {
+        private func applyManualReplacement(
+            _ textView: UITextView,
+            newText: String,
+            cursorOffset: Int,
+            oldText: String,
+            changedRange: NSRange,
+            replacement: String
+        ) {
             textView.text = newText
             parent.text = newText
+            pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: oldText, range: changedRange, replacement: replacement)
 
             if let cursor = textView.position(from: textView.beginningOfDocument, offset: cursorOffset) {
                 textView.selectedTextRange = textView.textRange(from: cursor, to: cursor)
             }
 
+            applyMarkdownStyling(in: textView, forceFullPass: false)
             refreshTagPreview(in: textView)
         }
 
@@ -264,7 +412,34 @@ struct NoteTextView: UIViewRepresentable {
             return nil
         }
 
-        private func newlineInsertion(for text: String, at location: Int) -> String? {
+        private func applyNewlineAction(
+            _ action: NewlineAction,
+            in textView: UITextView,
+            text: String,
+            oldText: String,
+            insertionLocation: Int
+        ) {
+            switch action {
+            case .insert(let insertion):
+                applyManualInsertion(
+                    textView,
+                    text: text,
+                    insertionLocation: insertionLocation,
+                    insertion: insertion,
+                    oldText: oldText
+                )
+            case .exitList(let lineRange, let replacementLine):
+                applyLineReplacement(
+                    textView,
+                    text: text,
+                    lineRange: lineRange,
+                    replacementLine: replacementLine,
+                    oldText: oldText
+                )
+            }
+        }
+
+        private func newlineAction(for text: String, at location: Int) -> NewlineAction? {
             let nsText = text as NSString
             let lineRange = nsText.lineRange(for: NSRange(location: location, length: 0))
 
@@ -279,11 +454,51 @@ struct NoteTextView: UIViewRepresentable {
             }
 
             let rawLine = nsText.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
+            if let replacementLine = exitListReplacement(for: rawLine) {
+                return .exitList(lineRange: lineRange, replacementLine: replacementLine)
+            }
+
             guard let continuation = continuationPrefix(for: rawLine) else {
                 return nil
             }
 
-            return "\n\(continuation)"
+            return .insert("\n\(continuation)")
+        }
+
+        private func applyLineReplacement(
+            _ textView: UITextView,
+            text: String,
+            lineRange: NSRange,
+            replacementLine: String,
+            oldText: String
+        ) {
+            let nsText = text as NSString
+            let contentRange = lineContentRange(for: lineRange, in: nsText)
+            let replaced = nsText.replacingCharacters(in: contentRange, with: replacementLine)
+            let cursorOffset = contentRange.location + (replacementLine as NSString).length
+
+            applyManualReplacement(
+                textView,
+                newText: replaced,
+                cursorOffset: cursorOffset,
+                oldText: oldText,
+                changedRange: contentRange,
+                replacement: replacementLine
+            )
+        }
+
+        private func lineContentRange(for lineRange: NSRange, in text: NSString) -> NSRange {
+            guard lineRange.length > 0 else { return lineRange }
+            let lastCharacterIndex = lineRange.location + lineRange.length - 1
+            guard lastCharacterIndex >= 0, lastCharacterIndex < text.length else {
+                return lineRange
+            }
+
+            let lastCharacter = text.substring(with: NSRange(location: lastCharacterIndex, length: 1))
+            if lastCharacter == "\n" {
+                return NSRange(location: lineRange.location, length: max(0, lineRange.length - 1))
+            }
+            return lineRange
         }
 
         private func continuationPrefix(for line: String) -> String? {
@@ -351,6 +566,22 @@ struct NoteTextView: UIViewRepresentable {
             return nil
         }
 
+        private func exitListReplacement(for line: String) -> String? {
+            if let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s+\[(?: |x|X)\]\s*$"#) {
+                return match[1]
+            }
+
+            if let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s*$"#) {
+                return match[1]
+            }
+
+            if let match = firstMatch(in: line, pattern: #"^(\s*)(\d+)([.)])\s*$"#) {
+                return match[1]
+            }
+
+            return nil
+        }
+
         private func firstMatch(in text: String, pattern: String) -> [String]? {
             guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
             let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -384,6 +615,55 @@ struct NoteTextView: UIViewRepresentable {
             CharacterSet.alphanumerics.contains(scalar)
                 || scalar.value == 95
                 || scalar.value == 45
+        }
+
+        @objc
+        private func handleMarkdownTap(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended,
+                  let textView = markdownTextView,
+                  let characterIndex = characterIndex(at: recognizer.location(in: textView), in: textView) else {
+                return
+            }
+
+            if let toggled = MarkdownLiteFormatter.toggleCheckbox(
+                in: textView.text ?? "",
+                at: characterIndex,
+                interactiveRanges: interactiveRanges
+            ) {
+                let oldText = textView.text ?? ""
+                applyManualReplacement(
+                    textView,
+                    newText: toggled,
+                    cursorOffset: min(characterIndex, (toggled as NSString).length),
+                    oldText: oldText,
+                    changedRange: NSRange(location: characterIndex, length: 0),
+                    replacement: ""
+                )
+                return
+            }
+
+            if let url = MarkdownLiteFormatter.url(at: characterIndex, interactiveRanges: interactiveRanges) {
+                UIApplication.shared.open(url)
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            guard gestureRecognizer === markdownTapRecognizer,
+                  let textView = markdownTextView,
+                  let index = characterIndex(at: touch.location(in: textView), in: textView) else {
+                return false
+            }
+
+            return interactiveRanges.contains { NSLocationInRange(index, $0.range) }
+        }
+
+        private func characterIndex(at point: CGPoint, in textView: UITextView) -> Int? {
+            guard let position = textView.closestPosition(to: point) else {
+                return nil
+            }
+
+            let beginning = textView.beginningOfDocument
+            return textView.offset(from: beginning, to: position)
         }
     }
 }

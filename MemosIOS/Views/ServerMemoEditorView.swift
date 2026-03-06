@@ -1,43 +1,44 @@
 import SwiftUI
 import SwiftData
 
-struct DraftEditorView: View {
+struct ServerMemoEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
-    @Bindable var draft: Draft
+    @Bindable var editDraft: ServerMemoEditDraft
 
-    let onOpenDraftsSheet: (Draft) -> Void
-    let onSendQueued: (Draft) -> Void
+    let saveQueue: ServerMemoSaveQueueController
+    let onOpenDraftsSheet: () -> Void
+    let onSaveSucceeded: (ServerMemoSummary) -> Void
 
     @State private var draftText: String
-    @State private var autosaveTask: Task<Void, Never>?
     @State private var remoteTagTask: Task<Void, Never>?
-    @State private var sendConfirmationTask: Task<Void, Never>?
+    @State private var saveTask: Task<Void, Never>?
     @State private var isEditorFocused = true
     @State private var focusRequestID = UUID()
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
-    @State private var isShowingSendConfirmation = false
     @State private var isTopBarHidden = false
     @StateObject private var keyboard = KeyboardStateObserver()
 
     init(
-        draft: Draft,
-        onOpenDraftsSheet: @escaping (Draft) -> Void = { _ in },
-        onSendQueued: @escaping (Draft) -> Void = { _ in }
+        editDraft: ServerMemoEditDraft,
+        saveQueue: ServerMemoSaveQueueController,
+        onOpenDraftsSheet: @escaping () -> Void = {},
+        onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in }
     ) {
-        self.draft = draft
+        self.editDraft = editDraft
+        self.saveQueue = saveQueue
         self.onOpenDraftsSheet = onOpenDraftsSheet
-        self.onSendQueued = onSendQueued
-        _draftText = State(initialValue: draft.text)
+        self.onSaveSucceeded = onSaveSucceeded
+        _draftText = State(initialValue: editDraft.localContent)
     }
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                if let error = draft.lastError, !error.isEmpty {
+                if let error = editDraft.lastError, !error.isEmpty {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
@@ -47,12 +48,8 @@ struct DraftEditorView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.primary)
 
-                            Button("Retry Send") {
-                                if draft.sendState == .pending {
-                                    onSendQueued(draft)
-                                } else {
-                                    sendDraft()
-                                }
+                            Button("Retry Save") {
+                                saveNote()
                             }
                             .font(.footnote.weight(.semibold))
                         }
@@ -77,17 +74,16 @@ struct DraftEditorView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 0)
                 .onChange(of: draftText) { _, _ in
-                    scheduleAutosave()
-                    refreshTagSuggestions()
+                    if draftText.utf16.count <= 4_000 {
+                        refreshTagSuggestions()
+                    }
                 }
             }
         }
-        .opacity(isShowingSendConfirmation ? 0 : 1)
-        .animation(.easeInOut(duration: 0.2), value: isShowingSendConfirmation)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .overlay(alignment: .bottomTrailing) {
-            sendButtonOverlay
+            saveButtonOverlay
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if !isTopBarHidden {
@@ -114,63 +110,42 @@ struct DraftEditorView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
-                flushPendingAutosave()
+                persistWorkingCopy()
             }
         }
-        .onChange(of: draft.id) { _, _ in
-            autosaveTask?.cancel()
-            sendConfirmationTask?.cancel()
-            remoteTagTask?.cancel()
-            draftText = draft.text
-            remoteTags = []
-            isShowingSendConfirmation = false
-            isEditorFocused = true
-            focusRequestID = UUID()
-            refreshTagSuggestions()
-            fetchRemoteTagsOnce()
-        }
         .onDisappear {
-            flushPendingAutosave()
+            persistWorkingCopy()
             remoteTagTask?.cancel()
-            sendConfirmationTask?.cancel()
+            saveTask?.cancel()
         }
     }
 
-    private var sendButtonContent: RoundCaptureButtonContent {
-        if isShowingSendConfirmation {
-            return .symbol("checkmark")
-        }
-
-        if draft.sendState == .sending {
+    private var saveButtonContent: RoundCaptureButtonContent {
+        if editDraft.saveState == .saving {
             return .progress
         }
-
         return .symbol("paperplane.fill")
     }
 
-    private var sendAccessibilityLabel: String {
-        if isShowingSendConfirmation {
-            return "Sent"
+    private var saveAccessibilityLabel: String {
+        if editDraft.saveState == .saving {
+            return "Saving"
         }
-        if draft.sendState == .sending {
-            return "Sending"
+        if editDraft.saveState == .pending {
+            return "Save pending"
         }
-        if draft.sendState == .pending {
-            return "Pending"
-        }
-        return "Send"
+        return "Save"
     }
 
-    private var sendButtonOverlay: some View {
+    private var saveButtonOverlay: some View {
         RoundCaptureButton(
-            content: sendButtonContent,
-            isEnabled: canSendCurrentText,
-            action: sendDraft,
-            accessibilityLabel: sendAccessibilityLabel
+            content: saveButtonContent,
+            isEnabled: canSaveCurrentText,
+            action: saveNote,
+            accessibilityLabel: saveAccessibilityLabel
         )
         .padding(.trailing, 20)
         .padding(.bottom, 12)
-        .animation(.easeInOut(duration: 0.20), value: isShowingSendConfirmation)
     }
 
     private var topBar: some View {
@@ -200,12 +175,8 @@ struct DraftEditorView: View {
         .accessibilityLabel("Drafts")
     }
 
-    private var canSendCurrentText: Bool {
-        if isShowingSendConfirmation {
-            return false
-        }
-
-        if draft.sendState == .sending || draft.sendState == .pending {
+    private var canSaveCurrentText: Bool {
+        if editDraft.saveState == .saving {
             return false
         }
 
@@ -213,83 +184,46 @@ struct DraftEditorView: View {
             return false
         }
 
-        if let lastSentAt = draft.lastSentAt, draft.updatedAt <= lastSentAt, draftText == draft.text {
-            return false
+        if hasWorkingCopyChanges {
+            return true
         }
 
-        return true
+        return editDraft.saveState == .pending
     }
 
-    private func scheduleAutosave() {
-        autosaveTask?.cancel()
-        let latestText = draftText
-
-        autosaveTask = Task {
-            do {
-                try await Task.sleep(for: .milliseconds(350))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard !Task.isCancelled else { return }
-                applyDraftChanges(newText: latestText)
-            }
-        }
+    private var hasWorkingCopyChanges: Bool {
+        draftText != editDraft.serverContent
     }
 
-    private func flushPendingAutosave() {
-        autosaveTask?.cancel()
-        applyDraftChanges(newText: draftText)
-    }
-
-    private func applyDraftChanges(newText: String) {
-        guard draft.text != newText else {
-            return
-        }
-
-        draft.text = newText
-        draft.updatedAt = Date()
-
-        if AppSettings.clearErrorOnEdit {
-            draft.lastError = nil
-        }
-
-        if draft.sendState == .pending || draft.sendState == .failed {
-            draft.sendState = .idle
-        }
-
-        if draft.lastSentAt != nil {
-            draft.sendState = .idle
-            draft.isArchived = false
-        }
-
-        modelContext.saveOrAssert()
+    private func persistWorkingCopy() {
+        _ = ServerMemoSaveService.stageLocalContent(
+            draftText,
+            for: editDraft,
+            in: modelContext,
+            persist: true
+        )
     }
 
     private func handleOpenDraftsSheet() {
-        guard !isShowingSendConfirmation else { return }
-        flushPendingAutosave()
+        persistWorkingCopy()
         isEditorFocused = false
-        onOpenDraftsSheet(draft)
+        onOpenDraftsSheet()
     }
 
-    private func sendDraft() {
-        guard canSendCurrentText else { return }
+    private func saveNote() {
+        guard canSaveCurrentText else { return }
 
-        flushPendingAutosave()
-        sendConfirmationTask?.cancel()
-        draftText = draft.text
-        isEditorFocused = false
+        persistWorkingCopy()
+        saveTask?.cancel()
 
-        withAnimation(.easeInOut(duration: 0.20)) {
-            isShowingSendConfirmation = true
-        }
-
-        sendConfirmationTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            guard !Task.isCancelled else { return }
-            onSendQueued(draft)
+        saveTask = Task { @MainActor in
+            let outcome = await saveQueue.saveNow(editDraft, in: modelContext)
+            switch outcome {
+            case .success(let memo):
+                onSaveSucceeded(memo)
+            case .failure:
+                break
+            }
         }
     }
 
@@ -312,7 +246,13 @@ struct DraftEditorView: View {
     }
 
     private func refreshTagSuggestions() {
-        let localTags = extractTags(in: drafts.map(\.text) + [draftText])
+        let currentTextForSuggestions: String
+        if draftText.utf16.count > 4_000 {
+            currentTextForSuggestions = String(draftText.prefix(2_000))
+        } else {
+            currentTextForSuggestions = draftText
+        }
+        let localTags = extractTags(in: drafts.map(\.text) + [currentTextForSuggestions])
 
         var canonicalByLowercase: [String: String] = [:]
         for tag in localTags + remoteTags {
