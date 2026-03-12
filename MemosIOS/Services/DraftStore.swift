@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 @MainActor
@@ -49,5 +50,31 @@ enum DraftStore {
         guard draft.isTransientBlankUnsent else { return false }
         delete(draft, in: modelContext)
         return true
+    }
+
+    @discardableResult
+    static func deleteInactiveTransientBlankDrafts(
+        preserving preservedDraftID: UUID?,
+        from drafts: [Draft],
+        in modelContext: ModelContext
+    ) -> [UUID] {
+        let staleDrafts = drafts.filter { draft in
+            draft.isTransientBlankUnsent && draft.id != preservedDraftID
+        }
+        guard !staleDrafts.isEmpty else { return [] }
+
+        let deletedIDs = staleDrafts.map(\.id)
+        delete(staleDrafts, in: modelContext)
+        return deletedIDs
+    }
+
+    static func visibleUnsentDrafts(from drafts: [Draft]) -> [Draft] {
+        drafts.filter { draft in
+            guard !draft.isArchived else { return false }
+            guard draft.sendState != .pending && draft.sendState != .sending else {
+                return false
+            }
+            return !draft.isTransientBlankUnsent
+        }
     }
 }

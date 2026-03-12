@@ -1,32 +1,83 @@
 import SwiftUI
 import UIKit
 
+struct EditableNoteTextView: View {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    var focusRequestID: UUID
+    var extraBottomScrollPadding: CGFloat = 120
+    var tagSuggestions: [String] = []
+    var onTagAccepted: (String) -> Void = { _ in }
+    var onTagTapped: (String) -> Void = { _ in }
+
+    var body: some View {
+        NoteTextView(
+            text: $text,
+            isFocused: $isFocused,
+            focusRequestID: focusRequestID,
+            isEditingEnabled: true,
+            allowsScrolling: true,
+            extraBottomScrollPadding: extraBottomScrollPadding,
+            tagSuggestions: tagSuggestions,
+            onTagAccepted: onTagAccepted,
+            onTagTapped: onTagTapped
+        )
+    }
+}
+
+struct RenderedNoteTextView: View {
+    @Binding var text: String
+    var allowsScrolling: Bool = false
+    var onTagTapped: (String) -> Void = { _ in }
+    var onNonInteractiveTap: (() -> Void)? = nil
+
+    var body: some View {
+        NoteTextView(
+            text: $text,
+            isFocused: .constant(false),
+            focusRequestID: UUID(),
+            isEditingEnabled: false,
+            allowsScrolling: allowsScrolling,
+            onTagTapped: onTagTapped,
+            onNonInteractiveTap: onNonInteractiveTap
+        )
+    }
+}
+
 struct NoteTextView: UIViewRepresentable {
     @Binding var text: String
     @Binding var isFocused: Bool
     var focusRequestID: UUID
+    var isEditingEnabled: Bool = true
+    var allowsScrolling: Bool = true
+    var extraBottomScrollPadding: CGFloat = 0
     var tagSuggestions: [String] = []
     var onTagAccepted: (String) -> Void = { _ in }
+    var onTagTapped: (String) -> Void = { _ in }
+    var onNonInteractiveTap: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        let textView = OverlayAwareTextView()
         textView.delegate = context.coordinator
         textView.font = UIFont.preferredFont(forTextStyle: .body)
         textView.backgroundColor = .clear
-        textView.alwaysBounceVertical = true
-        textView.keyboardDismissMode = .interactive
-        textView.textContainerInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        textView.alwaysBounceVertical = allowsScrolling
+        textView.keyboardDismissMode = isEditingEnabled ? .interactive : .none
         textView.textContainer.lineFragmentPadding = 0
-        textView.isSelectable = true
-        textView.isEditable = true
+        textView.isSelectable = isEditingEnabled
+        textView.isEditable = isEditingEnabled
+        textView.isScrollEnabled = allowsScrolling
         textView.allowsEditingTextAttributes = false
         textView.text = text
+        context.coordinator.applyTextInsets(to: textView)
 
-        context.coordinator.configureCompletionLabel(in: textView)
+        if isEditingEnabled {
+            context.coordinator.configureCompletionLabel(in: textView)
+        }
         context.coordinator.configureMarkdownInteractions(in: textView)
         context.coordinator.applyMarkdownStyling(in: textView, forceFullPass: true)
 
@@ -36,6 +87,13 @@ struct NoteTextView: UIViewRepresentable {
     func updateUIView(_ uiView: UITextView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.updateTagSuggestions(tagSuggestions)
+        context.coordinator.updateInteractionMode(isEditingEnabled: isEditingEnabled)
+        uiView.isEditable = isEditingEnabled
+        uiView.isSelectable = isEditingEnabled
+        uiView.isScrollEnabled = allowsScrolling
+        uiView.alwaysBounceVertical = allowsScrolling
+        uiView.keyboardDismissMode = isEditingEnabled ? .interactive : .none
+        context.coordinator.applyTextInsets(to: uiView)
 
         let didReplaceText = uiView.text != text
         if didReplaceText {
@@ -43,7 +101,7 @@ struct NoteTextView: UIViewRepresentable {
             context.coordinator.clearPendingEditContext()
         }
 
-        if context.coordinator.lastFocusRequestID != focusRequestID {
+        if isEditingEnabled, context.coordinator.lastFocusRequestID != focusRequestID {
             context.coordinator.lastFocusRequestID = focusRequestID
             if isFocused, !uiView.isFirstResponder {
                 DispatchQueue.main.async {
@@ -53,7 +111,7 @@ struct NoteTextView: UIViewRepresentable {
             }
         }
 
-        if !isFocused, uiView.isFirstResponder {
+        if (!isFocused || !isEditingEnabled), uiView.isFirstResponder {
             uiView.resignFirstResponder()
         }
 
@@ -61,7 +119,19 @@ struct NoteTextView: UIViewRepresentable {
             context.coordinator.applyMarkdownStyling(in: uiView, forceFullPass: true)
         }
 
-        context.coordinator.refreshTagPreview(in: uiView)
+        if isEditingEnabled {
+            context.coordinator.refreshTagPreview(in: uiView)
+        } else {
+            context.coordinator.hideTagPreview()
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard !allowsScrolling else { return nil }
+        let targetWidth = proposal.width ?? uiView.bounds.width
+        guard targetWidth > 0 else { return nil }
+        let fitting = uiView.sizeThatFits(CGSize(width: targetWidth, height: .greatestFiniteMagnitude))
+        return CGSize(width: targetWidth, height: max(22, fitting.height))
     }
 
     final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
@@ -107,6 +177,11 @@ struct NoteTextView: UIViewRepresentable {
             if !hasRecognizer {
                 textView.addGestureRecognizer(markdownTapRecognizer)
             }
+            updateInteractionMode(isEditingEnabled: parent.isEditingEnabled)
+        }
+
+        func updateInteractionMode(isEditingEnabled: Bool) {
+            markdownTapRecognizer.isEnabled = !isEditingEnabled
         }
 
         func updateTagSuggestions(_ tags: [String]) {
@@ -123,16 +198,26 @@ struct NoteTextView: UIViewRepresentable {
             pendingEditContext = nil
         }
 
+        func applyTextInsets(to textView: UITextView) {
+            let bottomInset = parent.isEditingEnabled && parent.allowsScrolling
+                ? parent.extraBottomScrollPadding
+                : 0
+            textView.textContainerInset = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+            textView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0)
+        }
+
         func needsRestyle(for text: String) -> Bool {
             lastStyledText != text
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
+            guard parent.isEditingEnabled else { return }
             parent.isFocused = true
             refreshTagPreview(in: textView)
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
+            guard parent.isEditingEnabled else { return }
             parent.isFocused = false
             hideTagPreview()
         }
@@ -149,6 +234,7 @@ struct NoteTextView: UIViewRepresentable {
         }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
+            guard parent.isEditingEnabled else { return false }
             let currentText = textView.text ?? ""
             guard let swiftRange = Range(range, in: currentText) else {
                 return true
@@ -198,7 +284,49 @@ struct NoteTextView: UIViewRepresentable {
             return false
         }
 
+        func textView(
+            _ textView: UITextView,
+            primaryActionFor textItem: UITextItem,
+            defaultAction: UIAction
+        ) -> UIAction? {
+            guard parent.isEditingEnabled else { return nil }
+
+            if textItem.value(forKey: "link") as? URL != nil {
+                return defaultAction
+            }
+
+            guard let identifier = textItem.value(forKey: "tagIdentifier") as? String,
+                  let tag = MarkdownLiteFormatter.parseTextItemTag(identifier) else {
+                return nil
+            }
+
+            switch tag {
+            case .checkbox:
+                return UIAction { [weak self, weak textView] _ in
+                    guard let self, let textView else { return }
+                    self.toggleCheckbox(in: textView, at: textItem.range.location)
+                }
+            case .tag(let value):
+                return UIAction { [weak self] _ in
+                    self?.parent.onTagTapped(value)
+                }
+            }
+        }
+
+        func textView(
+            _ textView: UITextView,
+            menuConfigurationFor textItem: UITextItem,
+            defaultMenu: UIMenu
+        ) -> UITextItem.MenuConfiguration? {
+            guard parent.isEditingEnabled else { return nil }
+            return nil
+        }
+
         func refreshTagPreview(in textView: UITextView) {
+            guard parent.isEditingEnabled else {
+                hideTagPreview()
+                return
+            }
             guard textView.selectedRange.length == 0 else {
                 hideTagPreview()
                 return
@@ -228,7 +356,7 @@ struct NoteTextView: UIViewRepresentable {
             completionLabel.isHidden = false
         }
 
-        private func hideTagPreview() {
+        func hideTagPreview() {
             completionLabel.isHidden = true
         }
 
@@ -252,6 +380,7 @@ struct NoteTextView: UIViewRepresentable {
                 textView.textStorage.endEditing()
                 textView.typingAttributes = baseAttributes
                 interactiveRanges = []
+                updateCheckboxRendering(in: textView)
                 lastStyledText = text
                 pendingEditContext = nil
                 restoreSelection(selectedRange, in: textView)
@@ -288,6 +417,12 @@ struct NoteTextView: UIViewRepresentable {
             lastStyledText = text
             pendingEditContext = nil
             restoreSelection(selectedRange, in: textView)
+            updateCheckboxRendering(in: textView)
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard let textView = scrollView as? UITextView else { return }
+            (textView as? OverlayAwareTextView)?.setNeedsDisplay()
         }
 
         private func restoreSelection(_ selection: NSRange, in textView: UITextView) {
@@ -336,21 +471,61 @@ struct NoteTextView: UIViewRepresentable {
         private func applyManualReplacement(
             _ textView: UITextView,
             newText: String,
-            cursorOffset: Int,
+            cursorOffset: Int?,
             oldText: String,
             changedRange: NSRange,
-            replacement: String
+            replacement: String,
+            preserveViewport: Bool = false
         ) {
+            let previousSelection = textView.selectedRange
+            let previousOffset = textView.contentOffset
             textView.text = newText
             parent.text = newText
             pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: oldText, range: changedRange, replacement: replacement)
 
-            if let cursor = textView.position(from: textView.beginningOfDocument, offset: cursorOffset) {
-                textView.selectedTextRange = textView.textRange(from: cursor, to: cursor)
+            if parent.isEditingEnabled {
+                if let cursorOffset,
+                   let cursor = textView.position(from: textView.beginningOfDocument, offset: cursorOffset) {
+                    textView.selectedTextRange = textView.textRange(from: cursor, to: cursor)
+                } else {
+                    restoreSelection(previousSelection, in: textView)
+                }
             }
 
             applyMarkdownStyling(in: textView, forceFullPass: false)
+            if preserveViewport, textView.isScrollEnabled {
+                textView.setContentOffset(previousOffset, animated: false)
+            }
             refreshTagPreview(in: textView)
+        }
+
+        private func toggleCheckbox(in textView: UITextView, at location: Int) {
+            guard let toggled = MarkdownLiteFormatter.toggleCheckbox(
+                in: textView.text ?? "",
+                at: location,
+                interactiveRanges: interactiveRanges
+            ) else {
+                return
+            }
+
+            let oldText = textView.text ?? ""
+            applyManualReplacement(
+                textView,
+                newText: toggled,
+                cursorOffset: nil,
+                oldText: oldText,
+                changedRange: NSRange(location: location, length: 0),
+                replacement: "",
+                preserveViewport: true
+            )
+        }
+
+        private func updateCheckboxRendering(in textView: UITextView) {
+            guard let overlayTextView = textView as? OverlayAwareTextView else { return }
+            overlayTextView.checkboxRenderRanges = interactiveRanges.compactMap { range -> OverlayAwareTextView.CheckboxRenderRange? in
+                guard case let .checkbox(isChecked) = range.kind else { return nil }
+                return OverlayAwareTextView.CheckboxRenderRange(range: range.range, isChecked: isChecked)
+            }
         }
 
         private struct TagCompletion {
@@ -620,50 +795,152 @@ struct NoteTextView: UIViewRepresentable {
         @objc
         private func handleMarkdownTap(_ recognizer: UITapGestureRecognizer) {
             guard recognizer.state == .ended,
-                  let textView = markdownTextView,
-                  let characterIndex = characterIndex(at: recognizer.location(in: textView), in: textView) else {
+                  let textView = markdownTextView else {
                 return
             }
 
-            if let toggled = MarkdownLiteFormatter.toggleCheckbox(
-                in: textView.text ?? "",
-                at: characterIndex,
-                interactiveRanges: interactiveRanges
-            ) {
-                let oldText = textView.text ?? ""
-                applyManualReplacement(
-                    textView,
-                    newText: toggled,
-                    cursorOffset: min(characterIndex, (toggled as NSString).length),
-                    oldText: oldText,
-                    changedRange: NSRange(location: characterIndex, length: 0),
-                    replacement: ""
-                )
+            let tapPoint = recognizer.location(in: textView)
+            guard let characterIndex = characterIndex(at: tapPoint, in: textView) else {
+                return
+            }
+
+            if interactiveRanges.contains(where: {
+                guard case .checkbox = $0.kind else { return false }
+                return NSLocationInRange(characterIndex, $0.range)
+            }) {
+                toggleCheckbox(in: textView, at: characterIndex)
                 return
             }
 
             if let url = MarkdownLiteFormatter.url(at: characterIndex, interactiveRanges: interactiveRanges) {
                 UIApplication.shared.open(url)
+                return
             }
+
+            if let tag = MarkdownLiteFormatter.tag(at: characterIndex, interactiveRanges: interactiveRanges) {
+                parent.onTagTapped(tag)
+                return
+            }
+
+            parent.onNonInteractiveTap?()
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard gestureRecognizer === markdownTapRecognizer,
-                  let textView = markdownTextView,
-                  let index = characterIndex(at: touch.location(in: textView), in: textView) else {
+                  let textView = markdownTextView else {
                 return false
             }
+            let point = touch.location(in: textView)
+            guard let index = characterIndex(at: point, in: textView) else { return false }
+            if interactiveRanges.contains(where: { NSLocationInRange(index, $0.range) }) {
+                return true
+            }
 
-            return interactiveRanges.contains { NSLocationInRange(index, $0.range) }
+            return parent.onNonInteractiveTap != nil
         }
 
         private func characterIndex(at point: CGPoint, in textView: UITextView) -> Int? {
-            guard let position = textView.closestPosition(to: point) else {
+            let textBounds = textView.bounds.insetBy(dx: -12, dy: -12)
+            guard textBounds.contains(point) else {
                 return nil
             }
 
-            let beginning = textView.beginningOfDocument
-            return textView.offset(from: beginning, to: position)
+            let adjustedPoint = CGPoint(
+                x: point.x - textView.textContainerInset.left,
+                y: point.y - textView.textContainerInset.top
+            )
+            let layoutManager = textView.layoutManager
+            let textContainer = textView.textContainer
+            var fraction: CGFloat = 0
+            let rawIndex = layoutManager.characterIndex(
+                for: adjustedPoint,
+                in: textContainer,
+                fractionOfDistanceBetweenInsertionPoints: &fraction
+            )
+
+            let length = (textView.text as NSString?)?.length ?? 0
+            guard length > 0 else { return nil }
+            return min(max(0, rawIndex), max(0, length - 1))
         }
+    }
+}
+
+private final class OverlayAwareTextView: UITextView {
+    struct CheckboxRenderRange: Equatable {
+        let range: NSRange
+        let isChecked: Bool
+    }
+
+    var checkboxRenderRanges: [CheckboxRenderRange] = [] {
+        didSet {
+            guard checkboxRenderRanges != oldValue else { return }
+            setNeedsDisplay()
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        setNeedsDisplay()
+    }
+
+    override func draw(_ rect: CGRect) {
+        super.draw(rect)
+        drawCheckboxes(in: rect)
+    }
+
+    private func drawCheckboxes(in rect: CGRect) {
+        guard !checkboxRenderRanges.isEmpty else { return }
+
+        for checkbox in checkboxRenderRanges {
+            guard let checkboxRect = checkboxRect(for: checkbox.range), checkboxRect.intersects(rect) else {
+                continue
+            }
+
+            let basePointSize = (font ?? UIFont.preferredFont(forTextStyle: .body)).pointSize
+            let visualSize = max(basePointSize + 7, 24)
+            let imageName = checkbox.isChecked ? "checkmark.square" : "square"
+            let symbolConfig = UIImage.SymbolConfiguration(pointSize: visualSize, weight: .regular)
+            guard let image = UIImage(systemName: imageName, withConfiguration: symbolConfig) else {
+                continue
+            }
+            let tintedImage = image.withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal)
+
+            let imageRect = CGRect(
+                x: checkboxRect.minX,
+                y: checkboxRect.midY - (visualSize / 2),
+                width: visualSize,
+                height: visualSize
+            ).integral
+
+            tintedImage.draw(in: imageRect)
+        }
+    }
+
+    private func checkboxRect(for range: NSRange) -> CGRect? {
+        let textLength = (text as NSString).length
+        guard textLength > 0 else { return nil }
+        let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: textLength))
+        guard safeRange.length > 0 else { return nil }
+
+        let layoutManager = self.layoutManager
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: safeRange, actualCharacterRange: nil)
+        var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        rect.origin.x += textContainerInset.left - contentOffset.x
+        rect.origin.y += textContainerInset.top - contentOffset.y
+
+        if rect.height < 1 {
+            rect.size.height = font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
+        }
+
+        if rect.width < 1 {
+            rect.size.width = rect.height
+        }
+
+        guard rect.isNull == false, rect.isInfinite == false, rect.width > 0, rect.height > 0 else {
+            return nil
+        }
+
+        return rect
     }
 }

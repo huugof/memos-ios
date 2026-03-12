@@ -53,6 +53,35 @@ final class DraftBehaviorTests: XCTestCase {
         XCTAssertTrue(remainingIDs.contains(started.id))
     }
 
+    func testDeleteInactiveTransientBlankDraftsPreservesSpecifiedDraft() throws {
+        let preservedBlank = DraftStore.createDraft(in: modelContext)
+        let staleBlank = DraftStore.createDraft(in: modelContext)
+        let started = DraftStore.createDraft(in: modelContext, text: "Keep me")
+
+        let deletedIDs = DraftStore.deleteInactiveTransientBlankDrafts(
+            preserving: preservedBlank.id,
+            from: try allDrafts(),
+            in: modelContext
+        )
+
+        let remainingIDs = try Set(allDrafts().map(\.id))
+        XCTAssertEqual(Set(deletedIDs), [staleBlank.id])
+        XCTAssertTrue(remainingIDs.contains(preservedBlank.id))
+        XCTAssertFalse(remainingIDs.contains(staleBlank.id))
+        XCTAssertTrue(remainingIDs.contains(started.id))
+    }
+
+    func testVisibleUnsentDraftsExcludesTransientBlankAndPendingDrafts() {
+        let blank = DraftStore.createDraft(in: modelContext)
+        let visible = DraftStore.createDraft(in: modelContext, text: "Visible draft")
+        let pending = DraftStore.createDraft(in: modelContext, text: "Pending draft")
+        pending.sendState = .pending
+
+        let filtered = DraftStore.visibleUnsentDrafts(from: [blank, visible, pending])
+
+        XCTAssertEqual(filtered.map(\.id), [visible.id])
+    }
+
     func testDeleteClearsLastActiveDraftID() throws {
         let draft = DraftStore.createDraft(in: modelContext, text: "To delete")
         DraftResumeCoordinator.markActiveDraft(draft)
@@ -118,6 +147,27 @@ final class DraftBehaviorTests: XCTestCase {
         } else {
             XCTFail("Expected queued send to fail without endpoint/token configuration.")
         }
+    }
+
+    func testNotesSearchQueryParsesTagAndTextTokens() {
+        let query = NotesSearchQuery(rawValue: "tag:house kitchen TAG:work")
+
+        XCTAssertEqual(query.tagTokens, ["house", "work"])
+        XCTAssertEqual(query.textTokens, ["kitchen"])
+    }
+
+    func testNotesSearchQueryRequiresAllTokensAndTags() {
+        let query = NotesSearchQuery(rawValue: "tag:house lamp")
+
+        XCTAssertTrue(query.matches(text: "Living room lamp #house"))
+        XCTAssertFalse(query.matches(text: "Living room #house"))
+        XCTAssertFalse(query.matches(text: "Desk lamp #office"))
+    }
+
+    func testNotesSearchQueryExtractsNormalizedTags() {
+        let tags = NotesSearchQuery.extractTags(from: "Alpha #Home and #work_item")
+
+        XCTAssertEqual(tags, ["Home", "work_item"])
     }
 
     private func allDrafts() throws -> [Draft] {
