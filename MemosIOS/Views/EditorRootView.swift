@@ -1358,14 +1358,28 @@ private struct AllNotesSheetView: View {
     private func timestampText(updatedAt: Date?) -> String? {
         guard let updatedAt else { return nil }
         let age = Date().timeIntervalSince(updatedAt)
+
         if age >= 24 * 60 * 60 {
             return updatedAt.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         }
 
-        let fullHours = max(1, Int(age / 3600))
-        if fullHours == 1 {
+        let minutes = Int(age / 60)
+
+        if minutes < 1 {
+            return "Now"
+        }
+        if minutes < 15 {
+            return "\(minutes) min ago"
+        }
+        if minutes < 60 {
+            let rounded = (minutes / 15) * 15
+            return "\(rounded) min ago"
+        }
+
+        let hours = Int(age / 3600)
+        if hours == 1 {
             return "1 hour ago"
         }
-        return "\(fullHours) hours ago"
+        return "\(hours) hours ago"
     }
 }
