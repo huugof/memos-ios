@@ -10,6 +10,7 @@ struct ServerMemoEditorView: View {
 
     let saveQueue: ServerMemoSaveQueueController
     let onSaveSucceeded: (ServerMemoSummary) -> Void
+    let onDismissAfterSave: () -> Void
     let onTagTapped: (String) -> Void
 
     @State private var draftText: String
@@ -19,17 +20,21 @@ struct ServerMemoEditorView: View {
     @State private var focusRequestID = UUID()
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
+    @State private var isShowingSaveConfirmation = false
+    @State private var saveConfirmationTask: Task<Void, Never>?
 
     init(
         editDraft: ServerMemoEditDraft,
         saveQueue: ServerMemoSaveQueueController,
         shouldAutoFocus: Bool = true,
         onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in },
+        onDismissAfterSave: @escaping () -> Void = {},
         onTagTapped: @escaping (String) -> Void = { _ in }
     ) {
         self.editDraft = editDraft
         self.saveQueue = saveQueue
         self.onSaveSucceeded = onSaveSucceeded
+        self.onDismissAfterSave = onDismissAfterSave
         self.onTagTapped = onTagTapped
         _draftText = State(initialValue: editDraft.localContent)
         _isEditorFocused = State(initialValue: shouldAutoFocus)
@@ -90,6 +95,21 @@ struct ServerMemoEditorView: View {
                 }
             }
         }
+        .opacity(isShowingSaveConfirmation ? 0 : 1)
+        .animation(.easeInOut(duration: 0.2), value: isShowingSaveConfirmation)
+        .overlay {
+            if isShowingSaveConfirmation {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48, weight: .medium))
+                        .foregroundStyle(.green)
+                    Text("Saved")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .overlay(alignment: .bottomTrailing) {
@@ -113,10 +133,14 @@ struct ServerMemoEditorView: View {
             }
             remoteTagTask?.cancel()
             saveTask?.cancel()
+            saveConfirmationTask?.cancel()
         }
     }
 
     private var saveButtonContent: RoundCaptureButtonContent {
+        if isShowingSaveConfirmation {
+            return .symbol("checkmark")
+        }
         if editDraft.saveState == .saving {
             return .progress
         }
@@ -124,6 +148,9 @@ struct ServerMemoEditorView: View {
     }
 
     private var saveAccessibilityLabel: String {
+        if isShowingSaveConfirmation {
+            return "Saved"
+        }
         if editDraft.saveState == .saving {
             return "Saving"
         }
@@ -142,9 +169,14 @@ struct ServerMemoEditorView: View {
         )
         .padding(.trailing, 20)
         .padding(.bottom, 12)
+        .animation(.easeInOut(duration: 0.20), value: isShowingSaveConfirmation)
     }
 
     private var canSaveCurrentText: Bool {
+        if isShowingSaveConfirmation {
+            return false
+        }
+
         if editDraft.saveState == .saving {
             return false
         }
@@ -185,9 +217,25 @@ struct ServerMemoEditorView: View {
             switch outcome {
             case .success(let memo):
                 onSaveSucceeded(memo)
+                showSaveConfirmation()
             case .failure:
                 break
             }
+        }
+    }
+
+    private func showSaveConfirmation() {
+        saveConfirmationTask?.cancel()
+        isEditorFocused = false
+
+        withAnimation(.easeInOut(duration: 0.20)) {
+            isShowingSaveConfirmation = true
+        }
+
+        saveConfirmationTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else { return }
+            onDismissAfterSave()
         }
     }
 

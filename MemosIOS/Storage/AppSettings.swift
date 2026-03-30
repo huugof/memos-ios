@@ -14,6 +14,7 @@ enum AppSettings {
         static let lastActiveDraftID = "lastActiveDraftID"
         static let resumeDeadlineAt = "resumeDeadlineAt"
         static let lastRouteRaw = "lastRouteRaw"
+        static let quickCaptureMode = "quickCaptureMode"
     }
 
     private static let defaults = UserDefaults.standard
@@ -175,6 +176,11 @@ enum AppSettings {
                 defaults.removeObject(forKey: Keys.resumeDeadlineAt)
             }
         }
+    }
+
+    static var quickCaptureMode: Bool {
+        get { defaults.object(forKey: Keys.quickCaptureMode) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.quickCaptureMode) }
     }
 
     static var lastRouteRaw: String? {

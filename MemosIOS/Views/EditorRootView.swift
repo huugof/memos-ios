@@ -289,6 +289,9 @@ struct EditorRootView: View {
             serverDeleteQueue.retryNow(in: modelContext)
             triggerServerRefreshAfterEditorAppears()
             AppSettings.lastRouteRaw = nil
+            if !AppSettings.quickCaptureMode {
+                activeSheet = .allNotes
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
@@ -296,11 +299,11 @@ struct EditorRootView: View {
                 sendQueue.stopProcessing()
                 serverSaveQueue.stopProcessing()
                 serverDeleteQueue.stopProcessing()
-                activeSession = nil
                 return
             }
 
             if newPhase == .active {
+                activeSheet = nil
                 applyForegroundRoutePolicy()
                 if !didBootstrap {
                     bootstrapIfNeeded()
@@ -311,6 +314,9 @@ struct EditorRootView: View {
                     serverDeleteQueue.startProcessing(in: modelContext)
                     serverDeleteQueue.retryNow(in: modelContext)
                     triggerServerRefreshAfterEditorAppears()
+                    if !AppSettings.quickCaptureMode {
+                        activeSheet = .allNotes
+                    }
                     return
                 }
                 ensureEditorHasSession()
@@ -321,6 +327,9 @@ struct EditorRootView: View {
                 serverDeleteQueue.startProcessing(in: modelContext)
                 serverDeleteQueue.retryNow(in: modelContext)
                 triggerServerRefreshAfterEditorAppears()
+                if !AppSettings.quickCaptureMode {
+                    activeSheet = .allNotes
+                }
             }
         }
         .onChange(of: activeSession) { _, newSession in
@@ -361,6 +370,7 @@ struct EditorRootView: View {
                         }
                     )
                     .id(draft.id)
+                    .transition(.opacity)
                 } else {
                     ProgressView()
                         .onAppear {
@@ -374,13 +384,17 @@ struct EditorRootView: View {
                         saveQueue: serverSaveQueue,
                         shouldAutoFocus: editorShouldAutoFocus,
                         onSaveSucceeded: { memo in
-                            handleServerSaveSucceeded(memo)
+                            serverMemosStore.upsertMemo(memo)
+                        },
+                        onDismissAfterSave: {
+                            navigateAfterServerSave()
                         },
                         onTagTapped: { tag in
                             applyTagSearch(tag)
                         }
                     )
                     .id("server-\(editDraft.memoID)")
+                    .transition(.opacity)
                 } else {
                     ProgressView()
                         .onAppear {
@@ -508,24 +522,22 @@ struct EditorRootView: View {
         }
         createAndActivateNewDraft(from: nil)
 
-        DispatchQueue.main.async {
-            activeSheet = .allNotes
+        if !AppSettings.quickCaptureMode {
+            DispatchQueue.main.async {
+                activeSheet = .allNotes
+            }
         }
     }
 
-    private func handleServerSaveSucceeded(_ memo: ServerMemoSummary) {
-        serverMemosStore.upsertMemo(memo)
-
-        guard case let .serverMemo(activeMemoID) = activeSession, activeMemoID == memo.id else {
-            return
-        }
-
+    private func navigateAfterServerSave() {
         activeSession = nil
         DraftResumeCoordinator.markActiveDraft(nil)
         createAndActivateNewDraft(from: nil)
 
-        DispatchQueue.main.async {
-            activeSheet = .allNotes
+        if !AppSettings.quickCaptureMode {
+            DispatchQueue.main.async {
+                activeSheet = .allNotes
+            }
         }
     }
 
@@ -546,7 +558,9 @@ struct EditorRootView: View {
     private func applyForegroundRoutePolicy(now: Date = Date()) {
         guard !DraftResumeCoordinator.shouldResumePreviousDraft(now: now) else { return }
 
-        activeSession = nil
+        withAnimation(.easeInOut(duration: 0.25)) {
+            activeSession = nil
+        }
         AppSettings.lastRouteRaw = nil
     }
 
@@ -1040,7 +1054,7 @@ private struct AllNotesSheetView: View {
         let pendingLocalDrafts = drafts.filter { draft in
             guard !draft.isArchived else { return false }
             guard draft.sendState == .pending || draft.sendState == .sending else { return false }
-            let optimisticID = Self.optimisticMemoID(for: draft.id)
+            let optimisticID = "optimistic-\(draft.id.uuidString)"
             return !serverMemosStore.memos.contains(where: { $0.id == optimisticID })
         }
 

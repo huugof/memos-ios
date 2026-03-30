@@ -39,7 +39,7 @@ When you first send a note it disappears from the list until the refresh button 
 ### Edited server notes should be marked as draft
 When editing a note that is already on the server, the note should be tagged as a draft until it's sent back to the server.
 
-**Status:** Open
+**Status:** Closed
 **Notes:**
 
 ---

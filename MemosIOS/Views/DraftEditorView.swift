@@ -85,6 +85,19 @@ struct DraftEditorView: View {
         }
         .opacity(isShowingSendConfirmation ? 0 : 1)
         .animation(.easeInOut(duration: 0.2), value: isShowingSendConfirmation)
+        .overlay {
+            if isShowingSendConfirmation {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48, weight: .medium))
+                        .foregroundStyle(.green)
+                    Text("Sent")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden(true)
         .overlay(alignment: .bottomTrailing) {
@@ -236,7 +249,7 @@ struct DraftEditorView: View {
         }
 
         sendConfirmationTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
+            try? await Task.sleep(for: .milliseconds(AppSettings.quickCaptureMode ? 500 : 180))
             guard !Task.isCancelled else { return }
             onSendQueued(draft)
         }
