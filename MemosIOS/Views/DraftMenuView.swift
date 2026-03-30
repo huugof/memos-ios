@@ -133,11 +133,12 @@ struct DraftMenuView: View {
                     } label: {
                         if serverMemosStore.isLoading {
                             ProgressView()
+                                .frame(width: 44, height: 44)
                         } else {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.secondary)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
                     }

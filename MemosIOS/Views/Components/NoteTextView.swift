@@ -1,6 +1,160 @@
 import SwiftUI
 import UIKit
 
+enum NoteTextViewListEditing {
+    struct SpaceInsertionNormalization: Equatable {
+        let lineRange: NSRange
+        let replacementLine: String
+    }
+
+    static func normalizedSpaceInsertion(in text: String, caretLocation: Int) -> SpaceInsertionNormalization? {
+        let nsText = text as NSString
+        guard caretLocation >= 0, caretLocation <= nsText.length else { return nil }
+
+        let lineRange = nsText.lineRange(for: NSRange(location: caretLocation, length: 0))
+        let contentRange = lineContentRange(for: lineRange, in: nsText)
+        let lineEnd = contentRange.location + contentRange.length
+        guard caretLocation == lineEnd else { return nil }
+
+        let rawLine = nsText.substring(with: contentRange)
+
+        if let match = firstMatch(in: rawLine, regex: unorderedMarkerOnlyRegex) {
+            return SpaceInsertionNormalization(
+                lineRange: lineRange,
+                replacementLine: "\(match[1])\(match[2])\t"
+            )
+        }
+
+        if let match = firstMatch(in: rawLine, regex: orderedDelimitedMarkerOnlyRegex) {
+            return SpaceInsertionNormalization(
+                lineRange: lineRange,
+                replacementLine: "\(match[1])\(match[2])\(match[3])\t"
+            )
+        }
+
+        if let match = firstMatch(in: rawLine, regex: orderedBareMarkerOnlyRegex) {
+            return SpaceInsertionNormalization(
+                lineRange: lineRange,
+                replacementLine: "\(match[1])\(match[2])\t"
+            )
+        }
+
+        return nil
+    }
+
+    static func continuationPrefix(for line: String) -> String? {
+        if let match = firstMatch(in: line, regex: taskContinuationRegex) {
+            let indent = match[1]
+            let marker = match[2]
+            let content = match[3].trimmingCharacters(in: .whitespaces)
+            guard !content.isEmpty else { return nil }
+            return "\(indent)\(marker) [ ] "
+        }
+
+        if let match = firstMatch(in: line, regex: unorderedContinuationRegex) {
+            let indent = match[1]
+            let marker = match[2]
+            let separator = match[3]
+            let content = match[4].trimmingCharacters(in: .whitespaces)
+            guard !content.isEmpty else { return nil }
+            return "\(indent)\(marker)\(separator.contains("\t") ? "\t" : " ")"
+        }
+
+        if let match = firstMatch(in: line, regex: orderedContinuationRegex) {
+            let indent = match[1]
+            let number = Int(match[2]) ?? 1
+            let delimiter = match[3]
+            let separator = match[4]
+            let content = match[5].trimmingCharacters(in: .whitespaces)
+            guard !content.isEmpty else { return nil }
+            return "\(indent)\(number + 1)\(delimiter)\(separator.contains("\t") ? "\t" : " ")"
+        }
+
+        return nil
+    }
+
+    static func exitListReplacement(for line: String) -> String? {
+        if let match = firstMatch(in: line, regex: taskExitRegex) {
+            return match[1]
+        }
+
+        if let match = firstMatch(in: line, regex: unorderedExitRegex) {
+            return match[1]
+        }
+
+        if let match = firstMatch(in: line, regex: orderedDelimitedExitRegex) {
+            return match[1]
+        }
+
+        if let match = firstMatch(in: line, regex: orderedBareExitRegex) {
+            return match[1]
+        }
+
+        return nil
+    }
+
+    static func normalizedTaskTab(in text: String, caretLocation: Int) -> SpaceInsertionNormalization? {
+        let nsText = text as NSString
+        guard caretLocation >= 0, caretLocation <= nsText.length else { return nil }
+
+        let lineRange = nsText.lineRange(for: NSRange(location: caretLocation, length: 0))
+        let contentRange = lineContentRange(for: lineRange, in: nsText)
+        let rawLine = nsText.substring(with: contentRange)
+
+        guard rawLine.contains("\t"),
+              firstMatch(in: rawLine, regex: taskTabRegex) != nil else {
+            return nil
+        }
+
+        let normalized = rawLine.replacingOccurrences(of: "\t", with: " ")
+        return SpaceInsertionNormalization(lineRange: lineRange, replacementLine: normalized)
+    }
+
+    static func lineContentRange(for lineRange: NSRange, in text: NSString) -> NSRange {
+        guard lineRange.length > 0 else { return lineRange }
+        let lastCharacterIndex = lineRange.location + lineRange.length - 1
+        guard lastCharacterIndex >= 0, lastCharacterIndex < text.length else {
+            return lineRange
+        }
+
+        let lastCharacter = text.substring(with: NSRange(location: lastCharacterIndex, length: 1))
+        if lastCharacter == "\n" {
+            return NSRange(location: lineRange.location, length: max(0, lineRange.length - 1))
+        }
+        return lineRange
+    }
+
+    private static func firstMatch(in text: String, regex: NSRegularExpression) -> [String]? {
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, options: [], range: range) else { return nil }
+
+        var values: [String] = []
+        for idx in 0..<match.numberOfRanges {
+            let matchRange = match.range(at: idx)
+            guard let swiftRange = Range(matchRange, in: text) else {
+                values.append("")
+                continue
+            }
+            values.append(String(text[swiftRange]))
+        }
+        return values
+    }
+
+    private static let taskTabRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])\t\[(?: |x|X)\]"#)
+    private static let taskContinuationRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])\s+\[(?: |x|X)\]\s+(.*)$"#)
+    private static let unorderedContinuationRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])(\t|\s+)(.*)$"#)
+    private static let orderedContinuationRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)([.)]?)(\t|\s+)(.*)$"#)
+
+    private static let taskExitRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])\s+\[(?: |x|X)\]\s*$"#)
+    private static let unorderedExitRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])(?:\t|\s*)$"#)
+    private static let orderedDelimitedExitRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)([.)])\s*$"#)
+    private static let orderedBareExitRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)(?:\t|\s+)$"#)
+
+    private static let unorderedMarkerOnlyRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])$"#)
+    private static let orderedDelimitedMarkerOnlyRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)([.)])$"#)
+    private static let orderedBareMarkerOnlyRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)$"#)
+}
+
 struct EditableNoteTextView: View {
     @Binding var text: String
     @Binding var isFocused: Bool
@@ -225,11 +379,19 @@ struct NoteTextView: UIViewRepresentable {
         func textViewDidChange(_ textView: UITextView) {
             let newText = textView.text ?? ""
             parent.text = newText
+
+            if let normalization = NoteTextViewListEditing.normalizedTaskTab(in: newText, caretLocation: textView.selectedRange.location) {
+                applyLineReplacement(textView, text: newText, lineRange: normalization.lineRange, replacementLine: normalization.replacementLine, oldText: newText)
+                return
+            }
+
             applyMarkdownStyling(in: textView, forceFullPass: false)
             refreshTagPreview(in: textView)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
+            let theme = MarkdownLiteFormatter.Theme.default(for: textView)
+            textView.typingAttributes = MarkdownLiteFormatter.baseAttributes(theme: theme)
             refreshTagPreview(in: textView)
         }
 
@@ -267,6 +429,35 @@ struct NoteTextView: UIViewRepresentable {
                     oldText: currentText,
                     insertionLocation: completedCaretLocation
                 )
+                return false
+            }
+
+            if replacement == " ",
+               range.length == 0,
+               textView.markedTextRange == nil,
+               let normalization = NoteTextViewListEditing.normalizedSpaceInsertion(
+                in: currentText,
+                caretLocation: range.location
+               ) {
+                applyLineReplacement(
+                    textView,
+                    text: currentText,
+                    lineRange: normalization.lineRange,
+                    replacementLine: normalization.replacementLine,
+                    oldText: currentText
+                )
+                return false
+            }
+
+            if replacement.count == 1,
+               range.length == 0,
+               textView.markedTextRange == nil,
+               let ch = replacement.unicodeScalars.first,
+               CharacterSet.lowercaseLetters.contains(ch),
+               isAtListContentStart(in: currentText, caretLocation: range.location) {
+                let capitalized = replacement.uppercased()
+                applyManualInsertion(textView, text: currentText,
+                    insertionLocation: range.location, insertion: capitalized, oldText: currentText)
                 return false
             }
 
@@ -410,19 +601,21 @@ struct NoteTextView: UIViewRepresentable {
                 interactiveRanges = mergeInteractiveRanges(
                     existing: interactiveRanges,
                     replacing: targetRange,
-                    with: renderResult.interactiveRanges
+                    with: renderResult.interactiveRanges,
+                    editContext: pendingEditContext
                 )
             }
 
             lastStyledText = text
             pendingEditContext = nil
             restoreSelection(selectedRange, in: textView)
+            textView.typingAttributes = baseAttributes
             updateCheckboxRendering(in: textView)
         }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             guard let textView = scrollView as? UITextView else { return }
-            (textView as? OverlayAwareTextView)?.setNeedsDisplay()
+            (textView as? OverlayAwareTextView)?.refreshCheckboxOverlay()
         }
 
         private func restoreSelection(_ selection: NSRange, in textView: UITextView) {
@@ -435,9 +628,25 @@ struct NoteTextView: UIViewRepresentable {
         private func mergeInteractiveRanges(
             existing: [MarkdownLiteFormatter.InteractiveRange],
             replacing range: NSRange,
-            with fresh: [MarkdownLiteFormatter.InteractiveRange]
+            with fresh: [MarkdownLiteFormatter.InteractiveRange],
+            editContext: MarkdownLiteFormatter.EditContext? = nil
         ) -> [MarkdownLiteFormatter.InteractiveRange] {
-            var merged = existing.filter { NSIntersectionRange($0.range, range).length == 0 }
+            let delta = editContext.map {
+                ($0.replacement as NSString).length - $0.range.length
+            } ?? 0
+            let insertionPoint = editContext?.range.location ?? Int.max
+
+            var merged: [MarkdownLiteFormatter.InteractiveRange] = existing.compactMap { r in
+                let adjustedLocation: Int
+                if delta != 0, r.range.location >= insertionPoint {
+                    adjustedLocation = r.range.location + delta
+                } else {
+                    adjustedLocation = r.range.location
+                }
+                let adjustedRange = NSRange(location: adjustedLocation, length: r.range.length)
+                guard NSIntersectionRange(adjustedRange, range).length == 0 else { return nil }
+                return .init(range: adjustedRange, kind: r.kind)
+            }
             merged.append(contentsOf: fresh)
             merged.sort { lhs, rhs in
                 if lhs.range.location != rhs.range.location {
@@ -629,11 +838,11 @@ struct NoteTextView: UIViewRepresentable {
             }
 
             let rawLine = nsText.substring(with: lineRange).replacingOccurrences(of: "\n", with: "")
-            if let replacementLine = exitListReplacement(for: rawLine) {
+            if let replacementLine = NoteTextViewListEditing.exitListReplacement(for: rawLine) {
                 return .exitList(lineRange: lineRange, replacementLine: replacementLine)
             }
 
-            guard let continuation = continuationPrefix(for: rawLine) else {
+            guard let continuation = NoteTextViewListEditing.continuationPrefix(for: rawLine) else {
                 return nil
             }
 
@@ -648,7 +857,7 @@ struct NoteTextView: UIViewRepresentable {
             oldText: String
         ) {
             let nsText = text as NSString
-            let contentRange = lineContentRange(for: lineRange, in: nsText)
+            let contentRange = NoteTextViewListEditing.lineContentRange(for: lineRange, in: nsText)
             let replaced = nsText.replacingCharacters(in: contentRange, with: replacementLine)
             let cursorOffset = contentRange.location + (replacementLine as NSString).length
 
@@ -662,118 +871,6 @@ struct NoteTextView: UIViewRepresentable {
             )
         }
 
-        private func lineContentRange(for lineRange: NSRange, in text: NSString) -> NSRange {
-            guard lineRange.length > 0 else { return lineRange }
-            let lastCharacterIndex = lineRange.location + lineRange.length - 1
-            guard lastCharacterIndex >= 0, lastCharacterIndex < text.length else {
-                return lineRange
-            }
-
-            let lastCharacter = text.substring(with: NSRange(location: lastCharacterIndex, length: 1))
-            if lastCharacter == "\n" {
-                return NSRange(location: lineRange.location, length: max(0, lineRange.length - 1))
-            }
-            return lineRange
-        }
-
-        private func continuationPrefix(for line: String) -> String? {
-            if let continuation = taskContinuation(for: line) {
-                return continuation
-            }
-
-            if let continuation = unorderedContinuation(for: line) {
-                return continuation
-            }
-
-            if let continuation = orderedContinuation(for: line) {
-                return continuation
-            }
-
-            return nil
-        }
-
-        private func taskContinuation(for line: String) -> String? {
-            guard let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s+\[(?: |x|X)\]\s+(.*)$"#) else {
-                return nil
-            }
-
-            let indent = match[1]
-            let marker = match[2]
-            let content = match[3].trimmingCharacters(in: .whitespaces)
-            guard !content.isEmpty else { return nil }
-
-            return "\(indent)\(marker) [ ] "
-        }
-
-        private func unorderedContinuation(for line: String) -> String? {
-            guard let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s+(.*)$"#) else {
-                return nil
-            }
-
-            let indent = match[1]
-            let marker = match[2]
-            let content = match[3].trimmingCharacters(in: .whitespaces)
-            guard !content.isEmpty else { return nil }
-
-            return "\(indent)\(marker) "
-        }
-
-        private func orderedContinuation(for line: String) -> String? {
-            if let match = firstMatch(in: line, pattern: #"^(\s*)(\d+)([.)])\s+(.*)$"#) {
-                let indent = match[1]
-                let number = Int(match[2]) ?? 1
-                let delimiter = match[3]
-                let content = match[4].trimmingCharacters(in: .whitespaces)
-                guard !content.isEmpty else { return nil }
-
-                return "\(indent)\(number + 1)\(delimiter) "
-            }
-
-            if let match = firstMatch(in: line, pattern: #"^(\s*)(\d+)\s+(.*)$"#) {
-                let indent = match[1]
-                let number = Int(match[2]) ?? 1
-                let content = match[3].trimmingCharacters(in: .whitespaces)
-                guard !content.isEmpty else { return nil }
-
-                return "\(indent)\(number + 1) "
-            }
-
-            return nil
-        }
-
-        private func exitListReplacement(for line: String) -> String? {
-            if let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s+\[(?: |x|X)\]\s*$"#) {
-                return match[1]
-            }
-
-            if let match = firstMatch(in: line, pattern: #"^(\s*)([-*+])\s*$"#) {
-                return match[1]
-            }
-
-            if let match = firstMatch(in: line, pattern: #"^(\s*)(\d+)([.)])\s*$"#) {
-                return match[1]
-            }
-
-            return nil
-        }
-
-        private func firstMatch(in text: String, pattern: String) -> [String]? {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-            let range = NSRange(text.startIndex..<text.endIndex, in: text)
-            guard let match = regex.firstMatch(in: text, options: [], range: range) else { return nil }
-
-            var values: [String] = []
-            for idx in 0..<match.numberOfRanges {
-                let matchRange = match.range(at: idx)
-                guard let swiftRange = Range(matchRange, in: text) else {
-                    values.append("")
-                    continue
-                }
-                values.append(String(text[swiftRange]))
-            }
-            return values
-        }
-
         private func sanitizeTag(_ raw: String) -> String? {
             var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if value.hasPrefix("#") {
@@ -784,6 +881,16 @@ struct NoteTextView: UIViewRepresentable {
                 return nil
             }
             return value
+        }
+
+        private func isAtListContentStart(in text: String, caretLocation: Int) -> Bool {
+            let nsText = text as NSString
+            guard caretLocation > 0 else { return false }
+            let lineRange = nsText.lineRange(for: NSRange(location: caretLocation, length: 0))
+            let contentRange = NoteTextViewListEditing.lineContentRange(for: lineRange, in: nsText)
+            guard caretLocation == contentRange.location + contentRange.length else { return false }
+            let rawLine = nsText.substring(with: contentRange)
+            return NoteTextViewListEditing.exitListReplacement(for: rawLine) != nil
         }
 
         private func isTagCharacter(_ scalar: UnicodeScalar) -> Bool {
@@ -871,52 +978,59 @@ private final class OverlayAwareTextView: UITextView {
         let isChecked: Bool
     }
 
+    fileprivate struct CheckboxOverlayItem {
+        let frame: CGRect
+        let isChecked: Bool
+        let pointSize: CGFloat
+    }
+
+    private let checkboxOverlayView = CheckboxOverlayView()
+
     var checkboxRenderRanges: [CheckboxRenderRange] = [] {
         didSet {
             guard checkboxRenderRanges != oldValue else { return }
-            setNeedsDisplay()
+            refreshCheckboxOverlay()
         }
+    }
+
+    override init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+        configureCheckboxOverlay()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureCheckboxOverlay()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        setNeedsDisplay()
+        refreshCheckboxOverlay()
     }
 
-    override func draw(_ rect: CGRect) {
-        super.draw(rect)
-        drawCheckboxes(in: rect)
+    func refreshCheckboxOverlay() {
+        checkboxOverlayView.frame = CGRect(origin: bounds.origin, size: bounds.size)
+        checkboxOverlayView.render(items: checkboxOverlayItems())
     }
 
-    private func drawCheckboxes(in rect: CGRect) {
-        guard !checkboxRenderRanges.isEmpty else { return }
+    private func configureCheckboxOverlay() {
+        checkboxOverlayView.isUserInteractionEnabled = false
+        checkboxOverlayView.backgroundColor = .clear
+        addSubview(checkboxOverlayView)
+    }
 
-        for checkbox in checkboxRenderRanges {
-            guard let checkboxRect = checkboxRect(for: checkbox.range), checkboxRect.intersects(rect) else {
-                continue
-            }
-
-            let basePointSize = (font ?? UIFont.preferredFont(forTextStyle: .body)).pointSize
-            let visualSize = max(basePointSize + 7, 24)
-            let imageName = checkbox.isChecked ? "checkmark.square" : "square"
-            let symbolConfig = UIImage.SymbolConfiguration(pointSize: visualSize, weight: .regular)
-            guard let image = UIImage(systemName: imageName, withConfiguration: symbolConfig) else {
-                continue
-            }
-            let tintedImage = image.withTintColor(.secondaryLabel, renderingMode: .alwaysOriginal)
-
-            let imageRect = CGRect(
-                x: checkboxRect.minX,
-                y: checkboxRect.midY - (visualSize / 2),
-                width: visualSize,
-                height: visualSize
-            ).integral
-
-            tintedImage.draw(in: imageRect)
+    private func checkboxOverlayItems() -> [CheckboxOverlayItem] {
+        checkboxRenderRanges.compactMap { checkbox in
+            guard let frame = checkboxFrame(for: checkbox.range) else { return nil }
+            return CheckboxOverlayItem(
+                frame: frame.integral,
+                isChecked: checkbox.isChecked,
+                pointSize: frame.height
+            )
         }
     }
 
-    private func checkboxRect(for range: NSRange) -> CGRect? {
+    private func checkboxFrame(for range: NSRange) -> CGRect? {
         let textLength = (text as NSString).length
         guard textLength > 0 else { return nil }
         let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: textLength))
@@ -925,13 +1039,28 @@ private final class OverlayAwareTextView: UITextView {
         let layoutManager = self.layoutManager
         layoutManager.ensureLayout(for: textContainer)
         let glyphRange = layoutManager.glyphRange(forCharacterRange: safeRange, actualCharacterRange: nil)
-        var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-        rect.origin.x += textContainerInset.left - contentOffset.x
-        rect.origin.y += textContainerInset.top - contentOffset.y
+        guard glyphRange.location != NSNotFound else { return nil }
 
-        if rect.height < 1 {
-            rect.size.height = font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
-        }
+        let glyphIndex = glyphRange.location
+        let lineRect = layoutManager.lineFragmentUsedRect(
+            forGlyphAt: glyphIndex,
+            effectiveRange: nil,
+            withoutAdditionalLayout: true
+        )
+        let glyphLocation = layoutManager.location(forGlyphAt: glyphIndex)
+        let basePointSize = (font ?? UIFont.preferredFont(forTextStyle: .body)).pointSize
+        let visualSize = max(basePointSize + 2, 18)
+
+        var rect = CGRect(
+            x: lineRect.minX + glyphLocation.x,
+            y: lineRect.midY - (visualSize / 2),
+            width: visualSize,
+            height: visualSize
+        )
+        rect.origin.x += textContainerInset.left
+        rect.origin.y += textContainerInset.top
+        rect.origin.x -= bounds.origin.x
+        rect.origin.y -= bounds.origin.y
 
         if rect.width < 1 {
             rect.size.width = rect.height
@@ -942,5 +1071,43 @@ private final class OverlayAwareTextView: UITextView {
         }
 
         return rect
+    }
+}
+
+private final class CheckboxOverlayView: UIView {
+    private var imageViews: [UIImageView] = []
+
+    func render(items: [OverlayAwareTextView.CheckboxOverlayItem]) {
+        ensureImageViewCount(items.count)
+
+        for (index, item) in items.enumerated() {
+            let imageView = imageViews[index]
+            imageView.isHidden = false
+            imageView.frame = item.frame
+            imageView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(
+                pointSize: item.pointSize,
+                weight: .regular
+            )
+            imageView.image = UIImage(
+                systemName: item.isChecked ? "checkmark.square.fill" : "square"
+            )
+            imageView.tintColor = item.isChecked ? .systemBlue : .secondaryLabel
+        }
+
+        if items.count < imageViews.count {
+            for imageView in imageViews[items.count...] {
+                imageView.isHidden = true
+            }
+        }
+    }
+
+    private func ensureImageViewCount(_ count: Int) {
+        while imageViews.count < count {
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFit
+            imageView.isUserInteractionEnabled = false
+            addSubview(imageView)
+            imageViews.append(imageView)
+        }
     }
 }

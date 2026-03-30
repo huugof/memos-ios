@@ -8,33 +8,30 @@ struct DraftEditorView: View {
 
     @Bindable var draft: Draft
 
-    let onOpenDraftsSheet: (Draft) -> Void
-    let onCreateNewDraft: (Draft) -> Void
     let onSendQueued: (Draft) -> Void
+    let onTagTapped: (String) -> Void
 
     @State private var draftText: String
     @State private var autosaveTask: Task<Void, Never>?
     @State private var remoteTagTask: Task<Void, Never>?
     @State private var sendConfirmationTask: Task<Void, Never>?
-    @State private var isEditorFocused = true
+    @State private var isEditorFocused: Bool
     @State private var focusRequestID = UUID()
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
     @State private var isShowingSendConfirmation = false
-    @State private var isTopBarHidden = false
-    @StateObject private var keyboard = KeyboardStateObserver()
 
     init(
         draft: Draft,
-        onOpenDraftsSheet: @escaping (Draft) -> Void = { _ in },
-        onCreateNewDraft: @escaping (Draft) -> Void = { _ in },
-        onSendQueued: @escaping (Draft) -> Void = { _ in }
+        shouldAutoFocus: Bool = true,
+        onSendQueued: @escaping (Draft) -> Void = { _ in },
+        onTagTapped: @escaping (String) -> Void = { _ in }
     ) {
         self.draft = draft
-        self.onOpenDraftsSheet = onOpenDraftsSheet
-        self.onCreateNewDraft = onCreateNewDraft
         self.onSendQueued = onSendQueued
+        self.onTagTapped = onTagTapped
         _draftText = State(initialValue: draft.text)
+        _isEditorFocused = State(initialValue: shouldAutoFocus)
     }
 
     var body: some View {
@@ -68,17 +65,18 @@ struct DraftEditorView: View {
                     .padding(.top, 6)
                 }
 
-                NoteTextView(
+                EditableNoteTextView(
                     text: $draftText,
                     isFocused: $isEditorFocused,
                     focusRequestID: focusRequestID,
                     tagSuggestions: tagSuggestions,
                     onTagAccepted: { tag in
                         rememberAcceptedTag(tag)
-                    }
+                    },
+                    onTagTapped: onTagTapped
                 )
                 .padding(.horizontal, 24)
-                .padding(.top, 0)
+                .padding(.top, 10)
                 .onChange(of: draftText) { _, _ in
                     scheduleAutosave()
                     refreshTagSuggestions()
@@ -92,27 +90,9 @@ struct DraftEditorView: View {
         .overlay(alignment: .bottomTrailing) {
             sendButtonOverlay
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if !isTopBarHidden {
-                topBar
-                    .transition(.opacity)
-            }
-        }
         .onAppear {
-            isEditorFocused = true
-            focusRequestID = UUID()
-            isTopBarHidden = keyboard.isVisible
             refreshTagSuggestions()
             fetchRemoteTagsOnce()
-        }
-        .onChange(of: keyboard.isVisible) { _, isVisible in
-            var transaction = Transaction()
-            transaction.animation = isVisible
-                ? .easeInOut(duration: 0.24)
-                : .easeInOut(duration: 0.34)
-            withTransaction(transaction) {
-                isTopBarHidden = isVisible
-            }
         }
         .onChange(of: drafts.map { "\($0.id.uuidString)-\($0.updatedAt.timeIntervalSince1970)" }) { _, _ in
             refreshTagSuggestions()
@@ -129,8 +109,6 @@ struct DraftEditorView: View {
             draftText = draft.text
             remoteTags = []
             isShowingSendConfirmation = false
-            isEditorFocused = true
-            focusRequestID = UUID()
             refreshTagSuggestions()
             fetchRemoteTagsOnce()
         }
@@ -176,48 +154,6 @@ struct DraftEditorView: View {
         .padding(.trailing, 20)
         .padding(.bottom, 12)
         .animation(.easeInOut(duration: 0.20), value: isShowingSendConfirmation)
-    }
-
-    private var topBar: some View {
-        HStack(spacing: 0) {
-            Text("Memos")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 12)
-            HStack(spacing: 8) {
-                newDraftButton
-                openDraftsButton
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-        .background(.clear)
-    }
-
-    private var newDraftButton: some View {
-        Button(action: handleCreateNewDraft) {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("New note")
-    }
-
-    private var openDraftsButton: some View {
-        Button(action: handleOpenDraftsSheet) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Drafts")
     }
 
     private var canSendCurrentText: Bool {
@@ -285,20 +221,6 @@ struct DraftEditorView: View {
         }
 
         modelContext.saveOrAssert()
-    }
-
-    private func handleOpenDraftsSheet() {
-        guard !isShowingSendConfirmation else { return }
-        flushPendingAutosave()
-        isEditorFocused = false
-        onOpenDraftsSheet(draft)
-    }
-
-    private func handleCreateNewDraft() {
-        guard !isShowingSendConfirmation else { return }
-        flushPendingAutosave()
-        isEditorFocused = false
-        onCreateNewDraft(draft)
     }
 
     private func sendDraft() {

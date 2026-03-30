@@ -165,6 +165,11 @@ private struct ServerTimelineRowData {
         return editDraft.saveState == .saving
     }
 
+    var isDraft: Bool {
+        guard let editDraft else { return false }
+        return editDraft.hasLocalChanges || editDraft.saveState != .idle
+    }
+
     var attachmentCount: Int {
         memo?.attachmentCount ?? 0
     }
@@ -212,6 +217,7 @@ struct EditorRootView: View {
     @State private var activeSheet: RootSheet?
     @State private var allNotesInitialQuery = ""
     @State private var didBootstrap = false
+    @State private var editorShouldAutoFocus = true
 
     @StateObject private var sendQueue = DraftSendQueueController()
     @StateObject private var serverSaveQueue = ServerMemoSaveQueueController()
@@ -250,14 +256,17 @@ struct EditorRootView: View {
                         }
                     },
                     onSelectDraft: { draft in
+                        editorShouldAutoFocus = false
                         activateDraft(draft)
                         activeSheet = nil
                     },
                     onSelectServerMemo: { memo in
+                        editorShouldAutoFocus = false
                         openServerMemoEditor(memo)
                         activeSheet = nil
                     },
                     onSelectServerEditDraft: { editDraft in
+                        editorShouldAutoFocus = false
                         openServerEditDraft(editDraft)
                         activeSheet = nil
                     }
@@ -328,6 +337,11 @@ struct EditorRootView: View {
             guard let memo else { return }
             serverMemosStore.upsertMemo(memo)
         }
+        .onReceive(sendQueue.$lastCreatedMemo) { memo in
+            guard let memo else { return }
+            serverMemosStore.upsertMemo(memo)
+            removeOptimisticMemo(for: sendQueue.lastSentDraftID)
+        }
     }
 
     @ViewBuilder
@@ -338,6 +352,7 @@ struct EditorRootView: View {
                 if let draft = drafts.first(where: { $0.id == draftID }) {
                     DraftEditorView(
                         draft: draft,
+                        shouldAutoFocus: editorShouldAutoFocus,
                         onSendQueued: { queuedDraft in
                             handleSendQueued(from: queuedDraft)
                         },
@@ -357,6 +372,7 @@ struct EditorRootView: View {
                     ServerMemoEditorView(
                         editDraft: editDraft,
                         saveQueue: serverSaveQueue,
+                        shouldAutoFocus: editorShouldAutoFocus,
                         onSaveSucceeded: { memo in
                             handleServerSaveSucceeded(memo)
                         },
@@ -466,6 +482,7 @@ struct EditorRootView: View {
             deleteTransientBlankIfNeeded(currentDraft)
         }
 
+        editorShouldAutoFocus = true
         let draft = DraftStore.createDraft(in: modelContext)
         activateDraft(draft)
     }
@@ -475,11 +492,25 @@ struct EditorRootView: View {
         guard queueDraftForSend(draft) else { return }
         guard !wasPending else { return }
 
+        // Optimistic memo ensures the note is visible in the sheet immediately,
+        // bypassing @Query timing issues. Removed when the real memo arrives.
+        let optimisticMemo = ServerMemoSummary(
+            id: Self.optimisticMemoID(for: draft.id),
+            resourceName: nil,
+            content: draft.text,
+            updatedAt: Date()
+        )
+        serverMemosStore.upsertMemo(optimisticMemo)
+
         if case let .localDraft(activeDraftID) = activeSession, activeDraftID == draft.id {
             activeSession = nil
             DraftResumeCoordinator.markActiveDraft(nil)
         }
         createAndActivateNewDraft(from: nil)
+
+        DispatchQueue.main.async {
+            activeSheet = .allNotes
+        }
     }
 
     private func handleServerSaveSucceeded(_ memo: ServerMemoSummary) {
@@ -492,11 +523,24 @@ struct EditorRootView: View {
         activeSession = nil
         DraftResumeCoordinator.markActiveDraft(nil)
         createAndActivateNewDraft(from: nil)
+
+        DispatchQueue.main.async {
+            activeSheet = .allNotes
+        }
     }
 
     @discardableResult
     private func queueDraftForSend(_ draft: Draft) -> Bool {
         return sendQueue.enqueue(draft, in: modelContext)
+    }
+
+    private static func optimisticMemoID(for draftID: UUID) -> String {
+        "optimistic-\(draftID.uuidString)"
+    }
+
+    private func removeOptimisticMemo(for draftID: UUID?) {
+        guard let draftID else { return }
+        serverMemosStore.removeMemo(memoID: Self.optimisticMemoID(for: draftID))
     }
 
     private func applyForegroundRoutePolicy(now: Date = Date()) {
@@ -621,12 +665,12 @@ private struct AllNotesSheetView: View {
                 } label: {
                     if serverMemosStore.isLoading {
                         ProgressView()
-                            .frame(width: 34, height: 34)
+                            .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.primary)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 44, height: 44)
                     }
                 }
                 .buttonStyle(.plain)
@@ -862,8 +906,13 @@ private struct AllNotesSheetView: View {
                     Spacer(minLength: 8)
 
                     HStack(spacing: 6) {
-                        if isCurrent {
+                        if rowData.memoID.hasPrefix("optimistic-") {
+                            statusPill("Pending", color: .orange)
+                        } else if rowData.isDraft {
                             statusPill("Draft", color: .indigo)
+                        }
+
+                        if isCurrent {
                             statusPill("Current", color: .blue)
                         }
 
@@ -990,7 +1039,9 @@ private struct AllNotesSheetView: View {
 
         let pendingLocalDrafts = drafts.filter { draft in
             guard !draft.isArchived else { return false }
-            return draft.sendState == .pending || draft.sendState == .sending
+            guard draft.sendState == .pending || draft.sendState == .sending else { return false }
+            let optimisticID = Self.optimisticMemoID(for: draft.id)
+            return !serverMemosStore.memos.contains(where: { $0.id == optimisticID })
         }
 
         rows.append(contentsOf: pendingLocalDrafts.map { draft in

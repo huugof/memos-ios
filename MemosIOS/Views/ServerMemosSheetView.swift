@@ -15,6 +15,7 @@ final class ServerMemosStore: ObservableObject {
     private var hasLoaded = false
     private var nextPageToken: String?
     private var reachedEnd = false
+    private var recentUpserts: [String: Date] = [:]
 
     func ensureInitialLoad() async {
         guard !hasLoaded else { return }
@@ -51,7 +52,27 @@ final class ServerMemosStore: ObservableObject {
                 pageSize: 30,
                 pageToken: nil
             )
-            memos = page.memos
+            let serverIDs = Set(page.memos.map(\.id))
+            let cutoff = Date().addingTimeInterval(-60)
+
+            // Merge server memos with recently-upserted local data
+            var refreshed = page.memos.map { serverMemo -> ServerMemoSummary in
+                if let upsertDate = recentUpserts[serverMemo.id], upsertDate > cutoff,
+                   let existing = memos.first(where: { $0.id == serverMemo.id }) {
+                    return mergeMemo(existing: existing, incoming: serverMemo)
+                }
+                return serverMemo
+            }
+
+            // Preserve recently-upserted memos not yet in server response
+            for memo in memos where !serverIDs.contains(memo.id) {
+                if let upsertDate = recentUpserts[memo.id], upsertDate > cutoff {
+                    refreshed.append(memo)
+                }
+            }
+
+            memos = refreshed
+            recentUpserts = recentUpserts.filter { $0.value > cutoff }
             nextPageToken = page.nextPageToken
             reachedEnd = page.nextPageToken == nil
             errorMessage = nil
@@ -106,10 +127,13 @@ final class ServerMemosStore: ObservableObject {
     }
 
     func upsertMemo(_ memo: ServerMemoSummary) {
+        let mergedMemo: ServerMemoSummary
         if let index = memos.firstIndex(where: { $0.id == memo.id }) {
-            memos[index] = memo
+            mergedMemo = mergeMemo(existing: memos[index], incoming: memo)
+            memos[index] = mergedMemo
         } else {
-            memos.insert(memo, at: 0)
+            mergedMemo = memo
+            memos.insert(mergedMemo, at: 0)
         }
 
         memos.sort { lhs, rhs in
@@ -126,8 +150,15 @@ final class ServerMemosStore: ObservableObject {
             return lhs.id < rhs.id
         }
 
+        recentUpserts[mergedMemo.id] = Date()
         errorMessage = nil
-        openingErrorByMemoID[memo.id] = nil
+        openingErrorByMemoID[mergedMemo.id] = nil
+        lastRefreshAt = Date()
+    }
+
+    func removeMemo(memoID: String) {
+        memos.removeAll { $0.id == memoID }
+        openingErrorByMemoID[memoID] = nil
         lastRefreshAt = Date()
     }
 
@@ -178,6 +209,32 @@ final class ServerMemosStore: ObservableObject {
             return nil
         }
     }
+
+    private func mergeMemo(existing: ServerMemoSummary, incoming: ServerMemoSummary) -> ServerMemoSummary {
+        let preservedUpdatedAt = incoming.updatedAt ?? existing.updatedAt
+        let mergedResourceName = incoming.resourceName ?? existing.resourceName
+        let mergedSnippet = incoming.snippet ?? existing.snippet
+        let mergedAttachmentCount = max(existing.attachmentCount, incoming.attachmentCount)
+        let mergedHasFullContent = incoming.hasFullContent || existing.hasFullContent
+        let mergedContent: String
+        if incoming.hasFullContent {
+            mergedContent = incoming.content
+        } else if existing.hasFullContent {
+            mergedContent = existing.content
+        } else {
+            mergedContent = incoming.content
+        }
+
+        return ServerMemoSummary(
+            id: incoming.id,
+            resourceName: mergedResourceName,
+            content: mergedContent,
+            updatedAt: preservedUpdatedAt,
+            snippet: mergedSnippet,
+            attachmentCount: mergedAttachmentCount,
+            hasFullContent: mergedHasFullContent
+        )
+    }
 }
 
 struct ServerMemosSheetView: View {
@@ -212,9 +269,11 @@ struct ServerMemosSheetView: View {
                     } label: {
                         if store.isLoading {
                             ProgressView()
+                                .frame(width: 44, height: 44)
                         } else {
                             Image(systemName: "arrow.clockwise")
                                 .font(.body.weight(.semibold))
+                                .frame(width: 44, height: 44)
                         }
                     }
                     .buttonStyle(.plain)

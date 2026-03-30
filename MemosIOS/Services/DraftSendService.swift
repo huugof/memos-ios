@@ -5,7 +5,7 @@ import SwiftData
 @MainActor
 enum DraftSendService {
     enum SendOutcome {
-        case success
+        case success(ServerMemoSummary)
         case failure
     }
 
@@ -56,7 +56,7 @@ enum DraftSendService {
         modelContext.saveOrAssert()
 
         do {
-            try await client.createMemo(
+            let createdMemo = try await client.createMemo(
                 content: draft.text,
                 baseURLString: AppSettings.endpointBaseURL,
                 token: KeychainTokenStore.getToken(),
@@ -74,7 +74,7 @@ enum DraftSendService {
             }
 
             modelContext.saveOrAssert()
-            return .success
+            return .success(createdMemo)
         } catch {
             draft.sendState = .pending
             draft.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -86,6 +86,9 @@ enum DraftSendService {
 
 @MainActor
 final class DraftSendQueueController: ObservableObject {
+    @Published private(set) var lastCreatedMemo: ServerMemoSummary?
+    private(set) var lastSentDraftID: UUID?
+
     private let client: MemosClient
 
     private var processingTask: Task<Void, Never>?
@@ -94,6 +97,10 @@ final class DraftSendQueueController: ObservableObject {
 
     init(client: MemosClient = MemosClient()) {
         self.client = client
+    }
+
+    deinit {
+        processingTask?.cancel()
     }
 
     @discardableResult
@@ -145,6 +152,7 @@ final class DraftSendQueueController: ObservableObject {
         guard processingTask == nil else { return }
 
         processingTask = Task { @MainActor [weak self] in
+            defer { self?.processingTask = nil }
             guard let self else { return }
 
             while !Task.isCancelled {
@@ -173,9 +181,11 @@ final class DraftSendQueueController: ObservableObject {
                     )
 
                     switch outcome {
-                    case .success:
+                    case .success(let memo):
                         self.failureCounts[draft.id] = nil
                         self.nextAttemptAt[draft.id] = nil
+                        self.lastSentDraftID = draft.id
+                        self.lastCreatedMemo = memo
                     case .failure:
                         let failureCount = (self.failureCounts[draft.id] ?? 0) + 1
                         self.failureCounts[draft.id] = failureCount
@@ -192,8 +202,6 @@ final class DraftSendQueueController: ObservableObject {
                     await Task.yield()
                 }
             }
-
-            self.processingTask = nil
         }
     }
 

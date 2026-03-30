@@ -54,10 +54,14 @@ enum KeychainTokenStore {
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess else {
+            if status != errSecItemNotFound {
+                print("⚠️ Keychain read failed (\(status)) — token unavailable")
+            }
             return ""
         }
 
         guard let data = result as? Data, let token = String(data: data, encoding: .utf8) else {
+            print("⚠️ Keychain data could not be decoded as UTF-8 string")
             return ""
         }
 

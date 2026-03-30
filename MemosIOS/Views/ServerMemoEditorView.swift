@@ -9,33 +9,39 @@ struct ServerMemoEditorView: View {
     @Bindable var editDraft: ServerMemoEditDraft
 
     let saveQueue: ServerMemoSaveQueueController
-    let onCreateNewDraft: () -> Void
-    let onOpenDraftsSheet: () -> Void
     let onSaveSucceeded: (ServerMemoSummary) -> Void
+    let onTagTapped: (String) -> Void
 
     @State private var draftText: String
     @State private var remoteTagTask: Task<Void, Never>?
     @State private var saveTask: Task<Void, Never>?
-    @State private var isEditorFocused = true
+    @State private var isEditorFocused: Bool
     @State private var focusRequestID = UUID()
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
-    @State private var isTopBarHidden = false
-    @StateObject private var keyboard = KeyboardStateObserver()
 
     init(
         editDraft: ServerMemoEditDraft,
         saveQueue: ServerMemoSaveQueueController,
-        onCreateNewDraft: @escaping () -> Void = {},
-        onOpenDraftsSheet: @escaping () -> Void = {},
-        onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in }
+        shouldAutoFocus: Bool = true,
+        onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in },
+        onTagTapped: @escaping (String) -> Void = { _ in }
     ) {
         self.editDraft = editDraft
         self.saveQueue = saveQueue
-        self.onCreateNewDraft = onCreateNewDraft
-        self.onOpenDraftsSheet = onOpenDraftsSheet
         self.onSaveSucceeded = onSaveSucceeded
+        self.onTagTapped = onTagTapped
         _draftText = State(initialValue: editDraft.localContent)
+        _isEditorFocused = State(initialValue: shouldAutoFocus)
+    }
+
+    private var draftsFingerprint: Int {
+        var hasher = Hasher()
+        for draft in drafts {
+            hasher.combine(draft.id)
+            hasher.combine(draft.updatedAt)
+        }
+        return hasher.finalize()
     }
 
     var body: some View {
@@ -65,17 +71,18 @@ struct ServerMemoEditorView: View {
                     .padding(.top, 6)
                 }
 
-                NoteTextView(
+                EditableNoteTextView(
                     text: $draftText,
                     isFocused: $isEditorFocused,
                     focusRequestID: focusRequestID,
                     tagSuggestions: tagSuggestions,
                     onTagAccepted: { tag in
                         rememberAcceptedTag(tag)
-                    }
+                    },
+                    onTagTapped: onTagTapped
                 )
                 .padding(.horizontal, 24)
-                .padding(.top, 0)
+                .padding(.top, 10)
                 .onChange(of: draftText) { _, _ in
                     if draftText.utf16.count <= 4_000 {
                         refreshTagSuggestions()
@@ -88,29 +95,11 @@ struct ServerMemoEditorView: View {
         .overlay(alignment: .bottomTrailing) {
             saveButtonOverlay
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if !isTopBarHidden {
-                topBar
-                    .transition(.opacity)
-            }
-        }
         .onAppear {
-            isEditorFocused = true
-            focusRequestID = UUID()
-            isTopBarHidden = keyboard.isVisible
             refreshTagSuggestions()
             fetchRemoteTagsOnce()
         }
-        .onChange(of: keyboard.isVisible) { _, isVisible in
-            var transaction = Transaction()
-            transaction.animation = isVisible
-                ? .easeInOut(duration: 0.24)
-                : .easeInOut(duration: 0.34)
-            withTransaction(transaction) {
-                isTopBarHidden = isVisible
-            }
-        }
-        .onChange(of: drafts.map { "\($0.id.uuidString)-\($0.updatedAt.timeIntervalSince1970)" }) { _, _ in
+        .onChange(of: draftsFingerprint) { _, _ in
             refreshTagSuggestions()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -119,7 +108,9 @@ struct ServerMemoEditorView: View {
             }
         }
         .onDisappear {
-            persistWorkingCopy()
+            if hasWorkingCopyChanges {
+                persistWorkingCopy()
+            }
             remoteTagTask?.cancel()
             saveTask?.cancel()
         }
@@ -153,48 +144,6 @@ struct ServerMemoEditorView: View {
         .padding(.bottom, 12)
     }
 
-    private var topBar: some View {
-        HStack(spacing: 0) {
-            Text("Memos")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 12)
-            HStack(spacing: 8) {
-                newDraftButton
-                openDraftsButton
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-        .background(.clear)
-    }
-
-    private var newDraftButton: some View {
-        Button(action: handleCreateNewDraft) {
-            Image(systemName: "plus")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("New note")
-    }
-
-    private var openDraftsButton: some View {
-        Button(action: handleOpenDraftsSheet) {
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Drafts")
-    }
-
     private var canSaveCurrentText: Bool {
         if editDraft.saveState == .saving {
             return false
@@ -212,7 +161,8 @@ struct ServerMemoEditorView: View {
     }
 
     private var hasWorkingCopyChanges: Bool {
-        draftText != editDraft.serverContent
+        draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+            != editDraft.serverContent.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func persistWorkingCopy() {
@@ -222,18 +172,6 @@ struct ServerMemoEditorView: View {
             in: modelContext,
             persist: true
         )
-    }
-
-    private func handleOpenDraftsSheet() {
-        persistWorkingCopy()
-        isEditorFocused = false
-        onOpenDraftsSheet()
-    }
-
-    private func handleCreateNewDraft() {
-        persistWorkingCopy()
-        isEditorFocused = false
-        onCreateNewDraft()
     }
 
     private func saveNote() {

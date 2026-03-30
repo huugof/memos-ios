@@ -282,12 +282,19 @@ struct MarkdownLiteFormatter {
         let nsLine = line as NSString
 
         if let match = firstMatch(in: line, regex: headerRegex) {
-            runs.append(AttributeRun(range: lineRange, attributes: [.font: theme.headerFont]))
+            let textOnlyRange = NSRange(
+                location: lineRange.location,
+                length: max(0, lineRange.length - (line.hasSuffix("\n") ? 1 : 0))
+            )
+            runs.append(AttributeRun(range: textOnlyRange, attributes: [.font: theme.headerFont]))
             let markerRange = match.range(at: 1)
             let markerPrefixLength = min(markerRange.length, nsLine.length)
             if markerPrefixLength > 0 {
                 let prefixRange = NSRange(location: lineRange.location, length: markerPrefixLength)
-                runs.append(AttributeRun(range: prefixRange, attributes: [.foregroundColor: theme.secondaryTextColor]))
+                let clippedPrefixRange = NSIntersectionRange(prefixRange, textOnlyRange)
+                if clippedPrefixRange.length > 0 {
+                    runs.append(AttributeRun(range: clippedPrefixRange, attributes: [.foregroundColor: theme.secondaryTextColor]))
+                }
             }
             return
         }
@@ -314,10 +321,10 @@ struct MarkdownLiteFormatter {
             let targetListPrefix = "\(indent)\(marker) [ ] "
             let taskPrefix = nsLine.substring(to: contentStart)
             let targetListPrefixWidth = (targetListPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let targetListHeadIndent = ceil(targetListPrefixWidth)
+            let targetListHeadIndent = ceil(targetListPrefixWidth * listIndentScale)
             let taskPrefixWidth = (taskPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let kerningGaps = CGFloat(max(1, checkboxTokenRange.length - 1))
-            let taskTokenKerning = (targetListPrefixWidth - taskPrefixWidth) / kerningGaps
+            let kerningGaps = CGFloat(max(1, checkboxTokenRange.length))
+            let taskTokenKerning = (targetListHeadIndent - taskPrefixWidth) / kerningGaps
             applyListIndent(
                 line: line,
                 lineRange: lineRange,
@@ -335,6 +342,11 @@ struct MarkdownLiteFormatter {
                 .textItemTag: checkboxTextItemIdentifier
             ]))
 
+            if checkboxTokenEnd < nsLine.length {
+                let resetKernRange = NSRange(location: lineRange.location + checkboxTokenEnd, length: 1)
+                runs.append(AttributeRun(range: resetKernRange, attributes: [.kern: CGFloat(0)]))
+            }
+
             if isChecked {
                 if contentRange.length > 0 {
                     let absoluteContentRange = NSRange(location: lineRange.location + contentRange.location, length: contentRange.length)
@@ -347,58 +359,80 @@ struct MarkdownLiteFormatter {
         if let match = firstMatch(in: line, regex: unorderedListRegex) {
             let indent = nsLine.substring(with: match.range(at: 1))
             let marker = nsLine.substring(with: match.range(at: 2))
+            let separator = nsLine.substring(with: match.range(at: 3))
             let targetListPrefix = "\(indent)\(marker) [ ] "
             let targetListPrefixWidth = (targetListPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let targetListHeadIndent = ceil(targetListPrefixWidth)
-            let contentStart = match.range(at: 3).location
+            let targetListHeadIndent = ceil(targetListPrefixWidth * listIndentScale)
+            let contentStart = match.range(at: 4).location
             let bulletPrefix = nsLine.substring(to: contentStart)
-            let bulletPrefixWidth = (bulletPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let bridgeKerning = max(0, targetListPrefixWidth - bulletPrefixWidth)
-            let markerShift = bridgeKerning * listMarkerShiftRatio
-            let adjustedBridgeKerning = max(0, bridgeKerning - markerShift)
-            applyListIndent(
-                line: line,
-                lineRange: lineRange,
-                contentGroup: 3,
-                match: match,
-                theme: theme,
-                runs: &runs,
-                headIndentOverride: targetListHeadIndent,
-                firstLineHeadIndentOverride: markerShift
-            )
-            if adjustedBridgeKerning > 0, contentStart > 0, contentStart < nsLine.length {
-                let bridgeStart = contentStart - 1
-                let bridgeRange = NSRange(location: lineRange.location + bridgeStart, length: 1)
-                runs.append(AttributeRun(range: bridgeRange, attributes: [.kern: adjustedBridgeKerning]))
+            if separator.contains("\t") {
+                applyListIndent(
+                    line: line,
+                    lineRange: lineRange,
+                    contentGroup: 4,
+                    match: match,
+                    theme: theme,
+                    runs: &runs,
+                    headIndentOverride: targetListHeadIndent,
+                    tabStopLocation: targetListHeadIndent
+                )
+            } else {
+                let bulletPrefixWidth = (bulletPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
+                let bridgeKerning = max(0, targetListHeadIndent - bulletPrefixWidth)
+                applyListIndent(
+                    line: line,
+                    lineRange: lineRange,
+                    contentGroup: 4,
+                    match: match,
+                    theme: theme,
+                    runs: &runs,
+                    headIndentOverride: targetListHeadIndent
+                )
+                if bridgeKerning > 0, contentStart > 0, contentStart < nsLine.length {
+                    let bridgeStart = contentStart - 1
+                    let bridgeRange = NSRange(location: lineRange.location + bridgeStart, length: 1)
+                    runs.append(AttributeRun(range: bridgeRange, attributes: [.kern: bridgeKerning]))
+                }
             }
             return
         }
 
         if let match = firstMatch(in: line, regex: orderedListRegex) {
             let indent = nsLine.substring(with: match.range(at: 1))
+            let separator = nsLine.substring(with: match.range(at: 4))
             let targetListPrefix = "\(indent)- [ ] "
             let targetListPrefixWidth = (targetListPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let targetListHeadIndent = ceil(targetListPrefixWidth)
-            let contentStart = match.range(at: 4).location
+            let targetListHeadIndent = ceil(targetListPrefixWidth * listIndentScale)
+            let contentStart = match.range(at: 5).location
             let orderedPrefix = nsLine.substring(to: contentStart)
-            let orderedPrefixWidth = (orderedPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let bridgeDelta = targetListPrefixWidth - orderedPrefixWidth
-            let markerShift = max(0, bridgeDelta) * listMarkerShiftRatio
-            let adjustedBridgeKerning = bridgeDelta - markerShift
-            applyListIndent(
-                line: line,
-                lineRange: lineRange,
-                contentGroup: 4,
-                match: match,
-                theme: theme,
-                runs: &runs,
-                headIndentOverride: targetListHeadIndent,
-                firstLineHeadIndentOverride: markerShift
-            )
-            if adjustedBridgeKerning != 0, contentStart > 0, contentStart < nsLine.length {
-                let bridgeStart = contentStart - 1
-                let bridgeRange = NSRange(location: lineRange.location + bridgeStart, length: 1)
-                runs.append(AttributeRun(range: bridgeRange, attributes: [.kern: adjustedBridgeKerning]))
+            if separator.contains("\t") {
+                applyListIndent(
+                    line: line,
+                    lineRange: lineRange,
+                    contentGroup: 5,
+                    match: match,
+                    theme: theme,
+                    runs: &runs,
+                    headIndentOverride: targetListHeadIndent,
+                    tabStopLocation: targetListHeadIndent
+                )
+            } else {
+                let orderedPrefixWidth = (orderedPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
+                let bridgeDelta = targetListHeadIndent - orderedPrefixWidth
+                applyListIndent(
+                    line: line,
+                    lineRange: lineRange,
+                    contentGroup: 5,
+                    match: match,
+                    theme: theme,
+                    runs: &runs,
+                    headIndentOverride: targetListHeadIndent
+                )
+                if bridgeDelta != 0, contentStart > 0, contentStart < nsLine.length {
+                    let bridgeStart = contentStart - 1
+                    let bridgeRange = NSRange(location: lineRange.location + bridgeStart, length: 1)
+                    runs.append(AttributeRun(range: bridgeRange, attributes: [.kern: bridgeDelta]))
+                }
             }
             return
         }
@@ -524,7 +558,8 @@ struct MarkdownLiteFormatter {
         runs: inout [AttributeRun],
         prefixOverride: String? = nil,
         headIndentOverride: CGFloat? = nil,
-        firstLineHeadIndentOverride: CGFloat? = nil
+        firstLineHeadIndentOverride: CGFloat? = nil,
+        tabStopLocation: CGFloat? = nil
     ) {
         let nsLine = line as NSString
         let contentStart = match.range(at: contentGroup).location
@@ -536,6 +571,10 @@ struct MarkdownLiteFormatter {
         let style = NSMutableParagraphStyle()
         style.firstLineHeadIndent = firstLineHeadIndentOverride ?? 0
         style.headIndent = width
+        if let tabStopLocation {
+            style.tabStops = [NSTextTab(textAlignment: .left, location: tabStopLocation)]
+            style.defaultTabInterval = tabStopLocation
+        }
 
         runs.append(AttributeRun(range: lineRange, attributes: [.paragraphStyle: style]))
         let prefixLength = min(contentStart, lineRange.length)
@@ -764,9 +803,9 @@ struct MarkdownLiteFormatter {
 
     private static let headerRegex = try! NSRegularExpression(pattern: #"^(\s{0,3}#{1,6}\s+).+$"#)
     private static let taskRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])\s+\[( |x|X)\]\s+(.*)$"#)
-    private static let unorderedListRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])\s+(.*)$"#)
-    private static let orderedListRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)([.)])\s+(.*)$"#)
-    private static let listMarkerShiftRatio: CGFloat = 0.35
+    private static let unorderedListRegex = try! NSRegularExpression(pattern: #"^(\s*)([-*+])(\t|\s+)(.*)$"#)
+    private static let orderedListRegex = try! NSRegularExpression(pattern: #"^(\s*)(\d+)([.)]?)(\t|\s+)(.*)$"#)
+    private static let listIndentScale: CGFloat = 0.75
 
     private static let openingFenceRegex = try! NSRegularExpression(pattern: #"^\s*```(?:\s*\S.*)?$"#)
     private static let closingFenceRegex = try! NSRegularExpression(pattern: #"^\s*```\s*$"#)

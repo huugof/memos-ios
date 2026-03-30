@@ -55,6 +55,7 @@ final class ServerMemoEditDraft {
     }
 
     var hasLocalChanges: Bool {
-        localContent != serverContent
+        localContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            != serverContent.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

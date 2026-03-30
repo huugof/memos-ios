@@ -15,7 +15,6 @@ enum ServerMemoSaveService {
             if memo.hasFullContent && existing.saveState == .idle && !existing.hasLocalChanges {
                 existing.serverContent = memo.content
                 existing.localContent = memo.content
-                existing.updatedAt = Date()
             }
             if existing.resourceName.isEmpty, let resourceName = memo.resourceName {
                 existing.resourceName = resourceName
@@ -192,6 +191,10 @@ final class ServerMemoSaveQueueController: ObservableObject {
         self.client = client
     }
 
+    deinit {
+        processingTask?.cancel()
+    }
+
     @discardableResult
     func enqueue(_ editDraft: ServerMemoEditDraft, in modelContext: ModelContext) -> Bool {
         if editDraft.saveState == .pending {
@@ -268,6 +271,7 @@ final class ServerMemoSaveQueueController: ObservableObject {
         guard processingTask == nil else { return }
 
         processingTask = Task { @MainActor [weak self] in
+            defer { self?.processingTask = nil }
             guard let self else { return }
 
             while !Task.isCancelled {
@@ -316,8 +320,6 @@ final class ServerMemoSaveQueueController: ObservableObject {
                     await Task.yield()
                 }
             }
-
-            self.processingTask = nil
         }
     }
 

@@ -274,11 +274,11 @@ final class MarkdownLiteFormatterTests: XCTestCase {
             let contentStart = match.range(at: 4).location
             let taskPrefix = nsLine.substring(to: contentStart)
 
-            let targetListPrefixWidth = (targetListPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
             let taskWidth = (taskPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width
-            let effectiveTaskWidth = taskWidth + (kern * CGFloat(max(1, checkboxRange.length - 1)))
+            let effectiveTaskWidth = taskWidth + (kern * CGFloat(max(1, checkboxRange.length)))
 
-            XCTAssertEqual(effectiveTaskWidth, targetListPrefixWidth, accuracy: 0.75)
+            let headIndent = rendered.runs.compactMap { ($0.attributes[.paragraphStyle] as? NSParagraphStyle)?.headIndent }.first!
+            XCTAssertEqual(effectiveTaskWidth, headIndent, accuracy: 0.75)
         }
     }
 
@@ -328,7 +328,7 @@ final class MarkdownLiteFormatterTests: XCTestCase {
 
         let targetPrefix = "- [ ] "
         let expected = ceil((targetPrefix as NSString).size(withAttributes: [.font: theme.baseFont]).width)
-        XCTAssertEqual(headIndent, expected, accuracy: 0.5)
+        XCTAssertEqual(headIndent!, expected, accuracy: 0.5)
     }
 
     func testUnorderedFirstLineTextStartMatchesSharedListPrefix() {
@@ -429,6 +429,55 @@ final class MarkdownLiteFormatterTests: XCTestCase {
 
         let firstLineTextStart = style.firstLineHeadIndent + orderedPrefixWidth + bridgeKern
         XCTAssertEqual(firstLineTextStart, targetListPrefixWidth, accuracy: 0.75)
+    }
+
+    func testTabSeparatedUnorderedListUsesTabStopAtSharedIndent() {
+        let text = "-\tplain bullet"
+        let theme = makeTheme()
+
+        let rendered = MarkdownLiteFormatter.fullRender(text: text, theme: theme)
+        let style = rendered.runs.compactMap { $0.attributes[.paragraphStyle] as? NSParagraphStyle }.first
+
+        XCTAssertNotNil(style)
+
+        let expected = ceil(("- [ ] " as NSString).size(withAttributes: [.font: theme.baseFont]).width)
+        XCTAssertEqual(style!.headIndent, expected, accuracy: 0.5)
+        XCTAssertEqual(style!.tabStops.first!.location, expected, accuracy: 0.5)
+
+        let tabBridgeRange = NSRange(location: 1, length: 1)
+        let hasBridgeKern = rendered.runs.contains { run in
+            run.range.location == tabBridgeRange.location
+                && run.range.length == tabBridgeRange.length
+                && run.attributes[.kern] != nil
+        }
+        XCTAssertFalse(hasBridgeKern)
+    }
+
+    func testBareOrderedListUsesCheckboxCompatibleIndent() {
+        let text = "1 bare ordered item"
+        let theme = makeTheme()
+
+        let rendered = MarkdownLiteFormatter.fullRender(text: text, theme: theme)
+        let style = rendered.runs.compactMap { $0.attributes[.paragraphStyle] as? NSParagraphStyle }.first
+
+        XCTAssertNotNil(style)
+
+        let expected = ceil(("- [ ] " as NSString).size(withAttributes: [.font: theme.baseFont]).width)
+        XCTAssertEqual(style!.headIndent, expected, accuracy: 0.5)
+    }
+
+    func testTabSeparatedBareOrderedListUsesTabStopAtSharedIndent() {
+        let text = "1\tbare ordered item"
+        let theme = makeTheme()
+
+        let rendered = MarkdownLiteFormatter.fullRender(text: text, theme: theme)
+        let style = rendered.runs.compactMap { $0.attributes[.paragraphStyle] as? NSParagraphStyle }.first
+
+        XCTAssertNotNil(style)
+
+        let expected = ceil(("- [ ] " as NSString).size(withAttributes: [.font: theme.baseFont]).width)
+        XCTAssertEqual(style!.headIndent, expected, accuracy: 0.5)
+        XCTAssertEqual(style!.tabStops.first!.location, expected, accuracy: 0.5)
     }
 
     func testInlineCodeRenderStylesFullSpanAndSuppressesNestedMarkdown() {

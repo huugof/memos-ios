@@ -6,6 +6,7 @@ extension ModelContext {
             try save()
         } catch {
             assertionFailure("Failed to save model context in \(context): \(error)")
+            print("⚠️ ModelContext save failed in \(context): \(error)")
         }
     }
 }

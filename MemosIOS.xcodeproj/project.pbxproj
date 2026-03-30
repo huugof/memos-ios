@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1A2B3C4D5E6F708190A1B2C3 /* ServerMemoDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4D5E6F708190A1B2C3D4E5 /* ServerMemoDeleteService.swift */; };
 		252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795498BBE4F9490E869AF36A /* DraftEditorView.swift */; };
+		2B3C4D5E6F708190A1B2C3D4 /* ServerMemoDeleteTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F708190A1B2C3D4E5F6 /* ServerMemoDeleteTask.swift */; };
 		36629055536B015DB077F63D /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */; };
 		3909908E13390CB272845F49 /* ServerMemoSaveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */; };
 		40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C74472076055012EE6D937 /* ModelContext+Persist.swift */; };
@@ -15,6 +17,7 @@
 		5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */; };
 		5C3475A24B6C88DD24557384 /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
 		5D158C156E2A0A3E96FF6AD3 /* DraftMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462609D7254A1C734443FA1E /* DraftMenuView.swift */; };
+		5E6F708190A1B2C3D4E5F607 /* ServerMemoDeleteQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F708190A1B2C3D4E5F60718 /* ServerMemoDeleteQueueTests.swift */; };
 		67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1892E90367D19C014B5DB91C /* MemosApp.swift */; };
 		6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D30B906F7228E420B8DC94 /* MemosClient.swift */; };
 		72F978A40DE08141F7E1743D /* ServerMemoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */; };
@@ -56,13 +59,16 @@
 		1892E90367D19C014B5DB91C /* MemosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosApp.swift; sourceTree = "<group>"; };
 		1FDBB605D40EF5E44DC19029 /* SurfacePanelHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePanelHost.swift; sourceTree = "<group>"; };
 		2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
+		3C4D5E6F708190A1B2C3D4E5 /* ServerMemoDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteService.swift; sourceTree = "<group>"; };
 		408248FB2E3B112C1F77B118 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		442F422A0920215ABAB5393A /* ServerMemosSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemosSheetView.swift; sourceTree = "<group>"; };
 		462609D7254A1C734443FA1E /* DraftMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftMenuView.swift; sourceTree = "<group>"; };
+		4D5E6F708190A1B2C3D4E5F6 /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
 		53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatterTests.swift; sourceTree = "<group>"; };
 		5C5F5A046FC50AFCF6336577 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
 		65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
 		6CC9CDDFC830112053304B30 /* DraftSendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftSendService.swift; sourceTree = "<group>"; };
+		6F708190A1B2C3D4E5F60718 /* ServerMemoDeleteQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteQueueTests.swift; sourceTree = "<group>"; };
 		795498BBE4F9490E869AF36A /* DraftEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftEditorView.swift; sourceTree = "<group>"; };
 		7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
 		8354C526B79D2F45DDD63DCB /* StatusBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeView.swift; sourceTree = "<group>"; };
@@ -100,6 +106,7 @@
 			children = (
 				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
 				53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */,
+				6F708190A1B2C3D4E5F60718 /* ServerMemoDeleteQueueTests.swift */,
 				7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */,
 			);
 			path = MemosIOSTests;
@@ -118,6 +125,7 @@
 			children = (
 				5C5F5A046FC50AFCF6336577 /* Draft.swift */,
 				2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */,
+				4D5E6F708190A1B2C3D4E5F6 /* ServerMemoDeleteTask.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -183,6 +191,7 @@
 				6CC9CDDFC830112053304B30 /* DraftSendService.swift */,
 				65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */,
 				C3D30B906F7228E420B8DC94 /* MemosClient.swift */,
+				3C4D5E6F708190A1B2C3D4E5 /* ServerMemoDeleteService.swift */,
 				C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */,
 			);
 			path = Services;
@@ -310,7 +319,9 @@
 				6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */,
 				40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */,
 				767F98B8A19FE571D96CF82B /* NoteTextView.swift in Sources */,
+				2B3C4D5E6F708190A1B2C3D4 /* ServerMemoDeleteTask.swift in Sources */,
 				D4B5E64BA90AAE346A06B8A2 /* ServerMemoEditDraft.swift in Sources */,
+				1A2B3C4D5E6F708190A1B2C3 /* ServerMemoDeleteService.swift in Sources */,
 				72F978A40DE08141F7E1743D /* ServerMemoEditorView.swift in Sources */,
 				3909908E13390CB272845F49 /* ServerMemoSaveService.swift in Sources */,
 				874614767398617B21C82CBF /* ServerMemosSheetView.swift in Sources */,
@@ -326,6 +337,7 @@
 			files = (
 				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
 				54990FB1A1717C9A8D392155 /* MarkdownLiteFormatterTests.swift in Sources */,
+				5E6F708190A1B2C3D4E5F607 /* ServerMemoDeleteQueueTests.swift in Sources */,
 				EBE2D06DA7ED48916DA3B4BD /* ServerMemoSaveQueueTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

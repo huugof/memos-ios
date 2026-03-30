@@ -99,7 +99,7 @@ struct ServerMemoPage: Equatable {
 struct MemosClient {
     var session: URLSession = .shared
 
-    func createMemo(content: String, baseURLString: String, token: String, allowInsecureHTTP: Bool) async throws {
+    func createMemo(content: String, baseURLString: String, token: String, allowInsecureHTTP: Bool) async throws -> ServerMemoSummary {
         let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
             baseURLString: baseURLString,
             token: token,
@@ -124,6 +124,17 @@ struct MemosClient {
                 let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 throw MemosError.badResponse(http.statusCode, body)
             }
+
+            if let memo = Self.extractMemoSummary(from: data, fallbackIndex: 0) {
+                return memo
+            }
+
+            return ServerMemoSummary(
+                id: "created-\(UUID().uuidString)",
+                resourceName: nil,
+                content: content,
+                updatedAt: Date()
+            )
         } catch let error as MemosError {
             throw error
         } catch {
@@ -285,7 +296,7 @@ struct MemosClient {
                 id: normalizedResourceName,
                 resourceName: normalizedResourceName,
                 content: "",
-                updatedAt: Date()
+                updatedAt: nil
             )
         } catch let error as MemosError {
             throw error
@@ -356,6 +367,35 @@ struct MemosClient {
         }
     }
 
+    func deleteMemo(
+        resourceName: String,
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool
+    ) async throws {
+        let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+
+        let normalizedResourceName = Self.normalizedResourceName(from: resourceName)
+        let endpoint = Self.memoEndpoint(baseURL: baseURL, resourceName: normalizedResourceName)
+
+        do {
+            try await performDelete(endpoint: endpoint, token: trimmedToken)
+            return
+        } catch let error as MemosError {
+            if case let .badResponse(statusCode, _) = error, Self.shouldTryArchiveFallback(statusCode: statusCode) {
+                try await performArchiveFallback(endpoint: endpoint, token: trimmedToken)
+                return
+            }
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
     private func validatedBaseURLAndToken(
         baseURLString: String,
         token: String,
@@ -391,6 +431,107 @@ struct MemosClient {
         }
 
         return (cleanedURL, trimmedToken)
+    }
+
+    private func performDelete(endpoint: URL, token: String) async throws {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MemosError.badURL
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
+    private func performArchiveFallback(endpoint: URL, token: String) async throws {
+        let attempts: [(updateMask: String, payloadKey: String)] = [
+            ("rowStatus", "rowStatus"),
+            ("row_status", "rowStatus"),
+            ("rowStatus", "row_status")
+        ]
+
+        var lastError: MemosError = .badURL
+
+        for attempt in attempts {
+            do {
+                try await performArchivePatch(
+                    endpoint: endpoint,
+                    updateMask: attempt.updateMask,
+                    payloadKey: attempt.payloadKey,
+                    token: token
+                )
+                return
+            } catch let error as MemosError {
+                lastError = error
+            } catch {
+                lastError = .networkFailure(error.localizedDescription)
+            }
+        }
+
+        throw lastError
+    }
+
+    private func performArchivePatch(
+        endpoint: URL,
+        updateMask: String,
+        payloadKey: String,
+        token: String
+    ) async throws {
+        guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw MemosError.badURL
+        }
+        components.queryItems = [URLQueryItem(name: "updateMask", value: updateMask)]
+        guard let finalURL = components.url else {
+            throw MemosError.badURL
+        }
+
+        var request = URLRequest(url: finalURL)
+        request.httpMethod = "PATCH"
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [payloadKey: "ARCHIVED"], options: [])
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw MemosError.badURL
+            }
+
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
+    private static func memoEndpoint(baseURL: URL, resourceName: String) -> URL {
+        var endpoint = baseURL.appendingPathComponent("api/v1")
+        for segment in resourceName.split(separator: "/") {
+            endpoint.appendPathComponent(String(segment))
+        }
+        return endpoint
+    }
+
+    private static func shouldTryArchiveFallback(statusCode: Int) -> Bool {
+        statusCode == 400 || statusCode == 404 || statusCode == 405 || statusCode == 501
     }
 
     private static func extractTags(from data: Data) -> Set<String> {
