@@ -33,6 +33,40 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UIRequiresFullScreen: NO
+  MemoChat:
+    type: application
+    platform: iOS
+    sources:
+      - path: MemoChat
+      - path: MemosIOS/Models
+      - path: MemosIOS/Services
+      - path: MemosIOS/Storage
+      - path: MemosIOS/Views/Components
+        includes:
+          - NoteTextView.swift
+          - MarkdownLiteFormatter.swift
+          - KeyboardStateObserver.swift
+      - path: MemosIOS/Views
+        includes:
+          - SettingsView.swift
+          - ServerMemosSheetView.swift
+    settings:
+      base:
+        PRODUCT_NAME: MemoChat
+        PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemoChat
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        DEVELOPMENT_ASSET_PATHS: '"MemoChat/Resources"'
+        SUPPORTS_MACCATALYST: NO
+        INFOPLIST_KEY_CFBundleDisplayName: MemoChat
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UIRequiresFullScreen: NO
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: MemoChat uses the microphone for voice transcription.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: MemoChat uses speech recognition to transcribe your voice notes.
+        IPHONEOS_DEPLOYMENT_TARGET: 26.0
+
   MemosIOSTests:
     type: bundle.unit-test
     platform: iOS
@@ -46,6 +80,15 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Memos.app/Memos"
         BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
+  MemoChat:
+    build:
+      targets:
+        MemoChat: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+
   MemosIOS:
     build:
       targets:

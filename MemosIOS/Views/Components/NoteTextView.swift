@@ -182,6 +182,7 @@ struct EditableNoteTextView: View {
 struct RenderedNoteTextView: View {
     @Binding var text: String
     var allowsScrolling: Bool = false
+    var shrinkToFit: Bool = false
     var onTagTapped: (String) -> Void = { _ in }
     var onNonInteractiveTap: (() -> Void)? = nil
 
@@ -192,6 +193,7 @@ struct RenderedNoteTextView: View {
             focusRequestID: UUID(),
             isEditingEnabled: false,
             allowsScrolling: allowsScrolling,
+            shrinkToFit: shrinkToFit,
             onTagTapped: onTagTapped,
             onNonInteractiveTap: onNonInteractiveTap
         )
@@ -204,6 +206,7 @@ struct NoteTextView: UIViewRepresentable {
     var focusRequestID: UUID
     var isEditingEnabled: Bool = true
     var allowsScrolling: Bool = true
+    var shrinkToFit: Bool = false
     var extraBottomScrollPadding: CGFloat = 0
     var tagSuggestions: [String] = []
     var onTagAccepted: (String) -> Void = { _ in }
@@ -284,6 +287,14 @@ struct NoteTextView: UIViewRepresentable {
         guard !allowsScrolling else { return nil }
         let targetWidth = proposal.width ?? uiView.bounds.width
         guard targetWidth > 0 else { return nil }
+        if shrinkToFit, let attributed = uiView.attributedText, attributed.length > 0 {
+            let rect = attributed.boundingRect(
+                with: CGSize(width: targetWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+            return CGSize(width: ceil(rect.width), height: max(22, ceil(rect.height)))
+        }
         let fitting = uiView.sizeThatFits(CGSize(width: targetWidth, height: .greatestFiniteMagnitude))
         return CGSize(width: targetWidth, height: max(22, fitting.height))
     }

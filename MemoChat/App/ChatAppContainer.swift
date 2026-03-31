@@ -1,0 +1,14 @@
+import Foundation
+import SwiftData
+
+enum ChatAppContainer {
+    static func make() -> ModelContainer {
+        let schema = Schema([Draft.self, ServerMemoEditDraft.self, ServerMemoDeleteTask.self])
+        let configuration = ModelConfiguration()
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Failed to initialize MemoChat model container: \(error)")
+        }
+    }
+}
