@@ -3,6 +3,7 @@ import SwiftData
 
 struct ChatInputBar: View {
     let activeDraft: Draft?
+    let keyboardVisible: Bool
     let onCommit: () -> Void
     let onPlusTapped: () -> Void
 
@@ -15,15 +16,19 @@ struct ChatInputBar: View {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var horizontalPad: CGFloat { keyboardVisible ? 12 : 28 }
+    private var bottomPad: CGFloat { keyboardVisible ? 10 : -10 }
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
             plusButton
 
             inputPill
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, horizontalPad)
         .padding(.top, 8)
-        .padding(.bottom, 10)
+        .padding(.bottom, bottomPad)
+        .animation(.easeOut(duration: 0.2), value: keyboardVisible)
         .onChange(of: inputText) { _, newText in saveText(newText) }
         .onChange(of: activeDraft?.id) { _, _ in inputText = activeDraft?.text ?? "" }
         .onChange(of: activeDraft?.text) { _, newText in
@@ -47,7 +52,7 @@ struct ChatInputBar: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: singleLinePillHeight, height: singleLinePillHeight)
-                .background(Color(uiColor: .secondarySystemBackground), in: Circle())
+                .glassEffect(in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

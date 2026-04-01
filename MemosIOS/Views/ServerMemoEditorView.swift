@@ -4,37 +4,26 @@ import SwiftData
 struct ServerMemoEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
 
     @Bindable var editDraft: ServerMemoEditDraft
 
-    let saveQueue: ServerMemoSaveQueueController
-    let onSaveSucceeded: (ServerMemoSummary) -> Void
-    let onDismissAfterSave: () -> Void
     let onTagTapped: (String) -> Void
 
     @State private var draftText: String
     @State private var remoteTagTask: Task<Void, Never>?
-    @State private var saveTask: Task<Void, Never>?
     @State private var isEditorFocused: Bool
     @State private var focusRequestID = UUID()
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
-    @State private var isShowingSaveConfirmation = false
-    @State private var saveConfirmationTask: Task<Void, Never>?
 
     init(
         editDraft: ServerMemoEditDraft,
-        saveQueue: ServerMemoSaveQueueController,
         shouldAutoFocus: Bool = true,
-        onSaveSucceeded: @escaping (ServerMemoSummary) -> Void = { _ in },
-        onDismissAfterSave: @escaping () -> Void = {},
         onTagTapped: @escaping (String) -> Void = { _ in }
     ) {
         self.editDraft = editDraft
-        self.saveQueue = saveQueue
-        self.onSaveSucceeded = onSaveSucceeded
-        self.onDismissAfterSave = onDismissAfterSave
         self.onTagTapped = onTagTapped
         _draftText = State(initialValue: editDraft.localContent)
         _isEditorFocused = State(initialValue: shouldAutoFocus)
@@ -50,70 +39,51 @@ struct ServerMemoEditorView: View {
     }
 
     var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                if let error = editDraft.lastError, !error.isEmpty {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+        VStack(spacing: 0) {
+            if let error = editDraft.lastError, !error.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(error)
-                                .font(.footnote)
-                                .foregroundStyle(.primary)
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
 
-                            Button("Retry Save") {
-                                saveNote()
-                            }
-                            .font(.footnote.weight(.semibold))
-                        }
-
-                        Spacer()
-                    }
-                    .padding(12)
-                    .background(Color.orange.opacity(0.12))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
+                    Spacer()
                 }
+                .padding(12)
+                .background(Color.orange.opacity(0.12))
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+            }
 
-                EditableNoteTextView(
-                    text: $draftText,
-                    isFocused: $isEditorFocused,
-                    focusRequestID: focusRequestID,
-                    tagSuggestions: tagSuggestions,
-                    onTagAccepted: { tag in
-                        rememberAcceptedTag(tag)
-                    },
-                    onTagTapped: onTagTapped
-                )
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .onChange(of: draftText) { _, _ in
-                    if draftText.utf16.count <= 4_000 {
-                        refreshTagSuggestions()
-                    }
+            EditableNoteTextView(
+                text: $draftText,
+                isFocused: $isEditorFocused,
+                focusRequestID: focusRequestID,
+                tagSuggestions: tagSuggestions,
+                onTagAccepted: { tag in
+                    rememberAcceptedTag(tag)
+                },
+                onTagTapped: onTagTapped
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 10)
+            .onChange(of: draftText) { _, _ in
+                if draftText.utf16.count <= 4_000 {
+                    refreshTagSuggestions()
                 }
             }
         }
-        .opacity(isShowingSaveConfirmation ? 0 : 1)
-        .animation(.easeInOut(duration: 0.2), value: isShowingSaveConfirmation)
-        .overlay {
-            if isShowingSaveConfirmation {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 48, weight: .medium))
-                        .foregroundStyle(.green)
-                    Text("Saved")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+        .navigationTitle("Edit Note")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    persistWorkingCopy()
+                    dismiss()
                 }
-                .transition(.scale(scale: 0.6).combined(with: .opacity))
             }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(true)
-        .overlay(alignment: .bottomTrailing) {
-            saveButtonOverlay
         }
         .onAppear {
             refreshTagSuggestions()
@@ -132,64 +102,7 @@ struct ServerMemoEditorView: View {
                 persistWorkingCopy()
             }
             remoteTagTask?.cancel()
-            saveTask?.cancel()
-            saveConfirmationTask?.cancel()
         }
-    }
-
-    private var saveButtonContent: RoundCaptureButtonContent {
-        if isShowingSaveConfirmation {
-            return .symbol("checkmark")
-        }
-        if editDraft.saveState == .saving {
-            return .progress
-        }
-        return .symbol("paperplane.fill")
-    }
-
-    private var saveAccessibilityLabel: String {
-        if isShowingSaveConfirmation {
-            return "Saved"
-        }
-        if editDraft.saveState == .saving {
-            return "Saving"
-        }
-        if editDraft.saveState == .pending {
-            return "Save pending"
-        }
-        return "Save"
-    }
-
-    private var saveButtonOverlay: some View {
-        RoundCaptureButton(
-            content: saveButtonContent,
-            isEnabled: canSaveCurrentText,
-            action: saveNote,
-            accessibilityLabel: saveAccessibilityLabel
-        )
-        .padding(.trailing, 20)
-        .padding(.bottom, 12)
-        .animation(.easeInOut(duration: 0.20), value: isShowingSaveConfirmation)
-    }
-
-    private var canSaveCurrentText: Bool {
-        if isShowingSaveConfirmation {
-            return false
-        }
-
-        if editDraft.saveState == .saving {
-            return false
-        }
-
-        if draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return false
-        }
-
-        if hasWorkingCopyChanges {
-            return true
-        }
-
-        return editDraft.saveState == .pending
     }
 
     private var hasWorkingCopyChanges: Bool {
@@ -204,39 +117,6 @@ struct ServerMemoEditorView: View {
             in: modelContext,
             persist: true
         )
-    }
-
-    private func saveNote() {
-        guard canSaveCurrentText else { return }
-
-        persistWorkingCopy()
-        saveTask?.cancel()
-
-        saveTask = Task { @MainActor in
-            let outcome = await saveQueue.saveNow(editDraft, in: modelContext)
-            switch outcome {
-            case .success(let memo):
-                onSaveSucceeded(memo)
-                showSaveConfirmation()
-            case .failure:
-                break
-            }
-        }
-    }
-
-    private func showSaveConfirmation() {
-        saveConfirmationTask?.cancel()
-        isEditorFocused = false
-
-        withAnimation(.easeInOut(duration: 0.20)) {
-            isShowingSaveConfirmation = true
-        }
-
-        saveConfirmationTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(800))
-            guard !Task.isCancelled else { return }
-            onDismissAfterSave()
-        }
     }
 
     private func fetchRemoteTagsOnce() {

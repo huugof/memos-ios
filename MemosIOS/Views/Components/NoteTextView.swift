@@ -264,6 +264,8 @@ struct NoteTextView: UIViewRepresentable {
                 DispatchQueue.main.async {
                     guard context.coordinator.parent.isFocused else { return }
                     uiView.becomeFirstResponder()
+                    let beginning = uiView.beginningOfDocument
+                    uiView.selectedTextRange = uiView.textRange(from: beginning, to: beginning)
                 }
             }
         }

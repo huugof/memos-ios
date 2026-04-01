@@ -29,7 +29,6 @@ final class KeyboardStateObserver: ObservableObject {
 
         let endFrame = frameValue.cgRectValue
         let overlap = Self.keyboardOverlapHeight(for: endFrame)
-
         height = overlap
         isVisible = overlap > 0.5
     }

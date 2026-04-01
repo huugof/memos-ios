@@ -11,6 +11,8 @@ final class ServerMemoEditDraft {
     var saveStateRaw: Int
     var lastError: String?
     var lastSyncedAt: Date?
+    // Preserved before each successful save so old content stays deduped in the chat timeline.
+    var previousServerContent: String?
 
     init(
         memoID: String,

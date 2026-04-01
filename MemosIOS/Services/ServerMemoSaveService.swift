@@ -160,6 +160,7 @@ enum ServerMemoSaveService {
                 )
             }
 
+            editDraft.previousServerContent = editDraft.serverContent
             editDraft.serverContent = trimmed
             editDraft.localContent = trimmed
             editDraft.saveState = .idle
