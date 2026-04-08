@@ -343,10 +343,6 @@ struct ChatRootView: View {
         }
     }
 
-    private var scrollViewIdentity: String {
-        "\(showDraftsOnly)\(showAttachmentsOnly)\(showTodosOnly)\(isSearching)"
-    }
-
     @ViewBuilder
     private var bottomBar: some View {
         let gradient = LinearGradient(
@@ -431,6 +427,7 @@ struct ChatRootView: View {
             .ignoresSafeArea(.container, edges: .bottom)
             // Push scroll content up so last message can be fully above the bar
             .contentMargins(.bottom, 110, for: .scrollContent)
+            .background(Color(uiColor: .systemBackground))
             .overlay(alignment: .top) {
                 LinearGradient(
                     colors: [Color(uiColor: .systemBackground), .clear],
@@ -441,13 +438,11 @@ struct ChatRootView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
             }
-            .id(scrollViewIdentity)
             .refreshable { await serverMemosStore.loadAllPages() }
-            .onChange(of: scrollViewIdentity) { _, _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    proxy.scrollTo("bottom", anchor: .bottom)
-                }
-            }
+            .onChange(of: showTodosOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: showDraftsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: showAttachmentsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: isSearching) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: mergedTimeline.count) { oldCount, newCount in
                 // Only scroll to bottom when new messages are added, not on delete/edit
                 guard newCount > oldCount else { return }

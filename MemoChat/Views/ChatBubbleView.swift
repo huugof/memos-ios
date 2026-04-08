@@ -17,6 +17,7 @@ struct ChatBubbleView: View {
     @State private var mutableText: String
     @State private var showDeleteConfirmation = false
     @State private var showStatusFlags = false
+    @State private var isSelectMode = false
 
     init(text: String, sendState: Draft.SendState? = nil,
          isSentAndUnedited: Bool = false, hasLocalEdits: Bool = false, isSavePending: Bool = false,
@@ -68,12 +69,9 @@ struct ChatBubbleView: View {
         hasLocalEdits || isSavePending || (sendState == .idle && !isSentAndUnedited)
     }
 
-    private var bubbleTintColor: Color {
-        isDraft ? Color(uiColor: .systemGreen) : .clear
-    }
-
     private var isSingleLine: Bool {
-        !mutableText.contains("\n")
+        // ~35 chars fit on one line at bubble max width with body font; 40 gives slack for narrow chars
+        !mutableText.contains("\n") && mutableText.count <= 40
     }
 
     private var bubbleCornerRadius: CGFloat {
@@ -141,24 +139,24 @@ struct ChatBubbleView: View {
     }
 
     private var bubbleContent: some View {
-        let tc = bubbleTintColor
         let previewText = mutableText
         let cr = bubbleCornerRadius
         return RenderedNoteTextView(text: $mutableText, allowsScrolling: false, shrinkToFit: true,
-                                    onTagTapped: onTagTapped ?? { _ in })
+                                    onTagTapped: onTagTapped ?? { _ in },
+                                    isSelectMode: isSelectMode,
+                                    onSelectionCleared: { isSelectMode = false })
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: cr, style: .continuous)
                     .fill(Color(uiColor: .tertiarySystemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cr, style: .continuous)
-                            .fill(tc)
-                    )
             )
             .contextMenu {
                 if let onEdit {
                     Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
+                }
+                Button { isSelectMode = true } label: {
+                    Label("Select", systemImage: "text.cursor")
                 }
                 Button { UIPasteboard.general.string = text } label: {
                     Label("Copy", systemImage: "doc.on.doc")
@@ -185,10 +183,6 @@ struct ChatBubbleView: View {
                     .background(
                         RoundedRectangle(cornerRadius: cr, style: .continuous)
                             .fill(Color(uiColor: .tertiarySystemBackground))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cr, style: .continuous)
-                                    .fill(tc)
-                            )
                     )
             }
     }

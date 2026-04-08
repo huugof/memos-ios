@@ -185,6 +185,8 @@ struct RenderedNoteTextView: View {
     var shrinkToFit: Bool = false
     var onTagTapped: (String) -> Void = { _ in }
     var onNonInteractiveTap: (() -> Void)? = nil
+    var isSelectMode: Bool = false
+    var onSelectionCleared: (() -> Void)? = nil
 
     var body: some View {
         NoteTextView(
@@ -195,7 +197,9 @@ struct RenderedNoteTextView: View {
             allowsScrolling: allowsScrolling,
             shrinkToFit: shrinkToFit,
             onTagTapped: onTagTapped,
-            onNonInteractiveTap: onNonInteractiveTap
+            onNonInteractiveTap: onNonInteractiveTap,
+            isSelectable: isSelectMode,
+            onSelectionCleared: onSelectionCleared
         )
     }
 }
@@ -212,6 +216,8 @@ struct NoteTextView: UIViewRepresentable {
     var onTagAccepted: (String) -> Void = { _ in }
     var onTagTapped: (String) -> Void = { _ in }
     var onNonInteractiveTap: (() -> Void)? = nil
+    var isSelectable: Bool = false
+    var onSelectionCleared: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -225,7 +231,7 @@ struct NoteTextView: UIViewRepresentable {
         textView.alwaysBounceVertical = allowsScrolling
         textView.keyboardDismissMode = isEditingEnabled ? .interactive : .none
         textView.textContainer.lineFragmentPadding = 0
-        textView.isSelectable = isEditingEnabled
+        textView.isSelectable = isEditingEnabled || isSelectable
         textView.isEditable = isEditingEnabled
         textView.isScrollEnabled = allowsScrolling
         textView.allowsEditingTextAttributes = false
@@ -246,7 +252,12 @@ struct NoteTextView: UIViewRepresentable {
         context.coordinator.updateTagSuggestions(tagSuggestions)
         context.coordinator.updateInteractionMode(isEditingEnabled: isEditingEnabled)
         uiView.isEditable = isEditingEnabled
-        uiView.isSelectable = isEditingEnabled
+        let selectableNow = isEditingEnabled || isSelectable
+        if isSelectable && !isEditingEnabled && !context.coordinator.prevIsSelectable {
+            DispatchQueue.main.async { uiView.selectAll(nil) }
+        }
+        context.coordinator.prevIsSelectable = selectableNow
+        uiView.isSelectable = selectableNow
         uiView.isScrollEnabled = allowsScrolling
         uiView.alwaysBounceVertical = allowsScrolling
         uiView.keyboardDismissMode = isEditingEnabled ? .interactive : .none
@@ -270,7 +281,7 @@ struct NoteTextView: UIViewRepresentable {
             }
         }
 
-        if (!isFocused || !isEditingEnabled), uiView.isFirstResponder {
+        if (!isFocused || !isEditingEnabled) && !isSelectable, uiView.isFirstResponder {
             uiView.resignFirstResponder()
         }
 
@@ -304,6 +315,7 @@ struct NoteTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var parent: NoteTextView
         var lastFocusRequestID: UUID?
+        var prevIsSelectable: Bool = false
 
         private enum NewlineAction {
             case insert(String)
@@ -406,6 +418,10 @@ struct NoteTextView: UIViewRepresentable {
             let theme = MarkdownLiteFormatter.Theme.default(for: textView)
             textView.typingAttributes = MarkdownLiteFormatter.baseAttributes(theme: theme)
             refreshTagPreview(in: textView)
+            if !parent.isEditingEnabled && parent.isSelectable && textView.selectedRange.length == 0 {
+                let callback = parent.onSelectionCleared
+                DispatchQueue.main.async { callback?() }
+            }
         }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
@@ -1008,6 +1024,9 @@ private final class OverlayAwareTextView: UITextView {
 
     override init(frame: CGRect, textContainer: NSTextContainer?) {
         super.init(frame: frame, textContainer: textContainer)
+        // Force TextKit 1 mode upfront — this class uses layoutManager for checkbox
+        // positioning, so the view would downgrade on every layout pass otherwise.
+        _ = self.layoutManager
         configureCheckboxOverlay()
     }
 
