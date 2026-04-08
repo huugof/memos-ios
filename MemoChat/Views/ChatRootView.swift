@@ -406,7 +406,8 @@ struct ChatRootView: View {
                                 onDelete: { handleDelete(entry) },
                                 onSaveToServer: entry.hasLocalEdits ? { handleSaveToServer(entry) } :
                                                 (entry.id.hasPrefix("d-") ? { handleSendDraft(entry) } : nil),
-                                onCheckboxToggled: entry.id.hasPrefix("m-") ? { handleCheckboxToggle(entry, newText: $0) } : nil,
+                                onCheckboxToggled: entry.id.hasPrefix("m-") ? { handleCheckboxToggle(entry, newText: $0) } :
+                                                   (entry.id.hasPrefix("d-") ? { handleDraftCheckboxToggle(entry, newText: $0) } : nil),
                                 onTagTapped: { handleTagTap($0) },
                                 suppressLocalEditsBadge: showTodosOnly
                             )
@@ -571,6 +572,15 @@ struct ChatRootView: View {
               let uuid = UUID(uuidString: String(entry.id.dropFirst(2))),
               let draft = allDrafts.first(where: { $0.id == uuid }) else { return }
         sendQueue.enqueue(draft, in: modelContext)
+    }
+
+    private func handleDraftCheckboxToggle(_ entry: TimelineEntry, newText: String) {
+        guard entry.id.hasPrefix("d-"),
+              let uuid = UUID(uuidString: String(entry.id.dropFirst(2))),
+              let draft = allDrafts.first(where: { $0.id == uuid }) else { return }
+        draft.text = newText
+        draft.updatedAt = Date()
+        modelContext.saveOrAssert()
     }
 
     private func handleSaveToServer(_ entry: TimelineEntry) {
