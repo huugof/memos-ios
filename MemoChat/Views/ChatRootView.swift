@@ -350,18 +350,8 @@ struct ChatRootView: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        if isSearching {
-            ChatSearchBar(text: $searchText, keyboardVisible: keyboard.isVisible, autoFocus: searchAutoFocus) {
-                isSearching = false
-                searchText = ""
-                showTodosOnly = false
-                showDraftsOnly = false
-                showAttachmentsOnly = false
-            }
-            .background(alignment: .bottom) {
-                gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
-            }
-        } else {
+        ZStack(alignment: .bottom) {
+            // Always in the hierarchy so the keyboard never dismisses on mode switch.
             ChatInputBar(
                 activeDraft: activeDraft,
                 keyboardVisible: keyboard.isVisible,
@@ -375,9 +365,23 @@ struct ChatRootView: View {
                 onRemoveFile: { id in pendingFiles.removeAll { $0.id == id } },
                 tagSuggestions: tagsByFrequency
             )
-            .background(alignment: .bottom) {
-                gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
+            .opacity(isSearching ? 0 : 1)
+            .allowsHitTesting(!isSearching)
+
+            if isSearching {
+                ChatSearchBar(text: $searchText, keyboardVisible: keyboard.isVisible, autoFocus: searchAutoFocus) {
+                    // Reclaim input focus before search bar leaves — keeps keyboard up.
+                    inputFocusTrigger = UUID()
+                    isSearching = false
+                    searchText = ""
+                    showTodosOnly = false
+                    showDraftsOnly = false
+                    showAttachmentsOnly = false
+                }
             }
+        }
+        .background(alignment: .bottom) {
+            gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
         }
     }
 
