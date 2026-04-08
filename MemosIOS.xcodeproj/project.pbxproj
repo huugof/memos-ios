@@ -23,6 +23,7 @@
 		47ECD5BD98B74A91B9AB5C74 /* ChatAppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62DC846BE9F8496E0BE346CF /* ChatAppContainer.swift */; };
 		4C11BC0875F2FCF6BAE87286 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */; };
 		54990FB1A1717C9A8D392155 /* MarkdownLiteFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */; };
+		575E120BB7C1067F3A1C00C1 /* ChatMemoEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33E4069A74F4E2E1C070F233 /* ChatMemoEditorSheet.swift */; };
 		594606047FBEB167F962BF02 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D30B906F7228E420B8DC94 /* MemosClient.swift */; };
 		5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */; };
 		5C3475A24B6C88DD24557384 /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
@@ -43,18 +44,14 @@
 		98FFF1D0E7C6616A2C53C9D4 /* ChatTextInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748DBD217790BAAABBE3A98A /* ChatTextInput.swift */; };
 		99FAE97B62CD88078E691131 /* EditorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6895619A12B12EA5CC18252 /* EditorRootView.swift */; };
 		A3C73D4222A3108D5CDDB781 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
-		412AC60F38394A38BE19E888 /* ChatMemoEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91AE6FB63864BB29899F156 /* ChatMemoEditorSheet.swift */; };
-		D3D626C1BD6340D1AA84112A /* FloatingSendPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4CDF6A8A0A5249589CA9F8 /* FloatingSendPill.swift */; };
-		25B4370E0BF0429AA93FBDA0 /* ServerMemoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */; };
 		A6E811E4A864CF64AFC964E8 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E68EE5D1E090B8C8F732D9 /* ChatBubbleView.swift */; };
 		A6E9DCF9E6520ABCC89D701F /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
 		A9119D2DE985DA2AC9D2B1B3 /* AppModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD9B2CC0C009355AB37BA83 /* AppModelContainer.swift */; };
 		AAB85D5AC74418D9659DD75E /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */; };
 		AF6D57E74C6E356C61A11F3D /* ChatAutoCommitCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD47F9F74C5A7C9094E48315 /* ChatAutoCommitCoordinator.swift */; };
-		B1A1279984787D35AB07441B /* SurfacePanelHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E36C41B3A75837B89D68043 /* SurfacePanelHost.swift */; };
 		B37416CB17DC21CF83AC6BD6 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374E7DEDA2DB7D23FF4FD07B /* ChatInputBar.swift */; };
 		B4DADC6C81DCBA9922FE85F0 /* NoteTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5642E65B09453E948886CFA /* NoteTextView.swift */; };
-		B5EB53A68A28A077DA6A8D3E /* BottomCaptureNavBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F260F3FB66BB33467D608753 /* BottomCaptureNavBar.swift */; };
+		BAFE5B525AE088064568D7E1 /* ServerMemoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */; };
 		CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
 		D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */; };
 		D4B5E64BA90AAE346A06B8A2 /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */; };
@@ -90,9 +87,9 @@
 		0C4CDF6A8A0A5249589CA9F8 /* FloatingSendPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingSendPill.swift; sourceTree = "<group>"; };
 		0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1892E90367D19C014B5DB91C /* MemosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosApp.swift; sourceTree = "<group>"; };
-		1E36C41B3A75837B89D68043 /* SurfacePanelHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePanelHost.swift; sourceTree = "<group>"; };
 		267BC0553695E330DE17C773 /* MemoChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoChatApp.swift; sourceTree = "<group>"; };
 		2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
+		33E4069A74F4E2E1C070F233 /* ChatMemoEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMemoEditorSheet.swift; sourceTree = "<group>"; };
 		374E7DEDA2DB7D23FF4FD07B /* ChatInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputBar.swift; sourceTree = "<group>"; };
 		3F3229B12ED0F0DE3D36FD9E /* ServerMemoDeleteQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteQueueTests.swift; sourceTree = "<group>"; };
 		404A002EE5250961E72196E1 /* KeyboardStateObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardStateObserver.swift; sourceTree = "<group>"; };
@@ -108,7 +105,6 @@
 		5C5F5A046FC50AFCF6336577 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
 		62DC846BE9F8496E0BE346CF /* ChatAppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAppContainer.swift; sourceTree = "<group>"; };
 		63E68EE5D1E090B8C8F732D9 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		B91AE6FB63864BB29899F156 /* ChatMemoEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMemoEditorSheet.swift; sourceTree = "<group>"; };
 		65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
 		6CC9CDDFC830112053304B30 /* DraftSendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftSendService.swift; sourceTree = "<group>"; };
 		748DBD217790BAAABBE3A98A /* ChatTextInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTextInput.swift; sourceTree = "<group>"; };
@@ -131,7 +127,6 @@
 		E5C74472076055012EE6D937 /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
 		E6895619A12B12EA5CC18252 /* EditorRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorRootView.swift; sourceTree = "<group>"; };
 		F085D168D5C6D6CF03DFE1B8 /* ChatStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStatusIndicator.swift; sourceTree = "<group>"; };
-		F260F3FB66BB33467D608753 /* BottomCaptureNavBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomCaptureNavBar.swift; sourceTree = "<group>"; };
 		F5642E65B09453E948886CFA /* NoteTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextView.swift; sourceTree = "<group>"; };
 		FB531B9EF3898E85401D8394 /* MarkdownLiteFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatter.swift; sourceTree = "<group>"; };
 		FBD9B2CC0C009355AB37BA83 /* AppModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelContainer.swift; sourceTree = "<group>"; };
@@ -268,14 +263,12 @@
 		A4E80D5ACB410BF143585BA4 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				F260F3FB66BB33467D608753 /* BottomCaptureNavBar.swift */,
 				9EB24025E7491AF947CA4F9C /* DraftRowView.swift */,
 				0C4CDF6A8A0A5249589CA9F8 /* FloatingSendPill.swift */,
 				404A002EE5250961E72196E1 /* KeyboardStateObserver.swift */,
 				FB531B9EF3898E85401D8394 /* MarkdownLiteFormatter.swift */,
 				F5642E65B09453E948886CFA /* NoteTextView.swift */,
 				A097E370C782025241B1B8BF /* StatusBadgeView.swift */,
-				1E36C41B3A75837B89D68043 /* SurfacePanelHost.swift */,
 			);
 			name = Components;
 			path = MemosIOS/Views/Components;
@@ -311,7 +304,7 @@
 			children = (
 				63E68EE5D1E090B8C8F732D9 /* ChatBubbleView.swift */,
 				374E7DEDA2DB7D23FF4FD07B /* ChatInputBar.swift */,
-				B91AE6FB63864BB29899F156 /* ChatMemoEditorSheet.swift */,
+				33E4069A74F4E2E1C070F233 /* ChatMemoEditorSheet.swift */,
 				8044D2FAF5CD3FAE08B4F9F9 /* ChatPlusSheet.swift */,
 				B65A90FDD366920231E03AFC /* ChatRootView.swift */,
 				F085D168D5C6D6CF03DFE1B8 /* ChatStatusIndicator.swift */,
@@ -440,7 +433,6 @@
 			files = (
 				A9119D2DE985DA2AC9D2B1B3 /* AppModelContainer.swift in Sources */,
 				CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */,
-				B5EB53A68A28A077DA6A8D3E /* BottomCaptureNavBar.swift in Sources */,
 				792A65BCCA8A44D95564C267 /* Draft.swift in Sources */,
 				252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */,
 				5D158C156E2A0A3E96FF6AD3 /* DraftMenuView.swift in Sources */,
@@ -465,7 +457,6 @@
 				874614767398617B21C82CBF /* ServerMemosSheetView.swift in Sources */,
 				D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */,
 				D6417C9E2B2882B83CC2BD11 /* StatusBadgeView.swift in Sources */,
-				B1A1279984787D35AB07441B /* SurfacePanelHost.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -491,10 +482,8 @@
 				AF6D57E74C6E356C61A11F3D /* ChatAutoCommitCoordinator.swift in Sources */,
 				A6E811E4A864CF64AFC964E8 /* ChatBubbleView.swift in Sources */,
 				B37416CB17DC21CF83AC6BD6 /* ChatInputBar.swift in Sources */,
-				412AC60F38394A38BE19E888 /* ChatMemoEditorSheet.swift in Sources */,
+				575E120BB7C1067F3A1C00C1 /* ChatMemoEditorSheet.swift in Sources */,
 				F7190A8EDDF03F07EDF06368 /* ChatPlusSheet.swift in Sources */,
-				D3D626C1BD6340D1AA84112A /* FloatingSendPill.swift in Sources */,
-				25B4370E0BF0429AA93FBDA0 /* ServerMemoEditorView.swift in Sources */,
 				979A8442549E867DC98D712D /* ChatRootView.swift in Sources */,
 				33BA22F54DBB9A84DAC3D4AD /* ChatStatusIndicator.swift in Sources */,
 				98FFF1D0E7C6616A2C53C9D4 /* ChatTextInput.swift in Sources */,
@@ -512,6 +501,7 @@
 				6A92ABF354E215CBE0AD1F83 /* ServerMemoDeleteService.swift in Sources */,
 				2539247A098964643A50157E /* ServerMemoDeleteTask.swift in Sources */,
 				AAB85D5AC74418D9659DD75E /* ServerMemoEditDraft.swift in Sources */,
+				BAFE5B525AE088064568D7E1 /* ServerMemoEditorView.swift in Sources */,
 				FADEC7ED11CFEFD5BF269D8F /* ServerMemoSaveService.swift in Sources */,
 				DC53A526146298B9F151A256 /* ServerMemosSheetView.swift in Sources */,
 				84A81B46C1ABB535868C68B6 /* SettingsView.swift in Sources */,

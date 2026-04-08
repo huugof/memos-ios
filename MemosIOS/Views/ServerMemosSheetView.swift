@@ -118,6 +118,25 @@ final class ServerMemosStore: ObservableObject {
         }
     }
 
+    /// Fetches all pages sequentially. Used by MemoChat so the full history is
+    /// available for display and search without requiring the user to scroll.
+    func loadAllPages() async {
+        await refresh(force: true)
+        while !reachedEnd {
+            await loadNextPageIfNeeded()
+        }
+    }
+
+    /// Like `refreshIfStale` but continues loading remaining pages after the initial
+    /// fetch so MemoChat always has the full note history.
+    func refreshAllIfStale(maxAge: TimeInterval = 60) async {
+        let now = Date()
+        if let lastRefreshAt, now.timeIntervalSince(lastRefreshAt) < maxAge, hasLoaded, reachedEnd {
+            return
+        }
+        await loadAllPages()
+    }
+
     func canEdit(_ memo: ServerMemoSummary) -> Bool {
         isEditingSupported && memo.isEditable
     }

@@ -13,20 +13,20 @@ struct ChatStatusIndicator: View {
     }
 
     var body: some View {
-        if let icon = iconName {
+        if let (icon, color) = iconAndColor {
             Image(systemName: icon)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(color)
         }
     }
 
-    private var iconName: String? {
+    private var iconAndColor: (String, Color)? {
         switch displayState {
         case nil, .idle: return nil
-        case .pending:   return "clock"
-        case .sending:   return "arrow.up.circle"
-        case .sent:      return "checkmark"
-        case .failed:    return "exclamationmark.circle"
+        case .pending:   return ("clock", .orange)
+        case .sending:   return ("arrow.up.circle", .blue)
+        case .sent:      return ("checkmark", .secondary)
+        case .failed:    return ("exclamationmark.circle", .red)
         }
     }
 }

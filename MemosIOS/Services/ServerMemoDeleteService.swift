@@ -88,7 +88,7 @@ enum ServerMemoDeleteService {
     static func pruneResolvedTasks(olderThan age: TimeInterval = 60 * 60 * 24 * 7, in modelContext: ModelContext) {
         let descriptor = FetchDescriptor<ServerMemoDeleteTask>()
         guard let tasks = try? modelContext.fetch(descriptor) else { return }
-        let threshold = Date().addingTimeInterval(-max(60, age))
+        let threshold = Date().addingTimeInterval(-age)
 
         var deletedAny = false
         for task in tasks where task.deleteState == .resolved && task.updatedAt < threshold {

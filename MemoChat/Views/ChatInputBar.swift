@@ -1,11 +1,19 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ChatInputBar: View {
     let activeDraft: Draft?
     let keyboardVisible: Bool
+    var focusTrigger: UUID? = nil
     let onCommit: () -> Void
     let onPlusTapped: () -> Void
+    var onImageSelected: ((UIImage) -> Void)? = nil
+    var pendingImages: [PendingImage] = []
+    var onRemoveImage: ((UUID) -> Void)? = nil
+    var pendingFiles: [PendingFile] = []
+    var onRemoveFile: ((UUID) -> Void)? = nil
+    var tagSuggestions: [String] = []
 
     @Environment(\.modelContext) private var modelContext
     @State private var inputText: String = ""
@@ -14,16 +22,26 @@ struct ChatInputBar: View {
 
     private var canSend: Bool {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        || pendingImages.contains { $0.uploadedURL != nil }
+        || pendingFiles.contains { $0.uploadedURL != nil }
     }
 
     private var horizontalPad: CGFloat { keyboardVisible ? 12 : 28 }
     private var bottomPad: CGFloat { keyboardVisible ? 10 : -10 }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            plusButton
+        VStack(alignment: .leading, spacing: 6) {
+            if !pendingImages.isEmpty {
+                pendingImageStrip
+            }
+            if !pendingFiles.isEmpty {
+                pendingFileStrip
+            }
+            HStack(alignment: .bottom, spacing: 10) {
+                plusButton
 
-            inputPill
+                inputPill
+            }
         }
         .padding(.horizontal, horizontalPad)
         .padding(.top, 8)
@@ -46,6 +64,81 @@ struct ChatInputBar: View {
 
     // MARK: - Subviews
 
+    private var pendingImageStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(pendingImages) { pending in
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: pending.image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay {
+                                if pending.isUploading {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(.black.opacity(0.3))
+                                    ProgressView().tint(.white)
+                                }
+                            }
+                        Button { onRemoveImage?(pending.id) } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 6, y: -6)
+                    }
+                }
+            }
+            .padding(.leading, singleLinePillHeight + 10) // align with input pill (past plus button)
+            .padding(.top, 4)
+        }
+    }
+
+    private var pendingFileStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(pendingFiles) { pending in
+                    ZStack(alignment: .topTrailing) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.secondary)
+                            Text(pending.filename)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(height: 40)
+                        .background(Color(uiColor: .tertiarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            if pending.isUploading {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(.black.opacity(0.3))
+                                ProgressView().tint(.white)
+                            }
+                        }
+                        Button { onRemoveFile?(pending.id) } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 6, y: -6)
+                    }
+                }
+            }
+            .padding(.leading, singleLinePillHeight + 10)
+            .padding(.top, 4)
+        }
+    }
+
     private var plusButton: some View {
         Button { onPlusTapped() } label: {
             Image(systemName: "plus")
@@ -63,7 +156,10 @@ struct ChatInputBar: View {
             ChatTextInput(
                 text: $inputText,
                 height: $textHeight,
-                placeholder: "Message"
+                placeholder: "Message",
+                tagSuggestions: tagSuggestions,
+                focusTrigger: focusTrigger,
+                onImagePasted: onImageSelected
             )
             .frame(height: textHeight)
 
@@ -120,6 +216,7 @@ struct ChatInputBar: View {
         guard canSend else { return }
         onCommit()
         inputText = ""
+        textHeight = 36
     }
 
     private func handleMic() {
@@ -130,3 +227,4 @@ struct ChatInputBar: View {
         }
     }
 }
+

@@ -26,6 +26,11 @@ enum MemosError: LocalizedError {
     }
 }
 
+struct ResourceUploadResult {
+    /// Relative URL path used to access the file, e.g. "/o/r/123/image.jpg"
+    let fileURLPath: String
+}
+
 struct ServerMemoSummary: Identifiable, Equatable {
     let id: String
     let resourceName: String?
@@ -135,6 +140,146 @@ struct MemosClient {
                 content: content,
                 updatedAt: Date()
             )
+        } catch let error as MemosError {
+            throw error
+        } catch {
+            throw MemosError.networkFailure(error.localizedDescription)
+        }
+    }
+
+    func uploadResource(
+        imageData: Data,
+        mimeType: String,
+        filename: String,
+        baseURLString: String,
+        token: String,
+        allowInsecureHTTP: Bool
+    ) async throws -> ResourceUploadResult {
+        let (baseURL, trimmedToken) = try validatedBaseURLAndToken(
+            baseURLString: baseURLString,
+            token: token,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
+
+        // Strategy 1: gRPC-gateway attachments endpoint (v0.22+ current API)
+        // POST /api/v1/attachments — JSON body with base64 content, response has string "name"
+        // URL pattern: /file/attachments/{id}/{filename}
+        do {
+            let base64 = imageData.base64EncodedString()
+            let bodyObj: [String: Any] = ["filename": filename, "type": mimeType, "content": base64]
+            return try await uploadResourceJSON(
+                body: bodyObj,
+                endpoint: baseURL.appendingPathComponent("api/v1/attachments"),
+                token: trimmedToken,
+                filename: filename,
+                buildPath: { payload, fallbackFilename in
+                    let fn = (payload["filename"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackFilename
+                    if let name = payload["name"] as? String, !name.isEmpty {
+                        return "/file/\(name)/\(fn)"
+                    }
+                    return nil
+                }
+            )
+        } catch let e as MemosError {
+            guard case .badResponse(let code, _) = e, code == 404 || code == 405 else { throw e }
+        }
+
+        // Strategy 2: REST blob endpoint (pre-gRPC stable API)
+        // POST /api/v1/resource/blob — multipart/form-data, response has integer "id"
+        // URL pattern: /o/r/{id}/{filename}
+        do {
+            return try await uploadResourceMultipart(
+                imageData: imageData, mimeType: mimeType, filename: filename,
+                endpoint: baseURL.appendingPathComponent("api/v1/resource/blob"),
+                token: trimmedToken,
+                buildPath: { payload, fallbackFilename in
+                    guard let id = payload["id"] as? Int ?? (payload["id"] as? String).flatMap({ Int($0) }) else { return nil }
+                    let fn = (payload["filename"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackFilename
+                    return "/o/r/\(id)/\(fn)"
+                }
+            )
+        } catch let e as MemosError {
+            guard case .badResponse(let code, _) = e, code == 404 || code == 405 else { throw e }
+        }
+
+        // Strategy 3: Older REST endpoint without /blob suffix
+        return try await uploadResourceMultipart(
+            imageData: imageData, mimeType: mimeType, filename: filename,
+            endpoint: baseURL.appendingPathComponent("api/v1/resource"),
+            token: trimmedToken,
+            buildPath: { payload, fallbackFilename in
+                let fn = (payload["filename"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? fallbackFilename
+                if let id = payload["id"] as? Int ?? (payload["id"] as? String).flatMap({ Int($0) }) {
+                    return "/o/r/\(id)/\(fn)"
+                }
+                if let name = payload["name"] as? String, !name.isEmpty {
+                    return "/file/\(name)/\(fn)"
+                }
+                return nil
+            }
+        )
+    }
+
+    private func uploadResourceMultipart(
+        imageData: Data,
+        mimeType: String,
+        filename: String,
+        endpoint: URL,
+        token: String,
+        buildPath: ([String: Any], String) -> String?
+    ) async throws -> ResourceUploadResult {
+        let boundary = "Boundary-\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8) ?? Data())
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8) ?? Data())
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8) ?? Data())
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8) ?? Data())
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        return try await performUpload(request: request, filename: filename, buildPath: buildPath)
+    }
+
+    private func uploadResourceJSON(
+        body bodyObj: [String: Any],
+        endpoint: URL,
+        token: String,
+        filename: String,
+        buildPath: ([String: Any], String) -> String?
+    ) async throws -> ResourceUploadResult {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: bodyObj)
+        return try await performUpload(request: request, filename: filename, buildPath: buildPath)
+    }
+
+    private func performUpload(
+        request: URLRequest,
+        filename: String,
+        buildPath: ([String: Any], String) -> String?
+    ) async throws -> ResourceUploadResult {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw MemosError.badURL }
+            guard (200..<300).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                throw MemosError.badResponse(http.statusCode, body)
+            }
+            guard let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw MemosError.badResponse(0, "Unexpected response format")
+            }
+            guard let path = buildPath(payload, filename) else {
+                throw MemosError.badResponse(0, "Could not determine resource URL from response")
+            }
+            return ResourceUploadResult(fileURLPath: path)
         } catch let error as MemosError {
             throw error
         } catch {

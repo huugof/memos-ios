@@ -9,7 +9,6 @@ enum AppSettings {
         static let clearErrorOnEdit = "clearErrorOnEdit"
         static let recentAcceptedTags = "recentAcceptedTags"
         static let newNoteAfterOption = "newNoteAfterOption"
-        static let newNoteDelaySecondsLegacy = "newNoteDelaySeconds"
         static let lastBackgroundAt = "lastBackgroundAt"
         static let lastActiveDraftID = "lastActiveDraftID"
         static let resumeDeadlineAt = "resumeDeadlineAt"
@@ -110,27 +109,6 @@ enum AppSettings {
                let value = NewNoteDelay(rawValue: raw) {
                 return value
             }
-
-            // Legacy migration from earlier integer-based settings.
-            if let legacy = defaults.object(forKey: Keys.newNoteDelaySecondsLegacy) as? Int {
-                switch legacy {
-                case 0:
-                    return .immediately
-                case 30:
-                    return .seconds30
-                case 60:
-                    return .seconds60
-                case 120:
-                    return .seconds60
-                case 300:
-                    return .minutes5
-                case 600:
-                    return .minutes15
-                default:
-                    return .immediately
-                }
-            }
-
             return .immediately
         }
         set { defaults.set(newValue.rawValue, forKey: Keys.newNoteAfterOption) }

@@ -1,5 +1,22 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
+import UIKit
+import UniformTypeIdentifiers
+
+struct PendingImage: Identifiable {
+    let id = UUID()
+    let image: UIImage
+    var uploadedURL: String? = nil
+    var isUploading: Bool = true
+}
+
+struct PendingFile: Identifiable {
+    let id = UUID()
+    let filename: String
+    var uploadedURL: String? = nil
+    var isUploading: Bool = true
+}
 
 private struct TimelineEntry: Identifiable {
     let id: String
@@ -13,6 +30,10 @@ private struct TimelineEntry: Identifiable {
 
 private struct EditingTarget: Identifiable {
     let id: String  // "m-{memoID}" or "d-{uuid}"
+}
+
+private enum PlusSheetAction {
+    case photos, files
 }
 
 private enum DisplayItem: Identifiable {
@@ -35,12 +56,21 @@ struct ChatRootView: View {
 
     @State private var activeDraftID: UUID?
     @State private var showPlusSheet = false
+    @State private var showPhotoPicker = false
+    @State private var showFilePicker = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var plusSheetPendingAction: PlusSheetAction?
+    @State private var pendingImages: [PendingImage] = []
+    @State private var pendingFiles: [PendingFile] = []
+    @State private var imageUploadError: String?
     @State private var isSearching = false
     @State private var searchText = ""
     @State private var searchAutoFocus = true
     @State private var editingTarget: EditingTarget?
     @State private var showTodosOnly = false
     @State private var showDraftsOnly = false
+    @State private var showAttachmentsOnly = false
+    @State private var inputFocusTrigger = UUID()
     @AppStorage("chatShowDrafts") private var showDrafts = true
 
     @StateObject private var sendQueue = DraftSendQueueController()
@@ -67,8 +97,8 @@ struct ChatRootView: View {
             let hasLocalEdits = editDraft?.hasLocalChanges == true
             let isSavePending = editDraft?.saveState == .pending || editDraft?.saveState == .saving
             let displayText: String
-            if hasLocalEdits {
-                let local = editDraft!.localContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if hasLocalEdits, let editDraft {
+                let local = editDraft.localContent.trimmingCharacters(in: .whitespacesAndNewlines)
                 displayText = local.isEmpty
                     ? memo.preferredDisplayText.trimmingCharacters(in: .whitespacesAndNewlines)
                     : local
@@ -141,18 +171,20 @@ struct ChatRootView: View {
 
         // Persistent draft visibility preference (overridden when drafts filter is active)
         if !showDrafts && !showDraftsOnly {
-            entries = entries.filter { $0.sendState == nil }
+            entries = entries.filter { $0.sendState == nil && !$0.hasLocalEdits && !$0.isSavePending }
         }
 
         // Mutually exclusive filter modes
         if showDraftsOnly {
-            entries = entries.filter { $0.sendState != nil }
+            entries = entries.filter { $0.sendState != nil || $0.hasLocalEdits || $0.isSavePending }
+        } else if showAttachmentsOnly {
+            entries = entries.filter { $0.text.contains("![") }
         } else if showTodosOnly {
             entries = entries.compactMap { entry -> TimelineEntry? in
-                let todoLines = entry.text.components(separatedBy: "\n").filter { $0.contains("- [ ]") }
-                guard !todoLines.isEmpty else { return nil }
+                let openTodos = entry.text.components(separatedBy: "\n").filter { $0.contains("- [ ]") }
+                guard !openTodos.isEmpty else { return nil }
                 var copy = entry
-                copy.text = todoLines.joined(separator: "\n")
+                copy.text = openTodos.joined(separator: "\n")
                 return copy
             }
         }
@@ -179,84 +211,97 @@ struct ChatRootView: View {
         return result
     }
 
+    private static let timeFormatter: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm"; return f }()
+    private static let dayFormatter: DateFormatter  = { let f = DateFormatter(); f.dateFormat = "EEE"; return f }()
+    private static let fullFormatter: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE, MMM d"; return f }()
+
     private static func headerLabel(for date: Date) -> String {
         let cal = Calendar.current
-        let tf = DateFormatter()
-        tf.dateFormat = "HH:mm"
-        let time = tf.string(from: date)
-
+        let time = timeFormatter.string(from: date)
         if cal.isDateInToday(date)     { return "Today \(time)" }
         if cal.isDateInYesterday(date) { return "Yesterday \(time)" }
-
         let days = cal.dateComponents([.day], from: date, to: Date()).day ?? 0
-        if days < 7 {
-            let df = DateFormatter(); df.dateFormat = "EEE"
-            return "\(df.string(from: date)) \(time)"
-        }
-        let df = DateFormatter(); df.dateFormat = "EEE, MMM d"
-        return "\(df.string(from: date)) at \(time)"
+        if days < 7 { return "\(dayFormatter.string(from: date)) \(time)" }
+        return "\(fullFormatter.string(from: date)) at \(time)"
     }
 
     var body: some View {
         ZStack {
+            Color(uiColor: .systemBackground).ignoresSafeArea()
             timeline
                 // Fill behind the Dynamic Island only — not behind the input bar
                 .background(Color(uiColor: .systemBackground).ignoresSafeArea(.container, edges: .top))
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    Group {
-                        if isSearching {
-                            ChatSearchBar(text: $searchText, keyboardVisible: keyboard.isVisible, autoFocus: searchAutoFocus) {
-                                isSearching = false
-                                searchText = ""
-                            }
-                        } else {
-                            ChatInputBar(activeDraft: activeDraft, keyboardVisible: keyboard.isVisible, onCommit: commitActiveDraft, onPlusTapped: { showPlusSheet = true })
-                        }
-                    }
-                    .background(alignment: .bottom) {
-                        LinearGradient(
-                            colors: [.clear, Color(uiColor: .systemBackground).opacity(0.6)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 220)
-                        .offset(y: 44)
-                        .allowsHitTesting(false)
-                    }
+                    bottomBar
                 }
         }
         .sheet(item: $editingTarget) { target in
             ChatMemoEditorSheet(entryID: target.id)
         }
-        .sheet(isPresented: $showPlusSheet) {
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItems, maxSelectionCount: nil, matching: .images)
+        .onChange(of: selectedPhotoItems) { _, items in
+            Task {
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run { handleImageSelected(image) }
+                    }
+                }
+                selectedPhotoItems = []
+            }
+        }
+        .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            let filename = url.lastPathComponent
+            let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            handleFileSelected(url: url, filename: filename, mimeType: mimeType)
+        }
+        .sheet(isPresented: $showPlusSheet, onDismiss: {
+            if let action = plusSheetPendingAction {
+                plusSheetPendingAction = nil
+                switch action {
+                case .photos: showPhotoPicker = true
+                case .files: showFilePicker = true
+                }
+            }
+        }) {
             ChatPlusSheet(
                 isPresented: $showPlusSheet,
                 showTodosOnly: $showTodosOnly,
                 showDraftsOnly: $showDraftsOnly,
+                showAttachmentsOnly: $showAttachmentsOnly,
                 showDrafts: $showDrafts,
                 onSearch: {
                     searchAutoFocus = true
                     isSearching = true
                 },
-                onTagSearch: { tag in
-                    searchText = "#\(tag)"
-                    searchAutoFocus = false
-                    isSearching = true
-                },
                 onRefresh: {
-                    Task { await serverMemosStore.refresh(force: true) }
+                    Task { await serverMemosStore.loadAllPages() }
                 },
-                tags: tagsByFrequency
+                onPhotoPicker: { plusSheetPendingAction = .photos },
+                onFilePicker: { plusSheetPendingAction = .files },
+                onSendAll: handleSendAll
             )
-            .presentationDetents([.height(520)])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .task { await serverMemosStore.ensureInitialLoad() }
+        .alert("Upload Failed", isPresented: .init(
+            get: { imageUploadError != nil },
+            set: { if !$0 { imageUploadError = nil } }
+        )) {
+            Button("OK") { imageUploadError = nil }
+        } message: {
+            if let err = imageUploadError { Text(err) }
+        }
+        .task { await serverMemosStore.loadAllPages() }
         .onAppear {
             ensureActiveDraft()
             sendQueue.startProcessing(in: modelContext)
             serverDeleteQueue.startProcessing(in: modelContext)
             saveQueue.startProcessing(in: modelContext)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                inputFocusTrigger = UUID()
+            }
         }
         .onChange(of: sendQueue.lastCreatedMemo) { _, memo in
             guard let memo else { return }
@@ -265,6 +310,11 @@ struct ChatRootView: View {
         .onChange(of: saveQueue.lastSuccessfulMemo) { _, memo in
             guard let memo else { return }
             serverMemosStore.upsertMemo(memo)
+        }
+        .onChange(of: showTodosOnly) { _, isActive in
+            guard !isActive else { return }
+            // Only enqueue drafts that actually have local changes (avoids state churn on clean drafts)
+            // Note: manual send handles syncing; auto-enqueue removed per item 12.
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -278,7 +328,6 @@ struct ChatRootView: View {
                     activeDraftID: activeDraftID,
                     allDrafts: allDrafts,
                     modelContext: modelContext,
-                    sendQueue: sendQueue,
                     setActiveDraftID: { activeDraftID = $0 }
                 )
                 sendQueue.startProcessing(in: modelContext)
@@ -287,9 +336,51 @@ struct ChatRootView: View {
                 serverDeleteQueue.retryNow(in: modelContext)
                 saveQueue.startProcessing(in: modelContext)
                 saveQueue.retryNow(in: modelContext)
-                Task { await serverMemosStore.refreshIfStale() }
+                Task { await serverMemosStore.refreshAllIfStale() }
             default:
                 break
+            }
+        }
+    }
+
+    private var scrollViewIdentity: String {
+        "\(showDraftsOnly)\(showAttachmentsOnly)\(showTodosOnly)\(isSearching)"
+    }
+
+    @ViewBuilder
+    private var bottomBar: some View {
+        let gradient = LinearGradient(
+            colors: [.clear, Color(uiColor: .systemBackground).opacity(0.6)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        if isSearching {
+            ChatSearchBar(text: $searchText, keyboardVisible: keyboard.isVisible, autoFocus: searchAutoFocus) {
+                isSearching = false
+                searchText = ""
+                showTodosOnly = false
+                showDraftsOnly = false
+                showAttachmentsOnly = false
+            }
+            .background(alignment: .bottom) {
+                gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
+            }
+        } else {
+            ChatInputBar(
+                activeDraft: activeDraft,
+                keyboardVisible: keyboard.isVisible,
+                focusTrigger: inputFocusTrigger,
+                onCommit: commitActiveDraft,
+                onPlusTapped: { showPlusSheet = true },
+                onImageSelected: handleImageSelected,
+                pendingImages: pendingImages,
+                onRemoveImage: { id in pendingImages.removeAll { $0.id == id } },
+                pendingFiles: pendingFiles,
+                onRemoveFile: { id in pendingFiles.removeAll { $0.id == id } },
+                tagSuggestions: tagsByFrequency
+            )
+            .background(alignment: .bottom) {
+                gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
             }
         }
     }
@@ -302,8 +393,8 @@ struct ChatRootView: View {
                         switch item {
                         case .header(_, let label):
                             Text(label)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 14)
@@ -318,13 +409,15 @@ struct ChatRootView: View {
                                 isSavePending: entry.isSavePending,
                                 onEdit: { handleEdit(entry) },
                                 onDelete: { handleDelete(entry) },
-                                onSaveToServer: entry.hasLocalEdits ? { handleSaveToServer(entry) } : nil,
-                                onDoubleTap: entry.hasLocalEdits ? { handleSaveToServer(entry) } : nil,
+                                onSaveToServer: entry.hasLocalEdits ? { handleSaveToServer(entry) } :
+                                                (entry.id.hasPrefix("d-") ? { handleSendDraft(entry) } : nil),
                                 onCheckboxToggled: entry.id.hasPrefix("m-") ? { handleCheckboxToggle(entry, newText: $0) } : nil,
-                                onTagTapped: { handleTagTap($0) }
+                                onTagTapped: { handleTagTap($0) },
+                                suppressLocalEditsBadge: showTodosOnly
                             )
+                            .transaction { $0.animation = nil }
                             .padding(.horizontal, 16)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 3)
                             .id(entry.id)
                         }
                     }
@@ -348,9 +441,20 @@ struct ChatRootView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
             }
-            .refreshable { await serverMemosStore.refresh(force: true) }
-            .onChange(of: mergedTimeline.count) { _, _ in
-                withAnimation(.easeOut(duration: 0.2)) {
+            .id(scrollViewIdentity)
+            .refreshable { await serverMemosStore.loadAllPages() }
+            .onChange(of: scrollViewIdentity) { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: mergedTimeline.count) { oldCount, newCount in
+                // Only scroll to bottom when new messages are added, not on delete/edit
+                guard newCount > oldCount else { return }
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+            .onChange(of: keyboard.isVisible) { _, visible in
+                if visible {
                     proxy.scrollTo("bottom", anchor: .bottom)
                 }
             }
@@ -364,10 +468,88 @@ struct ChatRootView: View {
     }
 
     func commitActiveDraft() {
-        guard let draft = activeDraft, draft.hasStartedText else { return }
+        guard let draft = activeDraft else { return }
+        let readyImages = pendingImages.filter { $0.uploadedURL != nil }
+        let readyFiles = pendingFiles.filter { $0.uploadedURL != nil }
+        guard draft.hasStartedText || !readyImages.isEmpty || !readyFiles.isEmpty else { return }
+        for p in readyImages {
+            guard let url = p.uploadedURL else { continue }
+            let sep = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
+            draft.text += sep + "![](\(url))"
+        }
+        for f in readyFiles {
+            guard let url = f.uploadedURL else { continue }
+            let sep = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
+            draft.text += sep + "[\(f.filename)](\(url))"
+        }
+        if !readyImages.isEmpty || !readyFiles.isEmpty { draft.updatedAt = Date(); modelContext.saveOrAssert() }
+        pendingImages.removeAll()
+        pendingFiles.removeAll()
         sendQueue.enqueue(draft, in: modelContext)
         let newDraft = DraftStore.createDraft(in: modelContext)
         activeDraftID = newDraft.id
+    }
+
+    private func handleImageSelected(_ image: UIImage) {
+        let resized = image.resizedToMaxEdge(1024)
+        guard let data = resized.jpegData(compressionQuality: 0.75) else { return }
+        var pending = PendingImage(image: resized)
+        pendingImages.append(pending)
+        let pendingID = pending.id
+        Task {
+            do {
+                let result = try await MemosClient().uploadResource(
+                    imageData: data,
+                    mimeType: "image/jpeg",
+                    filename: "image.jpg",
+                    baseURLString: AppSettings.endpointBaseURL,
+                    token: KeychainTokenStore.getToken(),
+                    allowInsecureHTTP: AppSettings.allowInsecureHTTP
+                )
+                let base = AppSettings.endpointBaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+                let url = "\(base)\(result.fileURLPath)"
+                if let idx = pendingImages.firstIndex(where: { $0.id == pendingID }) {
+                    pendingImages[idx].uploadedURL = url
+                    pendingImages[idx].isUploading = false
+                }
+            } catch {
+                pendingImages.removeAll { $0.id == pendingID }
+                imageUploadError = error.localizedDescription
+            }
+        }
+    }
+
+    private func handleFileSelected(url: URL, filename: String, mimeType: String) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else {
+            imageUploadError = "Could not read file data"
+            return
+        }
+        let pending = PendingFile(filename: filename)
+        pendingFiles.append(pending)
+        let pendingID = pending.id
+        Task {
+            do {
+                let result = try await MemosClient().uploadResource(
+                    imageData: data,
+                    mimeType: mimeType,
+                    filename: filename,
+                    baseURLString: AppSettings.endpointBaseURL,
+                    token: KeychainTokenStore.getToken(),
+                    allowInsecureHTTP: AppSettings.allowInsecureHTTP
+                )
+                let base = AppSettings.endpointBaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+                let resourceURL = "\(base)\(result.fileURLPath)"
+                if let idx = pendingFiles.firstIndex(where: { $0.id == pendingID }) {
+                    pendingFiles[idx].uploadedURL = resourceURL
+                    pendingFiles[idx].isUploading = false
+                }
+            } catch {
+                pendingFiles.removeAll { $0.id == pendingID }
+                imageUploadError = error.localizedDescription
+            }
+        }
     }
 
     private func handleEdit(_ entry: TimelineEntry) {
@@ -375,10 +557,26 @@ struct ChatRootView: View {
             let memoID = String(entry.id.dropFirst(2))
             guard let memo = serverMemosStore.memo(memoID: memoID), memo.hasFullContent else { return }
             _ = ServerMemoSaveService.upsertEditDraft(for: memo, in: modelContext)
-            editingTarget = EditingTarget(id: entry.id)
-        } else {
-            editingTarget = EditingTarget(id: entry.id)
         }
+        editingTarget = EditingTarget(id: entry.id)
+    }
+
+    private func handleSendAll() {
+        for draft in allDrafts where !draft.isBlank && !draft.isArchived && draft.id != activeDraftID {
+            sendQueue.enqueue(draft, in: modelContext)
+        }
+        for editDraft in allEditDrafts where editDraft.hasLocalChanges {
+            Task { @MainActor in
+                await saveQueue.saveNow(editDraft, in: modelContext)
+            }
+        }
+    }
+
+    private func handleSendDraft(_ entry: TimelineEntry) {
+        guard entry.id.hasPrefix("d-"),
+              let uuid = UUID(uuidString: String(entry.id.dropFirst(2))),
+              let draft = allDrafts.first(where: { $0.id == uuid }) else { return }
+        sendQueue.enqueue(draft, in: modelContext)
     }
 
     private func handleSaveToServer(_ entry: TimelineEntry) {
@@ -395,9 +593,55 @@ struct ChatRootView: View {
         guard entry.id.hasPrefix("m-") else { return }
         let memoID = String(entry.id.dropFirst(2))
         guard let memo = serverMemosStore.memo(memoID: memoID), memo.hasFullContent else { return }
+
+        // Use the current local content as the base (if it exists and is non-empty) rather than
+        // the server content. This ensures:
+        //   (a) Multiple rapid checkbox toggles don't revert each other (local content already
+        //       has the first toggle applied, server content doesn't yet).
+        //   (b) Locally-added todo lines that don't exist on the server yet are preserved instead
+        //       of falling back to the truncated filtered-only text.
+        let existingLocalContent = editDraftByMemoID[memoID]?.localContent ?? ""
+        let baseContent = existingLocalContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? memo.content : existingLocalContent
+
+        // In todo mode, entry.text is a filtered subset of the full memo. We need to find
+        // which checkbox line changed and apply that same change to the full memo content.
+        let fullContent = applyCheckboxChange(from: entry.text, to: newText, in: baseContent)
+
         let editDraft = ServerMemoSaveService.upsertEditDraft(for: memo, in: modelContext)
-        ServerMemoSaveService.stageLocalContent(newText, for: editDraft, in: modelContext)
-        _ = saveQueue.enqueue(editDraft, in: modelContext)
+        ServerMemoSaveService.stageLocalContent(fullContent, for: editDraft, in: modelContext)
+        // Changes are staged locally; user must manually send via context menu or double-tap.
+    }
+
+    /// Finds the line that changed between `oldFiltered` and `newFiltered` and applies
+    /// that same substitution inside `fullContent`. Falls back to `newFiltered` if no
+    /// single-line diff can be detected (i.e. the entry text was the full content).
+    private func applyCheckboxChange(from oldFiltered: String, to newFiltered: String, in fullContent: String) -> String {
+        let oldLines = oldFiltered.components(separatedBy: "\n")
+        let newLines = newFiltered.components(separatedBy: "\n")
+        guard oldLines.count == newLines.count else { return newFiltered }
+
+        // Find the single line that changed
+        var changedOld: String?
+        var changedNew: String?
+        for (old, new) in zip(oldLines, newLines) where old != new {
+            if changedOld != nil { return newFiltered } // more than one line changed — bail
+            changedOld = old
+            changedNew = new
+        }
+        guard let from = changedOld, let to = changedNew else { return newFiltered }
+
+        // Replace the first occurrence of that line in the full content
+        let fullLines = fullContent.components(separatedBy: "\n")
+        var replaced = false
+        let resultLines = fullLines.map { line -> String in
+            if !replaced && line == from {
+                replaced = true
+                return to
+            }
+            return line
+        }
+        return replaced ? resultLines.joined(separator: "\n") : newFiltered
     }
 
     private func handleDelete(_ entry: TimelineEntry) {
@@ -418,6 +662,7 @@ struct ChatRootView: View {
         }
     }
 }
+
 
 private struct ChatSearchBar: View {
     @Binding var text: String
@@ -463,5 +708,18 @@ private struct ChatSearchBar: View {
         .padding(.bottom, bottomPad)
         .animation(.easeOut(duration: 0.2), value: keyboardVisible)
         .onAppear { if autoFocus { focused = true } }
+    }
+}
+
+private extension UIImage {
+    /// Scales the image down so its longest edge is at most `maxEdge` points.
+    /// Returns self unchanged if already within the limit.
+    func resizedToMaxEdge(_ maxEdge: CGFloat) -> UIImage {
+        let longest = max(size.width, size.height)
+        guard longest > maxEdge else { return self }
+        let scale = maxEdge / longest
+        let newSize = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in draw(in: CGRect(origin: .zero, size: newSize)) }
     }
 }

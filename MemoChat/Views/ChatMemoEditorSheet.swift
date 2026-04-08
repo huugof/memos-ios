@@ -6,22 +6,22 @@ struct ChatMemoEditorSheet: View {
 
     var body: some View {
         if entryID.hasPrefix("m-") {
-            ServerMemoEditorWrapper(
-                memoID: String(entryID.dropFirst(2))
-            )
+            ServerMemoPlainEditor(memoID: String(entryID.dropFirst(2)))
         } else if entryID.hasPrefix("d-"),
                   let uuid = UUID(uuidString: String(entryID.dropFirst(2))) {
-            LocalDraftEditorSheet(draftID: uuid)
+            LocalDraftPlainEditor(draftID: uuid)
         }
     }
 }
 
 // MARK: - Server Memo Editor
 
-private struct ServerMemoEditorWrapper: View {
+private struct ServerMemoPlainEditor: View {
     let memoID: String
-
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query private var matchingDrafts: [ServerMemoEditDraft]
+    @State private var localText = ""
 
     init(memoID: String) {
         self.memoID = memoID
@@ -31,29 +31,37 @@ private struct ServerMemoEditorWrapper: View {
 
     var body: some View {
         NavigationStack {
-            if let editDraft = matchingDrafts.first {
-                ServerMemoEditorView(
-                    editDraft: editDraft,
-                    shouldAutoFocus: false,
-                    onTagTapped: { _ in }
-                )
-            } else {
-                ProgressView()
-            }
+            TextEditor(text: $localText)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .navigationTitle("Edit Note")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            if let editDraft = matchingDrafts.first {
+                                ServerMemoSaveService.stageLocalContent(localText, for: editDraft, in: modelContext)
+                            }
+                            dismiss()
+                        }
+                    }
+                }
+        }
+        .onAppear {
+            localText = matchingDrafts.first?.localContent ?? ""
         }
     }
 }
 
 // MARK: - Local Draft Editor
 
-private struct LocalDraftEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
+private struct LocalDraftPlainEditor: View {
     let draftID: UUID
-
+    @Environment(\.dismiss) private var dismiss
     @Query private var matchingDrafts: [Draft]
-    @State private var isFocused = true
-    @State private var focusRequestID = UUID()
 
     init(draftID: UUID) {
         self.draftID = draftID
@@ -64,20 +72,16 @@ private struct LocalDraftEditorSheet: View {
     var body: some View {
         NavigationStack {
             if let draft = matchingDrafts.first {
-                EditableNoteTextView(
-                    text: Bindable(draft).text,
-                    isFocused: $isFocused,
-                    focusRequestID: focusRequestID
-                )
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .navigationTitle("Edit Note")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
+                TextEditor(text: Bindable(draft).text)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .navigationTitle("Edit Note")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { dismiss() }
+                        }
                     }
-                }
             } else {
                 ProgressView()
             }

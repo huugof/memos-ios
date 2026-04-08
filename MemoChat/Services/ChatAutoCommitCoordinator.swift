@@ -11,22 +11,22 @@ enum ChatAutoCommitCoordinator {
         activeDraftID: UUID?,
         allDrafts: [Draft],
         modelContext: ModelContext,
-        sendQueue: DraftSendQueueController,
         setActiveDraftID: (UUID) -> Void
     ) {
         guard let backgroundAt = AppSettings.lastBackgroundAt else { return }
         AppSettings.lastBackgroundAt = nil
 
-        guard let delaySeconds = AppSettings.newNoteDelay.delaySeconds, delaySeconds > 0 else { return }
+        guard let delaySeconds = AppSettings.newNoteDelay.delaySeconds else { return }
 
         let elapsed = Date().timeIntervalSince(backgroundAt)
         guard elapsed >= TimeInterval(delaySeconds) else { return }
 
         guard let activeDraftID,
-              let activeDraft = allDrafts.first(where: { $0.id == activeDraftID }),
-              activeDraft.hasStartedText else { return }
+              let candidate = allDrafts.first(where: { $0.id == activeDraftID }),
+              candidate.hasStartedText else { return }
 
-        sendQueue.enqueue(activeDraft, in: modelContext)
+        // The candidate draft is left as-is: local, not enqueued for server upload.
+        // Create a new blank draft so the next capture starts fresh.
 
         let newDraft = DraftStore.createDraft(in: modelContext)
         setActiveDraftID(newDraft.id)

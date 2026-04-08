@@ -30,7 +30,7 @@ targets:
         ENABLE_PREVIEWS: YES
         DEVELOPMENT_ASSET_PATHS: '"MemosIOS/Resources"'
         SUPPORTS_MACCATALYST: NO
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UIRequiresFullScreen: NO
   MemoChat:
@@ -50,6 +50,7 @@ targets:
         includes:
           - SettingsView.swift
           - ServerMemosSheetView.swift
+          - ServerMemoEditorView.swift
     settings:
       base:
         PRODUCT_NAME: MemoChat
@@ -60,12 +61,12 @@ targets:
         SUPPORTS_MACCATALYST: NO
         INFOPLIST_KEY_CFBundleDisplayName: MemoChat
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UIRequiresFullScreen: NO
         INFOPLIST_KEY_NSMicrophoneUsageDescription: MemoChat uses the microphone for voice transcription.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: MemoChat uses speech recognition to transcribe your voice notes.
-        IPHONEOS_DEPLOYMENT_TARGET: 26.0
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
 
   MemosIOSTests:
     type: bundle.unit-test

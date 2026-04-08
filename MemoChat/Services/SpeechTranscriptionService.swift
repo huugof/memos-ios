@@ -50,6 +50,9 @@ final class SpeechTranscriptionService: ObservableObject {
             engine.prepare()
             try engine.start()
         } catch {
+            // Remove the tap installed above before bailing out; leaving it installed
+            // would prevent a future startTranscription() call from adding its own tap.
+            inputNode.removeTap(onBus: 0)
             self.error = "Microphone error: \(error.localizedDescription)"
             return
         }
