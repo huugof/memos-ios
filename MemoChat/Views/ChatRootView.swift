@@ -70,6 +70,7 @@ struct ChatRootView: View {
     @State private var showTodosOnly = false
     @State private var showDraftsOnly = false
     @State private var showAttachmentsOnly = false
+    @State private var activeTagFilter: String? = nil
     @State private var inputFocusTrigger = UUID()
     @AppStorage("chatShowDrafts") private var showDrafts = true
 
@@ -161,9 +162,7 @@ struct ChatRootView: View {
     }
 
     private func handleTagTap(_ tag: String) {
-        searchText = "#\(tag)"
-        searchAutoFocus = false
-        isSearching = true
+        activeTagFilter = activeTagFilter == tag ? nil : tag
     }
 
     private var filteredTimeline: [TimelineEntry] {
@@ -172,6 +171,12 @@ struct ChatRootView: View {
         // Persistent draft visibility preference (overridden when drafts filter is active)
         if !showDrafts && !showDraftsOnly {
             entries = entries.filter { $0.sendState == nil && !$0.hasLocalEdits && !$0.isSavePending }
+        }
+
+        // Tag filter runs before mode filters so it matches the full original text.
+        // The todos strip below would remove #tag lines, making them unmatchable.
+        if let tag = activeTagFilter {
+            entries = entries.filter { $0.text.lowercased().contains("#\(tag)") }
         }
 
         // Mutually exclusive filter modes
@@ -189,7 +194,7 @@ struct ChatRootView: View {
             }
         }
 
-        // Text search applies on top of active filter
+        // Text search applies on top of active filters
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return entries }
         return entries.filter { $0.text.lowercased().contains(q) }
@@ -232,7 +237,12 @@ struct ChatRootView: View {
                 // Fill behind the Dynamic Island only — not behind the input bar
                 .background(Color(uiColor: .systemBackground).ignoresSafeArea(.container, edges: .top))
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    bottomBar
+                    VStack(spacing: 0) {
+                        if let tag = activeTagFilter {
+                            ActiveTagFilterBar(tag: tag) { activeTagFilter = nil }
+                        }
+                        bottomBar
+                    }
                 }
         }
         .sheet(item: $editingTarget) { target in
@@ -363,6 +373,7 @@ struct ChatRootView: View {
                 showTodosOnly = false
                 showDraftsOnly = false
                 showAttachmentsOnly = false
+                activeTagFilter = nil
             }
             .background(alignment: .bottom) {
                 gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
@@ -676,6 +687,36 @@ struct ChatRootView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - ActiveTagFilterBar
+
+private struct ActiveTagFilterBar: View {
+    let tag: String
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack {
+            Spacer()
+            Button(action: onClear) {
+                HStack(spacing: 5) {
+                    Text("#\(tag)")
+                        .font(.subheadline.weight(.medium))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.blue)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .padding(.vertical, 6)
+        .background(Color(uiColor: .systemBackground))
     }
 }
 
