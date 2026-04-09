@@ -455,9 +455,9 @@ struct ChatRootView: View {
             .onChange(of: showDraftsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: showAttachmentsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: isSearching) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: mergedTimeline.count) { oldCount, newCount in
-                // Only scroll to bottom when new messages are added, not on delete/edit
-                guard newCount > oldCount else { return }
+            .onChange(of: mergedTimeline.last?.id) { _, _ in
+                // Only scroll to bottom when the newest item changes (new note sent).
+                // Pagination adds older items at the beginning, so .last?.id is unaffected.
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
             .onChange(of: keyboard.isVisible) { _, visible in
