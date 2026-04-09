@@ -436,7 +436,6 @@ struct ChatRootView: View {
                 }
                 .padding(.top, 8)
             }
-            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             // Extend scroll view behind the floating bar; keyboard safe area still applies
             .ignoresSafeArea(.container, edges: .bottom)
@@ -453,14 +452,12 @@ struct ChatRootView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
             }
+            .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
             .refreshable { await serverMemosStore.refresh(force: true) }
             .onChange(of: showTodosOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: showDraftsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: showAttachmentsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: isSearching) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: mergedTimeline.last?.id) { _, _ in
-                // Only scroll to bottom when the newest item changes (new note sent).
-                // Pagination adds older items at the beginning, so .last?.id is unaffected.
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
             .onChange(of: keyboard.isVisible) { _, visible in

@@ -74,24 +74,18 @@ struct ChatPlusSheet: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         FilterPill(label: "Todos", icon: "checkmark.square", active: showTodosOnly) {
-                            let activating = !showTodosOnly
                             showTodosOnly.toggle()
                             if showTodosOnly { showDraftsOnly = false; showAttachmentsOnly = false }
-                            if activating { onSearch() }
                             isPresented = false
                         }
                         FilterPill(label: "Drafts", icon: "tray.full", active: showDraftsOnly) {
-                            let activating = !showDraftsOnly
                             showDraftsOnly.toggle()
                             if showDraftsOnly { showTodosOnly = false; showAttachmentsOnly = false }
-                            if activating { onSearch() }
                             isPresented = false
                         }
                         FilterPill(label: "Attachments", icon: "paperclip", active: showAttachmentsOnly) {
-                            let activating = !showAttachmentsOnly
                             showAttachmentsOnly.toggle()
                             if showAttachmentsOnly { showTodosOnly = false; showDraftsOnly = false }
-                            if activating { onSearch() }
                             isPresented = false
                         }
                     }
