@@ -391,14 +391,6 @@ struct ChatRootView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    // Trigger loading of older pages when user scrolls to the top.
-                    // Suppressed when any filter is active: prepending content would shift
-                    // the viewport down and create a boomerang scroll effect.
-                    Color.clear.frame(height: 1).id("top")
-                        .onAppear {
-                            guard !showTodosOnly && !showDraftsOnly && !showAttachmentsOnly && searchText.isEmpty else { return }
-                            Task { await serverMemosStore.loadNextPageIfNeeded() }
-                        }
                     ForEach(displayTimeline) { item in
                         switch item {
                         case .header(_, let label):
