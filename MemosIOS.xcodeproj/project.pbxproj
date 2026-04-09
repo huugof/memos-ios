@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0B372C640CC822311E323631 /* DraftResumeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */; };
+		1B3A0615344E2E8078442978 /* MemoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B8209535CA85E615CBD975 /* MemoCache.swift */; };
 		252307934EB060C2BEE97EEF /* DraftEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795498BBE4F9490E869AF36A /* DraftEditorView.swift */; };
 		2539247A098964643A50157E /* ServerMemoDeleteTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC5F17C36786DF3D841776F /* ServerMemoDeleteTask.swift */; };
 		25B5165F6F78EEA7ED5E02FF /* ServerMemoDeleteQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3229B12ED0F0DE3D36FD9E /* ServerMemoDeleteQueueTests.swift */; };
@@ -43,6 +44,7 @@
 		979A8442549E867DC98D712D /* ChatRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65A90FDD366920231E03AFC /* ChatRootView.swift */; };
 		98FFF1D0E7C6616A2C53C9D4 /* ChatTextInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748DBD217790BAAABBE3A98A /* ChatTextInput.swift */; };
 		99FAE97B62CD88078E691131 /* EditorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6895619A12B12EA5CC18252 /* EditorRootView.swift */; };
+		9F734F8D7072D727A3C6542F /* MemoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B8209535CA85E615CBD975 /* MemoCache.swift */; };
 		A3C73D4222A3108D5CDDB781 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
 		A6E811E4A864CF64AFC964E8 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E68EE5D1E090B8C8F732D9 /* ChatBubbleView.swift */; };
 		A6E9DCF9E6520ABCC89D701F /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CC9CDDFC830112053304B30 /* DraftSendService.swift */; };
@@ -100,6 +102,7 @@
 		47E7E7B5F96B2E3E6CB4A4FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4AC5F17C36786DF3D841776F /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
 		4B7EBD7C9D11E556A4C1ACC5 /* MemoChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		51B8209535CA85E615CBD975 /* MemoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoCache.swift; sourceTree = "<group>"; };
 		53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatterTests.swift; sourceTree = "<group>"; };
 		53D1BC6FB62BE2579DAE6DB6 /* NoteTextViewListEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextViewListEditingTests.swift; sourceTree = "<group>"; };
 		5C5F5A046FC50AFCF6336577 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
@@ -139,6 +142,7 @@
 			children = (
 				408248FB2E3B112C1F77B118 /* AppSettings.swift */,
 				852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */,
+				51B8209535CA85E615CBD975 /* MemoCache.swift */,
 				E5C74472076055012EE6D937 /* ModelContext+Persist.swift */,
 			);
 			name = Storage;
@@ -445,6 +449,7 @@
 				E1C212674CD444516A0C6021 /* KeyboardStateObserver.swift in Sources */,
 				5AE7CC86FB7F55BB4E0A2D10 /* KeychainTokenStore.swift in Sources */,
 				3814F94BFEF3B59B287D0BE3 /* MarkdownLiteFormatter.swift in Sources */,
+				9F734F8D7072D727A3C6542F /* MemoCache.swift in Sources */,
 				67A3298178266BE1A2A0986E /* MemosApp.swift in Sources */,
 				6FF511D6D840B1829AC67F16 /* MemosClient.swift in Sources */,
 				40E2EFAA0013BEE12981D2E8 /* ModelContext+Persist.swift in Sources */,
@@ -494,6 +499,7 @@
 				8DC2FBBFF598316D340FDE11 /* KeyboardStateObserver.swift in Sources */,
 				4C11BC0875F2FCF6BAE87286 /* KeychainTokenStore.swift in Sources */,
 				2BB0463EB4355A0C08269861 /* MarkdownLiteFormatter.swift in Sources */,
+				1B3A0615344E2E8078442978 /* MemoCache.swift in Sources */,
 				E9A7E3C967CDEA582EB2B668 /* MemoChatApp.swift in Sources */,
 				594606047FBEB167F962BF02 /* MemosClient.swift in Sources */,
 				3A3FA48B4387B14620FABA61 /* ModelContext+Persist.swift in Sources */,
@@ -607,7 +613,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "MemoChat uses speech recognition to transcribe your voice notes.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -645,7 +651,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"MemosIOS/Resources\"";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -666,7 +672,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"MemosIOS/Resources\"";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -759,7 +765,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "MemoChat uses speech recognition to transcribe your voice notes.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -12,6 +12,8 @@ final class ServerMemosStore: ObservableObject {
     @Published private(set) var openingMemoID: String?
     @Published private(set) var openingErrorByMemoID: [String: String] = [:]
 
+    var onFirstPageFetched: (([ServerMemoSummary]) -> Void)? = nil
+
     private var hasLoaded = false
     private var nextPageToken: String?
     private var reachedEnd = false
@@ -20,6 +22,13 @@ final class ServerMemosStore: ObservableObject {
     func ensureInitialLoad() async {
         guard !hasLoaded else { return }
         await refresh(force: true)
+    }
+
+    /// Populates the feed from a local cache without marking `hasLoaded`.
+    /// Subsequent calls to `refresh()` will still hit the network.
+    func loadFromCache(_ cached: [ServerMemoSummary]) {
+        guard !hasLoaded, !cached.isEmpty else { return }
+        memos = cached
     }
 
     func refreshIfStale(maxAge: TimeInterval = 60) async {
@@ -78,6 +87,7 @@ final class ServerMemosStore: ObservableObject {
             errorMessage = nil
             hasLoaded = true
             lastRefreshAt = Date()
+            onFirstPageFetched?(memos)
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -127,14 +137,9 @@ final class ServerMemosStore: ObservableObject {
         }
     }
 
-    /// Like `refreshIfStale` but continues loading remaining pages after the initial
-    /// fetch so MemoChat always has the full note history.
-    func refreshAllIfStale(maxAge: TimeInterval = 60) async {
-        let now = Date()
-        if let lastRefreshAt, now.timeIntervalSince(lastRefreshAt) < maxAge, hasLoaded, reachedEnd {
-            return
-        }
-        await loadAllPages()
+    /// Refreshes the first page if stale. Additional pages are loaded lazily via scrolling.
+    func refreshAllIfStale(maxAge: TimeInterval = 300) async {
+        await refreshIfStale(maxAge: maxAge)
     }
 
     func canEdit(_ memo: ServerMemoSummary) -> Bool {

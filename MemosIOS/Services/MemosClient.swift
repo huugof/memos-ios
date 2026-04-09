@@ -31,7 +31,7 @@ struct ResourceUploadResult {
     let fileURLPath: String
 }
 
-struct ServerMemoSummary: Identifiable, Equatable {
+struct ServerMemoSummary: Identifiable, Equatable, Codable {
     let id: String
     let resourceName: String?
     let content: String

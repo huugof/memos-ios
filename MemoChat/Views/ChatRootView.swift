@@ -275,7 +275,7 @@ struct ChatRootView: View {
                     isSearching = true
                 },
                 onRefresh: {
-                    Task { await serverMemosStore.loadAllPages() }
+                    Task { await serverMemosStore.refresh(force: true) }
                 },
                 onPhotoPicker: { plusSheetPendingAction = .photos },
                 onFilePicker: { plusSheetPendingAction = .files },
@@ -292,7 +292,14 @@ struct ChatRootView: View {
         } message: {
             if let err = imageUploadError { Text(err) }
         }
-        .task { await serverMemosStore.loadAllPages() }
+        .task {
+            // 1. Show cached memos instantly — no network required
+            serverMemosStore.loadFromCache(MemoCache.load())
+            // 2. Write first-page results back to cache after each successful refresh
+            serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
+            // 3. Fetch only first page from server in background
+            await serverMemosStore.refresh(force: true)
+        }
         .onAppear {
             ensureActiveDraft()
             sendQueue.startProcessing(in: modelContext)
@@ -384,6 +391,11 @@ struct ChatRootView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    // Trigger loading of older pages when user scrolls to the top
+                    Color.clear.frame(height: 1).id("top")
+                        .onAppear {
+                            Task { await serverMemosStore.loadNextPageIfNeeded() }
+                        }
                     ForEach(displayTimeline) { item in
                         switch item {
                         case .header(_, let label):
@@ -438,7 +450,7 @@ struct ChatRootView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
             }
-            .refreshable { await serverMemosStore.loadAllPages() }
+            .refreshable { await serverMemosStore.refresh(force: true) }
             .onChange(of: showTodosOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: showDraftsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: showAttachmentsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
