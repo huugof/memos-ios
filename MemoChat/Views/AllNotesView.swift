@@ -18,6 +18,8 @@ struct AllNotesView: View {
     @State private var showSettings = false
     @State private var showAttachmentsBrowser = false
 
+    @FocusState private var searchFocused: Bool
+
     private var hiddenMemoIDs: Set<String> {
         Set(allDeleteTasks.filter { $0.deleteState != .resolved }.map { $0.memoID })
     }
@@ -44,35 +46,32 @@ struct AllNotesView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            notesList
-
+        ZStack {
             if isSearchActive {
                 NoteSearchView(
                     searchText: $searchText,
                     notes: allNotes,
-                    onDismiss: {
-                        isSearchActive = false
-                        searchText = ""
-                    },
                     onSuggestTags: {
                         filterByTags = true
-                        isSearchActive = false
-                        searchText = ""
+                        dismissSearch()
                     },
                     onSuggestAttachments: {
                         filterByAttachments = true
-                        isSearchActive = false
-                        searchText = ""
+                        dismissSearch()
                     },
                     onSuggestChecklists: {
                         filterByChecklists = true
-                        isSearchActive = false
-                        searchText = ""
+                        dismissSearch()
                     }
                 )
-                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                .transition(.opacity.animation(.easeInOut(duration: 0.12)))
+            } else {
+                notesList
+                    .transition(.opacity.animation(.easeInOut(duration: 0.12)))
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomBar
         }
         .navigationTitle("All Notes")
         .navigationBarTitleDisplayMode(.large)
@@ -96,7 +95,16 @@ struct AllNotesView: View {
         .sheet(isPresented: $showAttachmentsBrowser) {
             attachmentsBrowserSheet
         }
+        .onChange(of: isSearchActive) { _, active in
+            if active {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    searchFocused = true
+                }
+            }
+        }
     }
+
+    // MARK: Notes list
 
     private var notesList: some View {
         List {
@@ -119,7 +127,9 @@ struct AllNotesView: View {
 
             if groups.isEmpty && !serverMemosStore.isLoading {
                 Section {
-                    Text("No notes yet. Tap the button below to create your first note.")
+                    Text(activeFilterLabel != nil
+                         ? "No notes match this filter."
+                         : "No notes yet. Tap the compose button below to create your first note.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
@@ -136,11 +146,9 @@ struct AllNotesView: View {
         }
         .listStyle(.insetGrouped)
         .refreshable { await serverMemosStore.loadAllPages() }
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
-        .overlay(alignment: .bottom) {
-            if serverMemosStore.isLoading || serverMemosStore.isLoadingNextPage {
+        .overlay(alignment: .center) {
+            if serverMemosStore.isLoading && groups.isEmpty {
                 ProgressView()
-                    .padding(.bottom, 100)
             }
         }
     }
@@ -151,44 +159,86 @@ struct AllNotesView: View {
             NoteRowView(note: note)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                deleteNote(note)
-            } label: {
+            Button(role: .destructive) { deleteNote(note) } label: {
                 Label("Delete", systemImage: "trash")
             }
         }
     }
 
+    // MARK: Bottom bar (floating glass pill)
+
     private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                isSearchActive = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            // Search pill
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 16, weight: .medium))
+
+                if isSearchActive {
+                    TextField("Search", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($searchFocused)
+                } else {
                     Text("Search")
                         .foregroundStyle(.tertiary)
-                    Spacer()
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color(uiColor: .secondarySystemGroupedBackground),
-                            in: RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
 
-            NavigationLink(value: NotesRoute.editor(.newNote)) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(width: 50, height: 50)
-                    .background(Color.yellow, in: Circle())
+                Spacer()
+
+                if isSearchActive && !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Image(systemName: "mic.fill")
+                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 14))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(.regularMaterial, in: Capsule())
+            .onTapGesture {
+                if !isSearchActive {
+                    isSearchActive = true
+                }
+            }
+
+            // Right button: X (search active) or compose (inactive)
+            if isSearchActive {
+                Button { dismissSearch() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 50, height: 50)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                NavigationLink(value: NotesRoute.editor(.newNote)) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 50, height: 50)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .padding(.vertical, 10)
+        .animation(.spring(duration: 0.25), value: isSearchActive)
+    }
+
+    private func dismissSearch() {
+        searchText = ""
+        searchFocused = false
+        isSearchActive = false
     }
 
     // MARK: Filter chip
@@ -211,18 +261,14 @@ struct AllNotesView: View {
     private var filterChip: some View {
         if let label = activeFilterLabel {
             HStack(spacing: 8) {
-                Image(systemName: activeFilterIcon)
-                    .font(.caption)
-                Text(label)
-                    .font(.caption.weight(.medium))
+                Image(systemName: activeFilterIcon).font(.caption)
+                Text(label).font(.caption.weight(.medium))
                 Button {
                     filterByTags = false
                     filterByAttachments = false
                     filterByChecklists = false
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    Image(systemName: "xmark.circle.fill").font(.caption).foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -233,13 +279,9 @@ struct AllNotesView: View {
 
     // MARK: Attachments browser
 
-    private var attachmentNotes: [UnifiedNote] {
-        allNotes.filter { $0.hasAttachments }
-    }
-
     private var attachmentsBrowserSheet: some View {
         NavigationStack {
-            List(attachmentNotes) { note in
+            List(allNotes.filter { $0.hasAttachments }) { note in
                 NavigationLink(value: NotesRoute.editor(note.editorTarget)) {
                     NoteRowView(note: note)
                 }
