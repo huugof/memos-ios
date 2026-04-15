@@ -153,41 +153,50 @@ struct AllNotesView: View {
 
     // MARK: Bottom bar
 
+    private var searchPill: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(noteAccent)
+                .font(.system(size: 16, weight: .medium))
+
+            if isSearchActive {
+                TextField("Search", text: $searchText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($searchFocused)
+                    .tint(noteAccent)
+            } else {
+                Text("Search").foregroundStyle(.tertiary)
+            }
+
+            Spacer()
+
+            if isSearchActive && !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Image(systemName: "mic.fill")
+                    .foregroundStyle(isSearchActive ? AnyShapeStyle(noteAccent) : AnyShapeStyle(.tertiary))
+                    .font(.system(size: 14))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .glassCapsule()
+        .contentShape(Capsule())
+    }
+
     private var bottomBar: some View {
         HStack(spacing: 10) {
-            // Search pill
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(noteAccent)
-                    .font(.system(size: 16, weight: .medium))
-
-                if isSearchActive {
-                    TextField("Search", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($searchFocused)
-                        .tint(noteAccent)
-                } else {
-                    Text("Search").foregroundStyle(.tertiary)
-                }
-
-                Spacer()
-
-                if isSearchActive && !searchText.isEmpty {
-                    Button { searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
+            // Search pill — tappable when inactive, live input when active
+            if isSearchActive {
+                searchPill
+            } else {
+                Button { isSearchActive = true } label: { searchPill }
                     .buttonStyle(.plain)
-                } else {
-                    Image(systemName: "mic.fill")
-                        .foregroundStyle(isSearchActive ? AnyShapeStyle(noteAccent) : AnyShapeStyle(.tertiary))
-                        .font(.system(size: 14))
-                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .glassCapsule()
-            .onTapGesture { if !isSearchActive { isSearchActive = true } }
 
             // Right button
             if isSearchActive {
