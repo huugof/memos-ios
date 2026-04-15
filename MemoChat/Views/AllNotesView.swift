@@ -74,7 +74,7 @@ struct AllNotesView: View {
             bottomBar
         }
         .navigationTitle(isSearchActive ? "" : "All Notes")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(isSearchActive ? .inline : .large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showMenu = true } label: {
@@ -206,6 +206,7 @@ struct AllNotesView: View {
                         .foregroundStyle(.primary)
                         .frame(width: 50, height: 50)
                         .glassCircle()
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .transition(.scale.combined(with: .opacity))
@@ -228,8 +229,8 @@ struct AllNotesView: View {
 
     private func dismissSearch() {
         searchText = ""
-        searchFocused = false
         isSearchActive = false
+        searchFocused = false
     }
 
     // MARK: Filter chip
