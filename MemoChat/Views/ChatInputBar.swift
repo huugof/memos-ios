@@ -18,6 +18,7 @@ struct ChatInputBar: View {
     @Environment(\.modelContext) private var modelContext
     @State private var inputText: String = ""
     @State private var textHeight: CGFloat = 36
+    @State private var preTranscriptionText: String = ""
     @StateObject private var speech = SpeechTranscriptionService()
 
     private var canSend: Bool {
@@ -53,7 +54,14 @@ struct ChatInputBar: View {
             let updated = newText ?? ""
             if inputText != updated { inputText = updated }
         }
-        .onChange(of: speech.transcribedText) { _, newText in inputText = newText }
+        .onChange(of: speech.isTranscribing) { _, active in
+            if active { preTranscriptionText = inputText }
+        }
+        .onChange(of: speech.transcribedText) { _, newText in
+            guard !newText.isEmpty else { return }
+            let base = preTranscriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+            inputText = base.isEmpty ? newText : base + " " + newText
+        }
         .onAppear { inputText = activeDraft?.text ?? "" }
     }
 

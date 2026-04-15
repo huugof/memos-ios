@@ -137,9 +137,13 @@ final class ServerMemosStore: ObservableObject {
         }
     }
 
-    /// Refreshes the first page if stale. Additional pages are loaded lazily via scrolling.
-    func refreshAllIfStale(maxAge: TimeInterval = 300) async {
-        await refreshIfStale(maxAge: maxAge)
+    /// Fetches all pages, but only if the first page is stale. Used by MemoChat on foreground resume.
+    func loadAllPagesIfStale(maxAge: TimeInterval = 300) async {
+        let now = Date()
+        if let lastRefreshAt, now.timeIntervalSince(lastRefreshAt) < maxAge, hasLoaded {
+            return
+        }
+        await loadAllPages()
     }
 
     func canEdit(_ memo: ServerMemoSummary) -> Bool {

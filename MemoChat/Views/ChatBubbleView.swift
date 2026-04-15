@@ -15,9 +15,9 @@ struct ChatBubbleView: View {
     var suppressLocalEditsBadge: Bool = false
 
     @State private var mutableText: String
+    @State private var lastCleanText: String
     @State private var showDeleteConfirmation = false
     @State private var showStatusFlags = false
-    @State private var isSelectMode = false
 
     init(text: String, sendState: Draft.SendState? = nil,
          isSentAndUnedited: Bool = false, hasLocalEdits: Bool = false, isSavePending: Bool = false,
@@ -39,6 +39,7 @@ struct ChatBubbleView: View {
         self.suppressLocalEditsBadge = suppressLocalEditsBadge
         let (clean, _) = Self.extractImages(from: text)
         self._mutableText = State(initialValue: clean)
+        self._lastCleanText = State(initialValue: clean)
     }
 
     // Splits a text string into (text without image markdown, [image URLs]).
@@ -95,13 +96,9 @@ struct ChatBubbleView: View {
             if !imageURLs.isEmpty {
                 ImageStackBubble(urls: imageURLs)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                    .contextMenu {
-                        if let onEdit { Button("Edit", action: onEdit) }
-                        if onDelete != nil {
-                            Button("Delete", role: .destructive) { showDeleteConfirmation = true }
-                        }
-                    }
             }
+
+            actionRow
 
             if hasStatusContent {
                 HStack(spacing: 6) {
@@ -128,10 +125,14 @@ struct ChatBubbleView: View {
         .onChange(of: text) { _, newText in
             let (clean, _) = Self.extractImages(from: newText)
             mutableText = clean
+            lastCleanText = clean
         }
         .onChange(of: mutableText) { _, newText in
-            let (cleanText, imageURLs) = Self.extractImages(from: text)
-            guard newText != cleanText else { return }
+            // Skip if this update came from an external text change (synced via lastCleanText)
+            guard newText != lastCleanText else { return }
+            lastCleanText = newText
+            // Reconstruct full text by re-attaching image markdown from the current text prop
+            let (_, imageURLs) = Self.extractImages(from: text)
             let imageMarkdown = imageURLs.map { "![](\($0.absoluteString))" }.joined(separator: "\n")
             let fullText = imageMarkdown.isEmpty ? newText : newText + "\n" + imageMarkdown
             onCheckboxToggled?(fullText)
@@ -139,52 +140,52 @@ struct ChatBubbleView: View {
     }
 
     private var bubbleContent: some View {
-        let previewText = mutableText
         let cr = bubbleCornerRadius
         return RenderedNoteTextView(text: $mutableText, allowsScrolling: false, shrinkToFit: true,
                                     onTagTapped: onTagTapped ?? { _ in },
-                                    isSelectMode: isSelectMode,
-                                    onSelectionCleared: { isSelectMode = false })
+                                    isSelectMode: true)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: cr, style: .continuous)
                     .fill(Color(uiColor: .tertiarySystemBackground))
             )
-            .contextMenu {
-                if let onEdit {
-                    Button(action: onEdit) { Label("Edit", systemImage: "pencil") }
-                }
-                Button { isSelectMode = true } label: {
-                    Label("Select", systemImage: "text.cursor")
-                }
-                Button { UIPasteboard.general.string = text } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                }
-                if let onSaveToServer {
-                    Button(action: onSaveToServer) {
-                        Label("Send to Server", systemImage: "icloud.and.arrow.up")
-                    }
-                }
-                if onDelete != nil {
-                    Section {
-                        Button(role: .destructive) { showDeleteConfirmation = true } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                }
-            } preview: {
-                let lines = previewText.components(separatedBy: "\n")
-                let t = lines.count > 10 ? lines.prefix(10).joined(separator: "\n") + "\n…" : previewText
-                RenderedNoteTextView(text: .constant(t), allowsScrolling: false, shrinkToFit: true)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .frame(width: UIScreen.main.bounds.width * 0.78)
-                    .background(
-                        RoundedRectangle(cornerRadius: cr, style: .continuous)
-                            .fill(Color(uiColor: .tertiarySystemBackground))
-                    )
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 18) {
+            Spacer()
+
+            // Copy
+            Button { UIPasteboard.general.string = text } label: {
+                Image(systemName: "doc.on.doc")
             }
+
+            // Edit
+            if let onEdit {
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                }
+            }
+
+            // Send to Server / Sync
+            if let onSaveToServer {
+                Button(action: onSaveToServer) {
+                    Image(systemName: "icloud.and.arrow.up")
+                }
+            }
+
+            // Delete
+            if onDelete != nil {
+                Button { showDeleteConfirmation = true } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(.tertiary)
+        .buttonStyle(.plain)
+        .padding(.trailing, 4)
     }
 }
 

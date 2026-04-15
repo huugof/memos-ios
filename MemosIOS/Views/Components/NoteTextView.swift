@@ -253,9 +253,6 @@ struct NoteTextView: UIViewRepresentable {
         context.coordinator.updateInteractionMode(isEditingEnabled: isEditingEnabled)
         uiView.isEditable = isEditingEnabled
         let selectableNow = isEditingEnabled || isSelectable
-        if isSelectable && !isEditingEnabled && !context.coordinator.prevIsSelectable {
-            DispatchQueue.main.async { uiView.selectAll(nil) }
-        }
         context.coordinator.prevIsSelectable = selectableNow
         uiView.isSelectable = selectableNow
         uiView.isScrollEnabled = allowsScrolling

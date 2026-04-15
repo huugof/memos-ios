@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MemoChat → Apple Notes Clone — UI Redesign Plan</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; line-height: 1.5; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+  h1 { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 16px; color: #888; margin-bottom: 40px; }
+
+  h2 { font-size: 22px; font-weight: 600; color: #FFD700; margin-top: 48px; margin-bottom: 16px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  h3 { font-size: 17px; font-weight: 600; color: #ccc; margin-top: 20px; margin-bottom: 8px; }
+
+  p { color: #bbb; margin-bottom: 12px; }
+  strong { color: #fff; }
+
+  /* Goal cards */
+  .goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 16px; }
+  .goal-card { background: #1c1c1e; border-radius: 12px; padding: 20px; border: 1px solid #333; }
+  .goal-card .icon { font-size: 28px; margin-bottom: 8px; }
+  .goal-card h4 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .goal-card p { font-size: 13px; color: #999; margin: 0; }
+
+  /* Phone mockups */
+  .screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; margin-top: 24px; }
+  .phone { background: #1c1c1e; border-radius: 24px; border: 2px solid #333; overflow: hidden; max-width: 340px; }
+  .phone-header { padding: 12px 16px 0; display: flex; justify-content: space-between; align-items: center; }
+  .phone-header .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+  .phone-body { padding: 16px; }
+
+  /* Screen 1: Editor mockup */
+  .editor-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; border-bottom: 1px solid #2a2a2a; margin-bottom: 16px; }
+  .toolbar-left, .toolbar-right { display: flex; gap: 12px; align-items: center; }
+  .tb-btn { width: 32px; height: 32px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #999; }
+  .done-btn { background: #FFD700; color: #000; font-weight: 700; font-size: 12px; width: auto; padding: 0 14px; border-radius: 16px; }
+  .cursor-line { border-left: 2px solid #FFD700; height: 20px; margin-top: 8px; animation: blink 1s infinite; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+  /* Screen 2: All Notes mockup */
+  .notes-title { font-size: 24px; font-weight: 700; color: #fff; }
+  .notes-count { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .section-label { font-size: 15px; font-weight: 600; color: #999; margin: 16px 0 8px; }
+  .note-row { background: #2a2a2a; border-radius: 10px; padding: 12px 14px; margin-bottom: 2px; }
+  .note-row:first-child { border-radius: 10px 10px 0 0; }
+  .note-row:last-child { border-radius: 0 0 10px 10px; margin-bottom: 0; }
+  .note-row:only-child { border-radius: 10px; }
+  .note-row .title { font-size: 14px; font-weight: 600; color: #fff; }
+  .note-row .meta { font-size: 11px; color: #888; margin-top: 2px; }
+  .note-row .meta .tag { color: #FFD700; margin-left: 6px; font-size: 10px; }
+  .note-group { margin-bottom: 16px; }
+  .note-group .note-row + .note-row { border-top: 1px solid #1c1c1e; }
+
+  .bottom-bar { display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 10px 0; }
+  .search-pill { flex: 1; background: #2a2a2a; border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #888; display: flex; align-items: center; gap: 8px; }
+  .fab { width: 36px; height: 36px; background: #FFD700; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #000; flex-shrink: 0; }
+
+  /* Screen 3: Search mockup */
+  .search-active { background: #2a2a2a; border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .search-active .q { color: #FFD700; }
+  .suggestion-row { padding: 12px 0; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+  .suggestion-row .sicon { width: 24px; text-align: center; font-size: 16px; }
+  .found-count { font-size: 13px; color: #888; text-align: right; margin-bottom: 12px; }
+  .highlight { background: #FFD700; color: #000; border-radius: 2px; padding: 0 2px; }
+
+  /* Flow diagram */
+  .flow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+  .flow-box { background: #1c1c1e; border: 1px solid #444; border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #fff; }
+  .flow-box.accent { border-color: #FFD700; color: #FFD700; }
+  .flow-arrow { color: #666; font-size: 18px; }
+
+  /* File list */
+  .file-list { list-style: none; }
+  .file-list li { padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 13px; }
+  .file-list .fname { color: #FFD700; font-family: 'SF Mono', monospace; font-size: 12px; }
+  .file-list .fdesc { color: #999; margin-left: 8px; }
+
+  /* Steps */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+  .step { background: #1c1c1e; border-radius: 10px; padding: 16px; border-left: 3px solid #FFD700; }
+  .step .num { font-size: 24px; font-weight: 700; color: #FFD700; }
+  .step .label { font-size: 13px; color: #ccc; margin-top: 4px; }
+
+  .badge { display: inline-block; background: #FFD700; color: #000; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>MemoChat Redesign</h1>
+<p class="subtitle">Apple Notes clone — quick capture, clean browsing, smart search</p>
+
+<!-- GOALS -->
+<h2>Design Goals</h2>
+<div class="goals">
+  <div class="goal-card">
+    <div class="icon">⚡</div>
+    <h4>Instant Capture</h4>
+    <p>App opens to a blank editor with blinking cursor. Zero taps to start typing.</p>
+  </div>
+  <div class="goal-card">
+    <div class="icon">📋</div>
+    <h4>Clean Organization</h4>
+    <p>Notes grouped by Today → Month → Year. One-line previews, tags inline.</p>
+  </div>
+  <div class="goal-card">
+    <div class="icon">🔍</div>
+    <h4>Smart Search</h4>
+    <p>Contextual suggestions, filtered results with count, highlighted matches.</p>
+  </div>
+  <div class="goal-card">
+    <div class="icon">🎨</div>
+    <h4>Apple Notes Aesthetic</h4>
+    <p>Dark theme, rounded cards, yellow accent, minimal UI chrome.</p>
+  </div>
+</div>
+
+<!-- SCREENS -->
+<h2>Three Screens</h2>
+<div class="screens">
+
+  <!-- Screen 1: Editor -->
+  <div>
+    <h3>Screen 1: Note Editor <span class="badge">Launch Screen</span></h3>
+    <div class="phone">
+      <div class="phone-body">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <div class="tb-btn">‹</div>
+            <div class="tb-btn">↩</div>
+            <div class="tb-btn">⬆</div>
+            <div class="tb-btn">•••</div>
+          </div>
+          <div class="toolbar-right">
+            <div class="tb-btn done-btn">Done</div>
+          </div>
+        </div>
+        <div class="cursor-line"></div>
+        <p style="margin-top: 24px; font-size: 12px; color: #555;">Full-screen editor. Start typing immediately.</p>
+        <p style="font-size: 12px; color: #555;">← Back goes to All Notes</p>
+        <p style="font-size: 12px; color: #555;">Done sends note to server</p>
+        <p style="font-size: 12px; color: #555;">••• menu: photos, files</p>
+        <div style="height: 120px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 2: All Notes -->
+  <div>
+    <h3>Screen 2: All Notes <span class="badge">Swipe Right</span></h3>
+    <div class="phone">
+      <div class="phone-header">
+        <span></span>
+        <div class="tb-btn" style="width:28px;height:28px;font-size:12px;">•••</div>
+      </div>
+      <div class="phone-body">
+        <div class="notes-title">All Notes</div>
+        <div class="notes-count">142 Notes</div>
+
+        <div class="section-label">Today</div>
+        <div class="note-group">
+          <div class="note-row">
+            <div class="title">Grocery list</div>
+            <div class="meta">14:30 &nbsp; eggs, milk, bread…</div>
+          </div>
+          <div class="note-row">
+            <div class="title">Meeting notes</div>
+            <div class="meta">09:15 &nbsp; Q2 planning session… <span class="tag">#work</span></div>
+          </div>
+        </div>
+
+        <div class="section-label">March</div>
+        <div class="note-group">
+          <div class="note-row">
+            <div class="title">Recipe: pasta</div>
+            <div class="meta">3/28 &nbsp; Boil water, add salt… <span class="tag">#food</span></div>
+          </div>
+          <div class="note-row">
+            <div class="title">Book recommendations</div>
+            <div class="meta">3/15 &nbsp; Dune, Neuromancer…</div>
+          </div>
+        </div>
+
+        <div class="section-label">2025</div>
+        <div class="note-group">
+          <div class="note-row">
+            <div class="title">Travel plans</div>
+            <div class="meta">12/1/25 &nbsp; Flight to Tokyo… <span class="tag">#travel</span></div>
+          </div>
+        </div>
+
+        <div class="bottom-bar">
+          <div class="search-pill">🔍 Search</div>
+          <div class="fab">✎</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 3: Search -->
+  <div>
+    <h3>Screen 3: Search</h3>
+    <div class="phone">
+      <div class="phone-body">
+        <div class="search-active">🔍 <span class="q">Food</span> <span style="margin-left:auto;font-size:12px;color:#666;">✕</span></div>
+        <div class="found-count">Notes &nbsp;&nbsp; <strong style="color:#fff;">12 Found</strong></div>
+
+        <div class="note-group">
+          <div class="note-row">
+            <div class="title">Recipe: pasta</div>
+            <div class="meta">3/28 &nbsp; Boil water for <span class="highlight">food</span>… <span class="tag">#food</span></div>
+          </div>
+          <div class="note-row">
+            <div class="title"><span class="highlight">Food</span> diary</div>
+            <div class="meta">3/10 &nbsp; Breakfast: oatmeal…</div>
+          </div>
+          <div class="note-row">
+            <div class="title">Best <span class="highlight">food</span> spots NYC</div>
+            <div class="meta">2/14 &nbsp; Joe's Pizza, Russ &amp;… <span class="tag">#travel</span></div>
+          </div>
+        </div>
+
+        <p style="font-size: 12px; color: #555; margin-top: 24px;">When search is empty, shows suggestions:</p>
+        <div class="suggestion-row"><div class="sicon">#</div> Notes with Tags</div>
+        <div class="suggestion-row"><div class="sicon">📎</div> Notes with Attachments</div>
+        <div class="suggestion-row"><div class="sicon">☑</div> Notes with Checklists</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- USER FLOW -->
+<h2>User Flow</h2>
+<div class="flow">
+  <div class="flow-box accent">App Launch</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">Editor (blank)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Type note</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">Tap Done</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Sent to server</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">All Notes</div>
+</div>
+<div class="flow">
+  <div class="flow-box accent">All Notes</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Tap note row</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">Editor (edit)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Done / Back</div>
+</div>
+<div class="flow">
+  <div class="flow-box accent">Editor</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Swipe right / ← back</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">All Notes</div>
+  <div class="flow-arrow">&nbsp;</div>
+  <div class="flow-box" style="background:#2a1a00;border-color:#664400;color:#cc8800;">Saves locally only (not sent)</div>
+</div>
+<div class="flow">
+  <div class="flow-box accent">All Notes</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Tap search bar</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">Search</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Tap result</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box accent">Editor</div>
+</div>
+
+<!-- KEY UI ELEMENTS -->
+<h2>Key UI Elements</h2>
+
+<h3>Editor Toolbar</h3>
+<p><strong>← Back</strong> (upper left) — returns to All Notes, saves draft locally<br>
+<strong>↩ Undo</strong> — standard undo<br>
+<strong>⬆ Share</strong> — iOS share sheet<br>
+<strong>••• Menu</strong> — attach photos, files<br>
+<strong>✓ Done</strong> (yellow, upper right) — sends/saves to server, returns to All Notes</p>
+
+<h3>All Notes Screen</h3>
+<p><strong>Title + count</strong> at top ("All Notes — 142 Notes")<br>
+<strong>••• Menu</strong> (upper right) — Select Multiple, Refresh, Show Attachments, Settings<br>
+<strong>Grouped list</strong> — sections: Today, month names, year labels<br>
+<strong>Note rows</strong> — bold title, date, 1-line preview, tag pills<br>
+<strong>Bottom bar</strong> — search pill (left+center) + new note FAB (bottom right)</p>
+
+<h3>Search</h3>
+<p><strong>Empty state</strong> — "Suggested" filters: Tags, Attachments, Checklists<br>
+<strong>Typing</strong> — "X Found" count, results with highlighted matches<br>
+<strong>Cancel</strong> — ✕ button dismisses search</p>
+
+<!-- NEW FILES -->
+<h2>New Files (8)</h2>
+<ul class="file-list">
+  <li><span class="fname">MemoChat/ViewModels/UnifiedNote.swift</span><span class="fdesc">— Wraps Draft + ServerMemoSummary into single display type</span></li>
+  <li><span class="fname">MemoChat/Views/NotesNavigationRoot.swift</span><span class="fdesc">— Top-level: NavigationStack, stores, lifecycle</span></li>
+  <li><span class="fname">MemoChat/Views/AllNotesView.swift</span><span class="fdesc">— Grouped note list with menu + search bar</span></li>
+  <li><span class="fname">MemoChat/Views/NoteEditorView.swift</span><span class="fdesc">— Full-screen editor with toolbar + attachments</span></li>
+  <li><span class="fname">MemoChat/Views/NoteSearchView.swift</span><span class="fdesc">— Search overlay with suggestions + results</span></li>
+  <li><span class="fname">MemoChat/Views/Components/NoteRowView.swift</span><span class="fdesc">— Note list row: title, date, preview, tags</span></li>
+  <li><span class="fname">MemoChat/Views/Components/NoteDateGrouping.swift</span><span class="fdesc">— Groups notes by Today/month/year</span></li>
+  <li><span class="fname">MemoChat/Views/Components/NotesMenuSheet.swift</span><span class="fdesc">— All Notes menu: select, refresh, attachments, settings</span></li>
+</ul>
+
+<!-- IMPLEMENTATION PHASES -->
+<h2>Implementation Order</h2>
+<div class="steps">
+  <div class="step"><div class="num">1</div><div class="label">Foundation<br><small style="color:#888;">UnifiedNote, date grouping</small></div></div>
+  <div class="step"><div class="num">2</div><div class="label">Components<br><small style="color:#888;">NoteRowView, menu sheet</small></div></div>
+  <div class="step"><div class="num">3</div><div class="label">Screens<br><small style="color:#888;">AllNotes, Editor, Search</small></div></div>
+  <div class="step"><div class="num">4</div><div class="label">Wiring<br><small style="color:#888;">NavigationRoot, app entry</small></div></div>
+  <div class="step"><div class="num">5</div><div class="label">Cleanup<br><small style="color:#888;">Delete old Chat* files</small></div></div>
+</div>
+
+<!-- ARCHITECTURE -->
+<h2>What Stays, What Goes</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px;">
+  <div>
+    <h3 style="color:#4CAF50;">Reused (unchanged)</h3>
+    <ul class="file-list">
+      <li><span class="fname">MemosClient.swift</span><span class="fdesc">— API client</span></li>
+      <li><span class="fname">NoteTextView.swift</span><span class="fdesc">— Rich text editor</span></li>
+      <li><span class="fname">MarkdownLiteFormatter.swift</span><span class="fdesc">— Markdown render</span></li>
+      <li><span class="fname">ServerMemosStore</span><span class="fdesc">— Memo fetch/cache</span></li>
+      <li><span class="fname">All Models</span><span class="fdesc">— Draft, EditDraft, etc.</span></li>
+      <li><span class="fname">All Services</span><span class="fdesc">— Send/Save/Delete queues</span></li>
+      <li><span class="fname">All Storage</span><span class="fdesc">— Settings, Keychain, Cache</span></li>
+      <li><span class="fname">SettingsView.swift</span><span class="fdesc">— Settings screen</span></li>
+    </ul>
+  </div>
+  <div>
+    <h3 style="color:#F44336;">Deleted (replaced)</h3>
+    <ul class="file-list">
+      <li><span class="fname">ChatRootView.swift</span><span class="fdesc">→ NotesNavigationRoot</span></li>
+      <li><span class="fname">ChatBubbleView.swift</span><span class="fdesc">→ NoteRowView</span></li>
+      <li><span class="fname">ChatInputBar.swift</span><span class="fdesc">→ NoteEditorView</span></li>
+      <li><span class="fname">ChatTextInput.swift</span><span class="fdesc">→ NoteEditorView</span></li>
+      <li><span class="fname">ChatPlusSheet.swift</span><span class="fdesc">→ NotesMenuSheet</span></li>
+      <li><span class="fname">ChatStatusIndicator.swift</span><span class="fdesc">→ removed</span></li>
+      <li><span class="fname">ChatMemoEditorSheet.swift</span><span class="fdesc">→ NoteEditorView</span></li>
+      <li><span class="fname">ChatAutoCommitCoordinator.swift</span><span class="fdesc">→ absorbed</span></li>
+    </ul>
+  </div>
+</div>
+
+<p style="margin-top: 48px; color: #555; font-size: 12px; text-align: center;">MemoChat UI Redesign Plan — April 2026</p>
+</div>
+</body>
+</html>

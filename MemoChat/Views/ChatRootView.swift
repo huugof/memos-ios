@@ -71,6 +71,8 @@ struct ChatRootView: View {
     @State private var showDraftsOnly = false
     @State private var showAttachmentsOnly = false
     @State private var inputFocusTrigger = UUID()
+    @State private var isNearBottom = true
+    @State private var hasCompletedInitialLoad = false
     @AppStorage("chatShowDrafts") private var showDrafts = true
 
     @StateObject private var sendQueue = DraftSendQueueController()
@@ -232,7 +234,10 @@ struct ChatRootView: View {
                 // Fill behind the Dynamic Island only — not behind the input bar
                 .background(Color(uiColor: .systemBackground).ignoresSafeArea(.container, edges: .top))
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    bottomBar
+                    VStack(spacing: 0) {
+                        activeFilterBar
+                        bottomBar
+                    }
                 }
         }
         .sheet(item: $editingTarget) { target in
@@ -275,7 +280,7 @@ struct ChatRootView: View {
                     isSearching = true
                 },
                 onRefresh: {
-                    Task { await serverMemosStore.refresh(force: true) }
+                    Task { await serverMemosStore.loadAllPages() }
                 },
                 onPhotoPicker: { plusSheetPendingAction = .photos },
                 onFilePicker: { plusSheetPendingAction = .files },
@@ -297,8 +302,9 @@ struct ChatRootView: View {
             serverMemosStore.loadFromCache(MemoCache.load())
             // 2. Write first-page results back to cache after each successful refresh
             serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
-            // 3. Fetch only first page from server in background
-            await serverMemosStore.refresh(force: true)
+            // 3. Fetch all pages from server so search/filter covers full history
+            await serverMemosStore.loadAllPages()
+            hasCompletedInitialLoad = true
         }
         .onAppear {
             ensureActiveDraft()
@@ -342,10 +348,52 @@ struct ChatRootView: View {
                 serverDeleteQueue.retryNow(in: modelContext)
                 saveQueue.startProcessing(in: modelContext)
                 saveQueue.retryNow(in: modelContext)
-                Task { await serverMemosStore.refreshAllIfStale() }
+                Task { await serverMemosStore.loadAllPagesIfStale() }
             default:
                 break
             }
+        }
+    }
+
+    private var activeFilterName: String? {
+        if showTodosOnly { return "Open Todos" }
+        if showDraftsOnly { return "Drafts" }
+        if showAttachmentsOnly { return "Attachments" }
+        return nil
+    }
+
+    private var activeFilterIcon: String {
+        if showTodosOnly { return "checklist" }
+        if showDraftsOnly { return "tray" }
+        if showAttachmentsOnly { return "paperclip" }
+        return "line.3.horizontal.decrease"
+    }
+
+    @ViewBuilder
+    private var activeFilterBar: some View {
+        if let filterName = activeFilterName {
+            HStack(spacing: 8) {
+                Image(systemName: activeFilterIcon)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(filterName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showTodosOnly = false
+                    showDraftsOnly = false
+                    showAttachmentsOnly = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
         }
     }
 
@@ -360,9 +408,6 @@ struct ChatRootView: View {
             ChatSearchBar(text: $searchText, keyboardVisible: keyboard.isVisible, autoFocus: false) {
                 isSearching = false
                 searchText = ""
-                showTodosOnly = false
-                showDraftsOnly = false
-                showAttachmentsOnly = false
             }
             .background(alignment: .bottom) {
                 gradient.frame(height: 220).offset(y: 44).allowsHitTesting(false)
@@ -425,6 +470,8 @@ struct ChatRootView: View {
                         }
                     }
                     Color.clear.frame(height: 4).id("bottom")
+                        .onAppear { isNearBottom = true }
+                        .onDisappear { isNearBottom = false }
                 }
                 .padding(.top, 8)
             }
@@ -444,13 +491,24 @@ struct ChatRootView: View {
                 .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
             }
-            .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
-            .refreshable { await serverMemosStore.refresh(force: true) }
-            .onChange(of: showTodosOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: showDraftsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
-            .onChange(of: showAttachmentsOnly) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .refreshable { await serverMemosStore.loadAllPages() }
+            .onChange(of: mergedTimeline.count) { _, _ in
+                // Keep scroll pinned to bottom while initial pages are loading
+                if !hasCompletedInitialLoad {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+            }
             .onChange(of: mergedTimeline.last?.id) { _, _ in
-                proxy.scrollTo("bottom", anchor: .bottom)
+                if isNearBottom {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
             }
             .onChange(of: keyboard.isVisible) { _, visible in
                 if visible {
