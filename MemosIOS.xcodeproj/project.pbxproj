@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -103,7 +103,7 @@
 		47E7E7B5F96B2E3E6CB4A4FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		49E4D178BDF9ABA1E38C563D /* NotesNavigationRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesNavigationRoot.swift; sourceTree = "<group>"; };
 		4AC5F17C36786DF3D841776F /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
-		4B7EBD7C9D11E556A4C1ACC5 /* MemoChat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MemoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B7EBD7C9D11E556A4C1ACC5 /* MemoChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E1488078961E4B815DFCC1C /* AllNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllNotesView.swift; sourceTree = "<group>"; };
 		51B8209535CA85E615CBD975 /* MemoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoCache.swift; sourceTree = "<group>"; };
 		53D0DE0C1EE46E01044A7114 /* MarkdownLiteFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownLiteFormatterTests.swift; sourceTree = "<group>"; };
@@ -116,7 +116,7 @@
 		78045225F7A285619686489E /* NoteDateGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDateGrouping.swift; sourceTree = "<group>"; };
 		795498BBE4F9490E869AF36A /* DraftEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftEditorView.swift; sourceTree = "<group>"; };
 		7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
-		84D0FBD92F134FFBE4CAD41C /* MemosIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MemosIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		84D0FBD92F134FFBE4CAD41C /* MemosIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; name = MemosIOS.app; path = Memos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		852FF41A12C69DAE1F530E34 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		9B819270F50541F328E16E01 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9EB24025E7491AF947CA4F9C /* DraftRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftRowView.swift; sourceTree = "<group>"; };
@@ -243,7 +243,6 @@
 				07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */,
 				442F422A0920215ABAB5393A /* ServerMemosSheetView.swift */,
 				0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */,
-				A4E80D5ACB410BF143585BA4 /* Components */,
 			);
 			name = Views;
 			path = MemosIOS/Views;
@@ -262,11 +261,7 @@
 			isa = PBXGroup;
 			children = (
 				95D6AA4E4858EA686E4D867B /* App */,
-				4D3AF44D18781760A1BFD7A3 /* Models */,
 				382EF2740A4A8AD2E6D8E3C0 /* Resources */,
-				A5AD44B6997C483819D716AA /* Services */,
-				04B457164DABCE12A0DCD885 /* Storage */,
-				6CC8E39E7596280A67198BCD /* Views */,
 			);
 			path = MemosIOS;
 			sourceTree = "<group>";
@@ -413,9 +408,6 @@
 					463C6BD1F97229A71A4EF4AA = {
 						DevelopmentTeam = "";
 					};
-					9466C0FA7EBA55B8AC15CA30 = {
-						DevelopmentTeam = "";
-					};
 					F0917677DA15D7A40394C170 = {
 						DevelopmentTeam = "";
 					};
@@ -431,7 +423,6 @@
 			);
 			mainGroup = 5E8C1ECA2548B4AE4F3E6826;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -639,6 +630,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_ASSET_PATHS = "\"MemoChat/Resources\"";
+				DEVELOPMENT_TEAM = 58RDU34A2M;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MemoChat;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MemoChat uses the microphone for voice transcription.";
@@ -790,6 +782,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_ASSET_PATHS = "\"MemoChat/Resources\"";
+				DEVELOPMENT_TEAM = 58RDU34A2M;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MemoChat;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "MemoChat uses the microphone for voice transcription.";
