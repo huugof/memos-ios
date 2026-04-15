@@ -48,6 +48,14 @@ struct AllNotesView: View {
         NoteDateGrouping.group(displayedNotes)
     }
 
+    private var topTags: [String] {
+        var counts: [String: Int] = [:]
+        for note in allNotes {
+            for tag in note.tags { counts[tag, default: 0] += 1 }
+        }
+        return counts.sorted { $0.value > $1.value }.prefix(12).map(\.key)
+    }
+
     // Narrower (more inset) when resting at the curved bottom edge;
     // wider (less inset) when floating above the keyboard.
     private var barHorizontalPadding: CGFloat {
@@ -60,6 +68,7 @@ struct AllNotesView: View {
                 NoteSearchView(
                     searchText: $searchText,
                     notes: allNotes,
+                    topTags: topTags,
                     onSuggestTags: { filterByTags = true; dismissSearch() },
                     onSuggestAttachments: { filterByAttachments = true; dismissSearch() },
                     onSuggestChecklists: { filterByChecklists = true; dismissSearch() }

@@ -54,6 +54,7 @@
 		AAB85D5AC74418D9659DD75E /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D94024F90C85C457143BD1A /* ServerMemoEditDraft.swift */; };
 		B4DADC6C81DCBA9922FE85F0 /* NoteTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5642E65B09453E948886CFA /* NoteTextView.swift */; };
 		B75497EFFAD90DE0763F3D19 /* NoteSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E01E9EEE9EB67BF68A1126A /* NoteSearchView.swift */; };
+		B7BD3C6DC521F12C08E62071 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFBCAF67FD411FF464F624CA /* FlowLayout.swift */; };
 		BAFE5B525AE088064568D7E1 /* ServerMemoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED285DF49F90A77139C775 /* ServerMemoEditorView.swift */; };
 		CE3379D03A03E1067D95B35E /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408248FB2E3B112C1F77B118 /* AppSettings.swift */; };
 		D2F91F60065CDEFAC123072C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFB1486FA4AB7D07C9CD9F6 /* SettingsView.swift */; };
@@ -121,6 +122,7 @@
 		9EB24025E7491AF947CA4F9C /* DraftRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftRowView.swift; sourceTree = "<group>"; };
 		A097E370C782025241B1B8BF /* StatusBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeView.swift; sourceTree = "<group>"; };
 		AB84C34061555C29A9FA1534 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
+		AFBCAF67FD411FF464F624CA /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		B1B111AA15AA8721BDAD09D5 /* NotesMenuSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMenuSheet.swift; sourceTree = "<group>"; };
 		BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
 		BE67B5643C362010CCEA361B /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
@@ -281,6 +283,7 @@
 		A1DF1D07549FBB883426613F /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AFBCAF67FD411FF464F624CA /* FlowLayout.swift */,
 				78045225F7A285619686489E /* NoteDateGrouping.swift */,
 				D68E753E5640FC44ADB0AB7C /* NoteRowView.swift */,
 				B1B111AA15AA8721BDAD09D5 /* NotesMenuSheet.swift */,
@@ -517,6 +520,7 @@
 				0B372C640CC822311E323631 /* DraftResumeCoordinator.swift in Sources */,
 				A6E9DCF9E6520ABCC89D701F /* DraftSendService.swift in Sources */,
 				E93B1D64E22D2A5CA8904E3F /* DraftStore.swift in Sources */,
+				B7BD3C6DC521F12C08E62071 /* FlowLayout.swift in Sources */,
 				8DC2FBBFF598316D340FDE11 /* KeyboardStateObserver.swift in Sources */,
 				4C11BC0875F2FCF6BAE87286 /* KeychainTokenStore.swift in Sources */,
 				2BB0463EB4355A0C08269861 /* MarkdownLiteFormatter.swift in Sources */,
