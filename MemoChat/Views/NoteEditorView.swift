@@ -14,11 +14,12 @@ struct NoteEditorView: View {
     @EnvironmentObject private var serverMemosStore: ServerMemosStore
     @EnvironmentObject private var sendQueue: DraftSendQueueController
     @EnvironmentObject private var saveQueue: ServerMemoSaveQueueController
+    @EnvironmentObject private var pinnedStore: PinnedNotesStore
 
     // Draft editing state
     @State private var localDraftID: UUID?
     @State private var draftText: String = ""
-    @State private var isFocused = true
+    @State private var isFocused = false
     @State private var focusRequestID = UUID()
 
     // Server memo editing state
@@ -48,6 +49,22 @@ struct NoteEditorView: View {
         return allDrafts.first { $0.id == id }
     }
 
+    /// The unified note ID used by PinnedNotesStore (matches UnifiedNote.id format).
+    private var noteID: String? {
+        switch target {
+        case .newNote, .localDraft:
+            guard let id = localDraftID else { return nil }
+            return "d-\(id.uuidString)"
+        case .serverMemo(let memoID):
+            return "m-\(memoID)"
+        }
+    }
+
+    private var isPinned: Bool {
+        guard let id = noteID else { return false }
+        return pinnedStore.isPinned(id)
+    }
+
     private var editDraftFromQuery: ServerMemoEditDraft? {
         guard case .serverMemo(let memoID) = target else { return nil }
         return allEditDrafts.first { $0.memoID == memoID }
@@ -71,6 +88,7 @@ struct NoteEditorView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbarContent }
+        .background { InteractivePopEnabler() }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItems,
                       maxSelectionCount: nil, matching: .images)
         .onChange(of: selectedPhotoItems) { _, items in
@@ -105,7 +123,12 @@ struct NoteEditorView: View {
             if newPhase == .background { saveCurrentState() }
         }
         .onDisappear {
-            if !didTapDone { saveCurrentState() }
+            if !didTapDone {
+                switch target {
+                case .newNote, .localDraft: commitDraft()
+                case .serverMemo: commitServerMemo()
+                }
+            }
             cleanupBlankDraft()
             remoteTagTask?.cancel()
         }
@@ -119,17 +142,37 @@ struct NoteEditorView: View {
                 text: textBinding,
                 isFocused: $isFocused,
                 focusRequestID: focusRequestID,
-                extraBottomScrollPadding: pendingAttachmentsHeight + 20,
+                extraBottomScrollPadding: pendingAttachmentsHeight + 100,
                 tagSuggestions: tagSuggestions,
                 onTagAccepted: { rememberTag($0) },
                 onTagTapped: { _ in }
             )
             .padding(.horizontal, 20)
-            .padding(.top, 8)
 
             if !pendingImages.isEmpty || !pendingFiles.isEmpty {
                 pendingAttachmentsBar
             }
+
+            // Bottom fade — inside the ZStack so it shares the extended frame
+            LinearGradient(
+                colors: [.clear, Color(uiColor: .systemBackground).opacity(0.35)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .allowsHitTesting(false)
+        }
+        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [Color(uiColor: .systemBackground).opacity(0.6), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
         }
     }
 
@@ -216,40 +259,50 @@ struct NoteEditorView: View {
                 Image(systemName: "chevron.left")
                     .fontWeight(.semibold)
             }
+            .tint(.primary)
         }
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            Button {
-                showAttachMenu = true
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
-                Button("Photo Library") { showPhotoPicker = true }
-                Button("Choose File") { showFilePicker = true }
-                Button("Cancel", role: .cancel) {}
-            }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 0) {
+                Button { togglePin() } label: {
+                    Image(systemName: isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 15))
+                        .foregroundStyle(isPinned ? appAccent : .primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .disabled(noteID == nil)
 
-            Button { handleDone() } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.yellow)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.black)
+                Divider()
+                    .frame(height: 16)
+
+                Button {
+                    showAttachMenu = true
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
+                .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
+                    Button("Photo Library") { showPhotoPicker = true }
+                    Button("Choose File") { showFilePicker = true }
+                    Button("Cancel", role: .cancel) {}
                 }
             }
+            .fixedSize()
+            .glassToolbarCapsule()
         }
+    }
+
+    private func togglePin() {
+        guard let id = noteID else { return }
+        pinnedStore.toggle(id)
     }
 
     // MARK: Actions
 
     private func handleBack() {
-        saveCurrentState()
-        dismiss()
-    }
-
-    private func handleDone() {
         didTapDone = true
         switch target {
         case .newNote, .localDraft:
@@ -286,10 +339,8 @@ struct NoteEditorView: View {
     }
 
     private func cleanupBlankDraft() {
-        guard !didTapDone, case .newNote = target, let draft = currentDraft else { return }
-        if draft.isBlank {
-            DraftStore.delete(draft, in: modelContext)
-        }
+        guard case .newNote = target, let draft = currentDraft else { return }
+        if draft.isBlank { DraftStore.delete(draft, in: modelContext) }
     }
 
     private func persistDraftText() {
@@ -314,6 +365,8 @@ struct NoteEditorView: View {
             let draft = DraftStore.createDraft(in: modelContext)
             localDraftID = draft.id
             draftText = ""
+            isFocused = true
+            focusRequestID = UUID()
         case .localDraft(let id):
             localDraftID = id
             if let draft = allDrafts.first(where: { $0.id == id }) {
@@ -507,6 +560,16 @@ struct NoteEditorView: View {
         var v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if v.hasPrefix("#") { v.removeFirst() }
         return v.filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }
+    }
+}
+
+private struct InteractivePopEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+    func updateUIViewController(_ vc: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            vc.navigationController?.interactivePopGestureRecognizer?.delegate = nil
+            vc.navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        }
     }
 }
 

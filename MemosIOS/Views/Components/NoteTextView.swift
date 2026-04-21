@@ -325,6 +325,7 @@ struct NoteTextView: UIViewRepresentable {
         private var interactiveRanges: [MarkdownLiteFormatter.InteractiveRange] = []
         private var pendingEditContext: MarkdownLiteFormatter.EditContext?
         private(set) var lastStyledText: String = ""
+        private var needsFullPassAfterMarkedText = false
 
         private weak var markdownTextView: UITextView?
         private lazy var markdownTapRecognizer: UITapGestureRecognizer = {
@@ -492,10 +493,8 @@ struct NoteTextView: UIViewRepresentable {
                 return true
             }
 
-            guard let action = newlineAction(for: currentText, at: range.location) else {
-                pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: currentText, range: range, replacement: replacement)
-                return true
-            }
+            let action = newlineAction(for: currentText, at: range.location)
+                ?? .insert("\n")
 
             applyNewlineAction(action, in: textView, text: currentText, oldText: currentText, insertionLocation: range.location)
             return false
@@ -579,6 +578,7 @@ struct NoteTextView: UIViewRepresentable {
 
         func applyMarkdownStyling(in textView: UITextView, forceFullPass: Bool) {
             guard textView.markedTextRange == nil else {
+                needsFullPassAfterMarkedText = true
                 return
             }
 
@@ -592,6 +592,7 @@ struct NoteTextView: UIViewRepresentable {
             let shouldUsePlainMode = MarkdownLiteFormatter.shouldUsePlainMode(for: text)
 
             if shouldUsePlainMode {
+                textView.typingAttributes = baseAttributes
                 textView.textStorage.beginEditing()
                 textView.textStorage.setAttributes(baseAttributes, range: fullRange)
                 textView.textStorage.endEditing()
@@ -600,11 +601,12 @@ struct NoteTextView: UIViewRepresentable {
                 updateCheckboxRendering(in: textView)
                 lastStyledText = text
                 pendingEditContext = nil
+                needsFullPassAfterMarkedText = false
                 restoreSelection(selectedRange, in: textView)
                 return
             }
 
-            let shouldFullPass = forceFullPass || MarkdownLiteFormatter.shouldUseFullPass(edit: pendingEditContext)
+            let shouldFullPass = forceFullPass || needsFullPassAfterMarkedText || MarkdownLiteFormatter.shouldUseFullPass(edit: pendingEditContext)
             let targetRange = shouldFullPass
                 ? fullRange
                 : MarkdownLiteFormatter.expandedLineRange(in: nsText, around: pendingEditContext)
@@ -613,6 +615,7 @@ struct NoteTextView: UIViewRepresentable {
                 ? MarkdownLiteFormatter.fullRender(text: text, theme: theme)
                 : MarkdownLiteFormatter.partialRender(text: text, range: targetRange, theme: theme)
 
+            textView.typingAttributes = baseAttributes
             textView.textStorage.beginEditing()
             textView.textStorage.setAttributes(baseAttributes, range: targetRange)
             for run in renderResult.runs {
@@ -634,6 +637,7 @@ struct NoteTextView: UIViewRepresentable {
 
             lastStyledText = text
             pendingEditContext = nil
+            needsFullPassAfterMarkedText = false
             restoreSelection(selectedRange, in: textView)
             textView.typingAttributes = baseAttributes
             updateCheckboxRendering(in: textView)
@@ -648,7 +652,10 @@ struct NoteTextView: UIViewRepresentable {
             let length = (textView.text as NSString?)?.length ?? 0
             let clampedLocation = min(max(0, selection.location), length)
             let clampedLength = min(max(0, selection.length), max(0, length - clampedLocation))
-            textView.selectedRange = NSRange(location: clampedLocation, length: clampedLength)
+            let clamped = NSRange(location: clampedLocation, length: clampedLength)
+            if textView.selectedRange != clamped {
+                textView.selectedRange = clamped
+            }
         }
 
         private func mergeInteractiveRanges(
@@ -714,7 +721,12 @@ struct NoteTextView: UIViewRepresentable {
         ) {
             let previousSelection = textView.selectedRange
             let previousOffset = textView.contentOffset
-            textView.text = newText
+            // Reset typingAttributes to base BEFORE setting attributedText. UIKit stamps
+            // the current typingAttributes onto newly-set text; if the cursor was inside a
+            // bold region (heading / tag) the entire note would turn bold.
+            let baseAttrs = MarkdownLiteFormatter.baseAttributes(theme: MarkdownLiteFormatter.Theme.default(for: textView))
+            textView.typingAttributes = baseAttrs
+            textView.attributedText = NSAttributedString(string: newText, attributes: baseAttrs)
             parent.text = newText
             pendingEditContext = MarkdownLiteFormatter.EditContext(oldText: oldText, range: changedRange, replacement: replacement)
 
@@ -727,7 +739,7 @@ struct NoteTextView: UIViewRepresentable {
                 }
             }
 
-            applyMarkdownStyling(in: textView, forceFullPass: false)
+            applyMarkdownStyling(in: textView, forceFullPass: true)
             if preserveViewport, textView.isScrollEnabled {
                 textView.setContentOffset(previousOffset, animated: false)
             }
@@ -869,6 +881,11 @@ struct NoteTextView: UIViewRepresentable {
             }
 
             guard let continuation = NoteTextViewListEditing.continuationPrefix(for: rawLine) else {
+                // Heading lines: handle manually so UIKit never inserts \n with headerFont
+                // typingAttributes, which would cause bold bleed on the new line.
+                if MarkdownLiteFormatter.lineIsHeading(rawLine) {
+                    return .insert("\n")
+                }
                 return nil
             }
 
@@ -1039,6 +1056,24 @@ private final class OverlayAwareTextView: UITextView {
 
     func refreshCheckboxOverlay() {
         checkboxOverlayView.frame = CGRect(origin: bounds.origin, size: bounds.size)
+
+        if let markedRange = markedTextRange {
+            // Marked text (autocomplete) shifts the layout without updating interactiveRanges.
+            // Offset any checkbox that sits after the marked text insertion point so its
+            // character index still maps to the correct glyph.
+            let markedStart = offset(from: beginningOfDocument, to: markedRange.start)
+            let markedLen = offset(from: markedRange.start, to: markedRange.end)
+            let items: [CheckboxOverlayItem] = checkboxRenderRanges.compactMap { checkbox in
+                let loc = checkbox.range.location >= markedStart
+                    ? checkbox.range.location + markedLen
+                    : checkbox.range.location
+                guard let frame = checkboxFrame(for: NSRange(location: loc, length: checkbox.range.length)) else { return nil }
+                return CheckboxOverlayItem(frame: frame.integral, isChecked: checkbox.isChecked, pointSize: frame.height)
+            }
+            checkboxOverlayView.render(items: items)
+            return
+        }
+
         checkboxOverlayView.render(items: checkboxOverlayItems())
     }
 

@@ -11,12 +11,12 @@ final class ServerMemosStore: ObservableObject {
     @Published private(set) var lastRefreshAt: Date?
     @Published private(set) var openingMemoID: String?
     @Published private(set) var openingErrorByMemoID: [String: String] = [:]
+    @Published private(set) var reachedEnd = false
 
     var onFirstPageFetched: (([ServerMemoSummary]) -> Void)? = nil
 
     private var hasLoaded = false
     private var nextPageToken: String?
-    private var reachedEnd = false
     private var recentUpserts: [String: Date] = [:]
 
     func ensureInitialLoad() async {
@@ -123,6 +123,7 @@ final class ServerMemosStore: ObservableObject {
             reachedEnd = page.nextPageToken == nil
             errorMessage = nil
             lastRefreshAt = Date()
+            MemoCache.save(memos)
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -132,6 +133,15 @@ final class ServerMemosStore: ObservableObject {
     /// available for display and search without requiring the user to scroll.
     func loadAllPages() async {
         await refresh(force: true)
+        while !reachedEnd {
+            await loadNextPageIfNeeded()
+        }
+    }
+
+    /// Loads remaining pages without resetting — safe to call while the main list is mid-scroll.
+    func loadRemainingPages() async {
+        guard !reachedEnd else { return }
+        guard !isLoading else { return }
         while !reachedEnd {
             await loadNextPageIfNeeded()
         }

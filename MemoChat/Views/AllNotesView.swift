@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-private let noteAccent = Color(red: 1.0, green: 0.78, blue: 0.0) // yellow-orange
+let appAccent = Color(red: 1.0, green: 0.78, blue: 0.0)
 
 struct AllNotesView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,16 +10,19 @@ struct AllNotesView: View {
     @Query private var allDeleteTasks: [ServerMemoDeleteTask]
     @EnvironmentObject private var serverMemosStore: ServerMemosStore
     @EnvironmentObject private var serverDeleteQueue: ServerMemoDeleteQueueController
+    @EnvironmentObject private var pinnedStore: PinnedNotesStore
     @StateObject private var keyboard = KeyboardStateObserver()
 
     @State private var isSearchActive = false
     @State private var searchText = ""
+    @State private var searchFilter: NoteSearchFilter? = nil
     @State private var filterByTags = false
     @State private var filterByAttachments = false
     @State private var filterByChecklists = false
     @State private var showMenu = false
     @State private var showSettings = false
     @State private var showAttachmentsBrowser = false
+    @State private var bottomBarID = 0
 
     @FocusState private var searchFocused: Bool
 
@@ -44,8 +47,12 @@ struct AllNotesView: View {
         return notes
     }
 
-    private var groups: [NoteDateGrouping.Group] {
-        NoteDateGrouping.group(displayedNotes)
+    private var pinnedNotes: [UnifiedNote] {
+        displayedNotes.filter { pinnedStore.isPinned($0.id) }
+    }
+
+    private var unpinnedGroups: [NoteDateGrouping.Group] {
+        NoteDateGrouping.group(displayedNotes.filter { !pinnedStore.isPinned($0.id) })
     }
 
     private var topTags: [String] {
@@ -53,13 +60,17 @@ struct AllNotesView: View {
         for note in allNotes {
             for tag in note.tags { counts[tag, default: 0] += 1 }
         }
-        return counts.sorted { $0.value > $1.value }.prefix(12).map(\.key)
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(12).map(\.key)
     }
 
     // Narrower (more inset) when resting at the curved bottom edge;
     // wider (less inset) when floating above the keyboard.
     private var barHorizontalPadding: CGFloat {
-        keyboard.isVisible ? 12 : 20
+        keyboard.isVisible ? 8 : 28
+    }
+
+    private var barVerticalPadding: CGFloat {
+        keyboard.isVisible ? 10 : 6
     }
 
     var body: some View {
@@ -67,11 +78,10 @@ struct AllNotesView: View {
             if isSearchActive {
                 NoteSearchView(
                     searchText: $searchText,
+                    searchFilter: $searchFilter,
                     notes: allNotes,
                     topTags: topTags,
-                    onSuggestTags: { filterByTags = true; dismissSearch() },
-                    onSuggestAttachments: { filterByAttachments = true; dismissSearch() },
-                    onSuggestChecklists: { filterByChecklists = true; dismissSearch() }
+                    isLoadingMore: !serverMemosStore.reachedEnd
                 )
                 .transition(.opacity.animation(.easeInOut(duration: 0.12)))
             } else {
@@ -79,17 +89,28 @@ struct AllNotesView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.12)))
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomBar
+        .overlay(alignment: .top) {
+            LinearGradient(
+                colors: [Color(uiColor: .systemGroupedBackground).opacity(0.6), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
         }
-        .navigationTitle(isSearchActive ? "" : "All Notes")
-        .navigationBarTitleDisplayMode(isSearchActive ? .inline : .large)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomBar.id(bottomBarID)
+        }
+        .navigationTitle(isSearchActive ? "" : (activeFilterLabel ?? "All Notes"))
+        .navigationBarTitleDisplayMode(activeFilterLabel != nil ? .inline : .large)
+        .toolbar(isSearchActive ? .hidden : .visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showMenu = true } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(noteAccent)
+                    Image(systemName: "ellipsis")
                 }
+                .tint(.primary)
             }
         }
         .sheet(isPresented: $showMenu) {
@@ -101,9 +122,16 @@ struct AllNotesView: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showAttachmentsBrowser) { attachmentsBrowserSheet }
+        .onAppear {
+            searchFocused = false
+            bottomBarID += 1  // force safeAreaInset re-render on navigation return
+        }
         .onChange(of: isSearchActive) { _, active in
             if active {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { searchFocused = true }
+                if !serverMemosStore.reachedEnd {
+                    Task { await serverMemosStore.loadRemainingPages() }
+                }
             }
         }
     }
@@ -125,7 +153,7 @@ struct AllNotesView: View {
                 }
             }
 
-            if groups.isEmpty && !serverMemosStore.isLoading {
+            if pinnedNotes.isEmpty && unpinnedGroups.isEmpty && !serverMemosStore.isLoading {
                 Section {
                     Text(activeFilterLabel != nil
                          ? "No notes match this filter."
@@ -135,16 +163,33 @@ struct AllNotesView: View {
                 }
             }
 
-            ForEach(groups) { group in
+            if !pinnedNotes.isEmpty {
+                Section("Pinned") {
+                    ForEach(pinnedNotes) { note in noteRow(for: note) }
+                }
+            }
+
+            ForEach(unpinnedGroups) { group in
                 Section(group.header) {
                     ForEach(group.notes) { note in noteRow(for: note) }
+                }
+            }
+
+            // Pagination sentinel — triggers lazy-load of older pages when scrolled into view
+            if !serverMemosStore.reachedEnd {
+                Section {
+                    Color.clear
+                        .frame(height: 1)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .task { await serverMemosStore.loadNextPageIfNeeded() }
                 }
             }
         }
         .listStyle(.insetGrouped)
         .refreshable { await serverMemosStore.loadAllPages() }
         .overlay(alignment: .center) {
-            if serverMemosStore.isLoading && groups.isEmpty { ProgressView() }
+            if serverMemosStore.isLoading && pinnedNotes.isEmpty && unpinnedGroups.isEmpty { ProgressView() }
         }
     }
 
@@ -157,23 +202,39 @@ struct AllNotesView: View {
             Button(role: .destructive) { deleteNote(note) } label: {
                 Label("Delete", systemImage: "trash")
             }
+            .tint(.red)
         }
     }
 
     // MARK: Bottom bar
 
     private var searchPill: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(noteAccent)
+                .foregroundStyle(.primary)
                 .font(.system(size: 16, weight: .medium))
 
+            // Active filter chip
+            if isSearchActive, let filter = searchFilter {
+                HStack(spacing: 4) {
+                    Image(systemName: filter.icon).font(.caption2.weight(.semibold))
+                    Text(filter.label).font(.caption.weight(.semibold)).lineLimit(1).fixedSize()
+                    Button { searchFilter = nil } label: {
+                        Image(systemName: "xmark").font(.caption2.weight(.bold))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(appAccent.opacity(0.18), in: Capsule())
+                .foregroundStyle(appAccent)
+            }
+
             if isSearchActive {
-                TextField("Search", text: $searchText)
+                TextField(searchFilter != nil ? "Narrow results…" : "Search", text: $searchText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .focused($searchFocused)
-                    .tint(noteAccent)
             } else {
                 Text("Search").foregroundStyle(.tertiary)
             }
@@ -187,7 +248,7 @@ struct AllNotesView: View {
                 .buttonStyle(.plain)
             } else {
                 Image(systemName: "mic.fill")
-                    .foregroundStyle(isSearchActive ? AnyShapeStyle(noteAccent) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(isSearchActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
                     .font(.system(size: 14))
             }
         }
@@ -223,21 +284,33 @@ struct AllNotesView: View {
                 NavigationLink(value: NotesRoute.editor(.newNote)) {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(noteAccent)
+                        .foregroundStyle(.primary)
                         .frame(width: 50, height: 50)
                         .glassCircle()
                 }
+                .tint(.primary)
                 .transition(.scale.combined(with: .opacity))
             }
         }
         .padding(.horizontal, barHorizontalPadding)
-        .padding(.vertical, 10)
+        .padding(.vertical, barVerticalPadding)
         .animation(.spring(duration: 0.25), value: isSearchActive)
-        .animation(.easeInOut(duration: 0.2), value: keyboard.isVisible)
+        .background(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, Color(uiColor: .systemGroupedBackground).opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 160)
+            .offset(y: 44)
+            .allowsHitTesting(false)
+            .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     private func dismissSearch() {
         searchText = ""
+        searchFilter = nil
         isSearchActive = false
         searchFocused = false
     }
@@ -247,7 +320,7 @@ struct AllNotesView: View {
     private var activeFilterLabel: String? {
         if filterByTags { return "Has Tags" }
         if filterByAttachments { return "Has Attachments" }
-        if filterByChecklists { return "Has Checklists" }
+        if filterByChecklists { return "Todos" }
         return nil
     }
 
@@ -314,7 +387,7 @@ struct AllNotesView: View {
 
 // MARK: Liquid glass helpers
 
-private extension View {
+extension View {
     @ViewBuilder
     func glassCapsule() -> some View {
         if #available(iOS 26.0, *) {
@@ -330,6 +403,17 @@ private extension View {
             self.glassEffect(in: Circle())
         } else {
             self.background(.regularMaterial, in: Circle())
+        }
+    }
+
+    /// Use inside system nav bar toolbar items. On iOS 26 the nav bar itself is glass,
+    /// so we skip the explicit glassEffect to avoid double-glass nesting.
+    @ViewBuilder
+    func glassToolbarCapsule() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            self.background(.regularMaterial, in: Capsule())
         }
     }
 }

@@ -32,7 +32,7 @@ struct MarkdownLiteFormatter {
         }
 
         static func `default`(for textView: UITextView) -> Theme {
-            let base = textView.font ?? UIFont.preferredFont(forTextStyle: .body)
+            let base = UIFont.preferredFont(forTextStyle: .body)
             let header = UIFont.systemFont(ofSize: base.pointSize, weight: .semibold)
             return Theme(
                 baseFont: base,
@@ -81,6 +81,14 @@ struct MarkdownLiteFormatter {
             .font: theme.baseFont,
             .foregroundColor: theme.textColor
         ]
+    }
+
+    static func lineIsHeading(_ line: String) -> Bool {
+        let nsLine = line as NSString
+        return headerRegex.firstMatch(
+            in: line, options: [],
+            range: NSRange(location: 0, length: nsLine.length)
+        ) != nil
     }
 
     static func shouldUsePlainMode(for text: String) -> Bool {
@@ -594,13 +602,16 @@ struct MarkdownLiteFormatter {
             return true
         }
 
-        if combined.contains(where: { structuralMarkdownCharacters.contains($0) }) {
-            return true
-        }
-
         let probeRange = NSRange(location: safeRange.location, length: min(max(1, safeRange.length), max(0, oldText.length - safeRange.location)))
         let lineRange = oldText.lineRange(for: probeRange)
         let prefixDistance = safeRange.location - lineRange.location
+
+        // Structural chars (-, #, *, [, ]) only matter near line start where they
+        // form headings, list markers, or checkboxes. Mid-line edits use partial render.
+        if combined.contains(where: { structuralMarkdownCharacters.contains($0) }) {
+            return prefixDistance <= 6
+        }
+
         if prefixDistance <= 6 {
             return true
         }

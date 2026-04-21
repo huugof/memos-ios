@@ -12,6 +12,7 @@ struct NotesNavigationRoot: View {
     @StateObject private var sendQueue = DraftSendQueueController()
     @StateObject private var saveQueue = ServerMemoSaveQueueController()
     @StateObject private var serverDeleteQueue = ServerMemoDeleteQueueController()
+    @StateObject private var pinnedStore = PinnedNotesStore()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -23,15 +24,17 @@ struct NotesNavigationRoot: View {
                     }
                 }
         }
+        .tint(appAccent)
         .environmentObject(serverMemosStore)
         .environmentObject(sendQueue)
         .environmentObject(saveQueue)
         .environmentObject(serverDeleteQueue)
+        .environmentObject(pinnedStore)
         .preferredColorScheme(.dark)
         .task {
             serverMemosStore.loadFromCache(MemoCache.load())
             serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
-            await serverMemosStore.loadAllPages()
+            await serverMemosStore.refresh(force: true)
         }
         .onAppear {
             sendQueue.startProcessing(in: modelContext)
@@ -61,7 +64,7 @@ struct NotesNavigationRoot: View {
                 serverDeleteQueue.retryNow(in: modelContext)
                 saveQueue.startProcessing(in: modelContext)
                 saveQueue.retryNow(in: modelContext)
-                Task { await serverMemosStore.loadAllPagesIfStale() }
+                Task { await serverMemosStore.refreshIfStale() }
             default:
                 break
             }
@@ -70,26 +73,24 @@ struct NotesNavigationRoot: View {
 
     private func handleForegroundResume() {
         guard let backgroundAt = AppSettings.lastBackgroundAt else { return }
-        AppSettings.lastBackgroundAt = nil
-
         guard let delaySeconds = AppSettings.newNoteDelay.delaySeconds else { return }
         let elapsed = Date().timeIntervalSince(backgroundAt)
         guard elapsed >= TimeInterval(delaySeconds) else { return }
 
-        // If the editor is open with an existing draft that has content, push a fresh note
-        if case .editor(let target) = path.last {
-            let hasContent: Bool
+        guard case .editor(let target) = path.last else { return }
+
+        // Leave pinned notes alone — preserve lastBackgroundAt so quick capture fires next time.
+        let pinnedID: String? = {
             switch target {
-            case .newNote:
-                hasContent = false
-            case .localDraft(let id):
-                hasContent = allDrafts.first(where: { $0.id == id })?.hasStartedText == true
-            case .serverMemo:
-                hasContent = true
+            case .newNote: return nil
+            case .localDraft(let id): return "d-\(id.uuidString)"
+            case .serverMemo(let memoID): return "m-\(memoID)"
             }
-            if hasContent {
-                path.append(.editor(.newNote))
-            }
-        }
+        }()
+        if let id = pinnedID, pinnedStore.isPinned(id) { return }
+
+        AppSettings.lastBackgroundAt = nil
+        // Replace the current editor — onDisappear will commit and send it.
+        path = [.editor(.newNote)]
     }
 }

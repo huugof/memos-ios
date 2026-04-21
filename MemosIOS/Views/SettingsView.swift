@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var keepTextAfterSend = AppSettings.keepTextAfterSend
     @State private var markSentOnSuccess = AppSettings.markSentOnSuccess
     @State private var clearErrorOnEdit = AppSettings.clearErrorOnEdit
+    @State private var quickCaptureMode = AppSettings.quickCaptureMode
+    @State private var newNoteDelay = AppSettings.newNoteDelay
     @State private var tokenStatus = ""
     @State private var showingDeleteTokenConfirmation = false
 
@@ -77,6 +79,22 @@ struct SettingsView: View {
                 }
 
                 Section("Behavior") {
+                    Toggle("Quick Capture Mode", isOn: $quickCaptureMode)
+                        .onChange(of: quickCaptureMode) { _, value in
+                            AppSettings.quickCaptureMode = value
+                        }
+
+                    if quickCaptureMode {
+                        Picker("New Note After", selection: $newNoteDelay) {
+                            ForEach(AppSettings.NewNoteDelay.allCases) { delay in
+                                Text(delay.label).tag(delay)
+                            }
+                        }
+                        .onChange(of: newNoteDelay) { _, value in
+                            AppSettings.newNoteDelay = value
+                        }
+                    }
+
                     Toggle("Allow insecure HTTP", isOn: $allowInsecureHTTP)
                         .onChange(of: allowInsecureHTTP) { _, value in
                             AppSettings.allowInsecureHTTP = value

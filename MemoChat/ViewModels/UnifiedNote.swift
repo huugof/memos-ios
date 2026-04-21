@@ -89,6 +89,17 @@ enum UnifiedNote: Identifiable {
         }
     }
 
+    var hasImages: Bool {
+        content.contains("![")
+    }
+
+    var hasFiles: Bool {
+        switch self {
+        case .local: return false
+        case .server(let memo, _): return memo.attachmentCount > 0
+        }
+    }
+
     var hasChecklists: Bool {
         content.contains("- [ ]") || content.contains("- [x]") || content.contains("- [X]")
     }

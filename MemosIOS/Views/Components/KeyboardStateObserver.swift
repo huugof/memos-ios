@@ -22,15 +22,24 @@ final class KeyboardStateObserver: ObservableObject {
     private func updateKeyboardState(from notification: Notification) {
         guard let userInfo = notification.userInfo,
               let frameValue = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else {
-            height = 0
-            isVisible = false
+            withAnimation(.easeInOut(duration: 0.35)) {
+                height = 0
+                isVisible = false
+            }
             return
         }
 
+        let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.35
+
         let endFrame = frameValue.cgRectValue
         let overlap = Self.keyboardOverlapHeight(for: endFrame)
-        height = overlap
-        isVisible = overlap > 0.5
+
+        // Drive SwiftUI changes with the same duration iOS uses for the keyboard
+        // slide so the bottom bar tracks the keyboard exactly.
+        withAnimation(.easeInOut(duration: duration)) {
+            height = overlap
+            isVisible = overlap > 0.5
+        }
     }
 
     private static func keyboardOverlapHeight(for endFrame: CGRect) -> CGFloat {
