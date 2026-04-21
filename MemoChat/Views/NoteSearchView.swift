@@ -40,9 +40,9 @@ struct NoteSearchView: View {
         case nil:         break
         }
 
-        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty {
-            results = results.filter { $0.content.lowercased().contains(q) }
+            results = results.filter { $0.content.range(of: q, options: .caseInsensitive) != nil }
         }
 
         return results

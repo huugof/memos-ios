@@ -64,10 +64,13 @@ final class ServerMemosStore: ObservableObject {
             let serverIDs = Set(page.memos.map(\.id))
             let cutoff = Date().addingTimeInterval(-60)
 
+            // Build a lookup for O(1) existing-memo access during merge.
+            let existingByID = Dictionary(uniqueKeysWithValues: memos.map { ($0.id, $0) })
+
             // Merge server memos with recently-upserted local data
             var refreshed = page.memos.map { serverMemo -> ServerMemoSummary in
                 if let upsertDate = recentUpserts[serverMemo.id], upsertDate > cutoff,
-                   let existing = memos.first(where: { $0.id == serverMemo.id }) {
+                   let existing = existingByID[serverMemo.id] {
                     return mergeMemo(existing: existing, incoming: serverMemo)
                 }
                 return serverMemo
@@ -114,10 +117,10 @@ final class ServerMemosStore: ObservableObject {
                 pageToken: token
             )
 
-            var seen = Set(memos.map(\.id))
-            for memo in page.memos where !seen.contains(memo.id) {
-                memos.append(memo)
-                seen.insert(memo.id)
+            let seen = Set(memos.map(\.id))
+            let newMemos = page.memos.filter { !seen.contains($0.id) }
+            if !newMemos.isEmpty {
+                memos.append(contentsOf: newMemos)
             }
             nextPageToken = page.nextPageToken
             reachedEnd = page.nextPageToken == nil
@@ -168,30 +171,42 @@ final class ServerMemosStore: ObservableObject {
         let mergedMemo: ServerMemoSummary
         if let index = memos.firstIndex(where: { $0.id == memo.id }) {
             mergedMemo = mergeMemo(existing: memos[index], incoming: memo)
-            memos[index] = mergedMemo
+            memos.remove(at: index)
         } else {
             mergedMemo = memo
-            memos.insert(mergedMemo, at: 0)
         }
 
-        memos.sort { lhs, rhs in
-            switch (lhs.updatedAt, rhs.updatedAt) {
-            case let (l?, r?):
-                if l != r { return l > r }
-            case (.some, .none):
-                return true
-            case (.none, .some):
-                return false
-            case (.none, .none):
-                break
+        // Binary-search for the correct sorted position instead of sorting the full array.
+        var lo = 0
+        var hi = memos.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if isBefore(memos[mid], mergedMemo) {
+                lo = mid + 1
+            } else {
+                hi = mid
             }
-            return lhs.id < rhs.id
         }
+        memos.insert(mergedMemo, at: lo)
 
         recentUpserts[mergedMemo.id] = Date()
         errorMessage = nil
         openingErrorByMemoID[mergedMemo.id] = nil
         lastRefreshAt = Date()
+    }
+
+    private func isBefore(_ lhs: ServerMemoSummary, _ rhs: ServerMemoSummary) -> Bool {
+        switch (lhs.updatedAt, rhs.updatedAt) {
+        case let (l?, r?):
+            if l != r { return l > r }
+        case (.some, .none):
+            return true
+        case (.none, .some):
+            return false
+        case (.none, .none):
+            break
+        }
+        return lhs.id < rhs.id
     }
 
     func removeMemo(memoID: String) {
@@ -393,8 +408,7 @@ struct ServerMemosSheetView: View {
 
     @ViewBuilder
     private var memoRows: some View {
-        ForEach(store.memos.indices, id: \.self) { index in
-            let baseMemo = store.memos[index]
+        ForEach(store.memos) { baseMemo in
             let row = rowData(for: baseMemo)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -453,13 +467,11 @@ struct ServerMemosSheetView: View {
                 }
             }
             .onAppear {
-                guard index >= store.memos.count - 5 else { return }
-                Task {
-                    await store.loadNextPageIfNeeded()
-                }
+                guard let lastMemo = store.memos.last, baseMemo.id == lastMemo.id else { return }
+                Task { await store.loadNextPageIfNeeded() }
             }
 
-            if index < store.memos.count - 1 {
+            if baseMemo.id != store.memos.last?.id {
                 Divider()
                     .padding(.horizontal, 14)
             }

@@ -40,6 +40,7 @@ struct NoteEditorView: View {
     @State private var remoteTags: [String] = []
     @State private var tagSuggestions: [String] = []
     @State private var remoteTagTask: Task<Void, Never>?
+    @State private var persistDebounceTask: Task<Void, Never>?
 
     @State private var showAttachMenu = false
     @State private var didTapDone = false
@@ -117,12 +118,14 @@ struct NoteEditorView: View {
             if let err = uploadError { Text(err) }
         }
         .task { await setup() }
-        .onChange(of: draftText) { _, _ in persistDraftText() }
+        .onChange(of: draftText) { _, _ in schedulePersist() }
         .onChange(of: serverMemoContent) { _, _ in stageServerMemoContent() }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background { saveCurrentState() }
         }
         .onDisappear {
+            persistDebounceTask?.cancel()
+            persistDraftText()  // flush any pending debounced save before committing
             if !didTapDone {
                 switch target {
                 case .newNote, .localDraft: commitDraft()
@@ -343,6 +346,15 @@ struct NoteEditorView: View {
         if draft.isBlank { DraftStore.delete(draft, in: modelContext) }
     }
 
+    private func schedulePersist() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            persistDraftText()
+        }
+    }
+
     private func persistDraftText() {
         guard let draft = currentDraft else { return }
         if draft.text != draftText {
@@ -407,33 +419,42 @@ struct NoteEditorView: View {
     // MARK: Attachment upload
 
     private func appendPendingAttachments(to draft: Draft) {
-        for p in pendingImages where p.uploadedURL != nil {
-            let sep = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
-            draft.text += sep + "![](\(p.uploadedURL!))"
+        let uploaded = attachmentMarkdown(existingText: draft.text)
+        guard !uploaded.isEmpty else {
+            pendingImages.removeAll()
+            pendingFiles.removeAll()
+            return
         }
-        for f in pendingFiles where f.uploadedURL != nil {
-            let sep = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
-            draft.text += sep + "[\(f.filename)](\(f.uploadedURL!))"
-        }
-        if !pendingImages.isEmpty || !pendingFiles.isEmpty {
-            draft.updatedAt = Date()
-            modelContext.saveOrAssert()
-        }
+        let sep = draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
+        draft.text = draft.text + sep + uploaded.joined(separator: "\n")
+        draft.updatedAt = Date()
+        modelContext.saveOrAssert()
         pendingImages.removeAll()
         pendingFiles.removeAll()
     }
 
     private func appendPendingAttachmentsToServerMemo(content: inout String) {
-        for p in pendingImages where p.uploadedURL != nil {
-            let sep = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
-            content += sep + "![](\(p.uploadedURL!))"
+        let uploaded = attachmentMarkdown(existingText: content)
+        guard !uploaded.isEmpty else {
+            pendingImages.removeAll()
+            pendingFiles.removeAll()
+            return
         }
-        for f in pendingFiles where f.uploadedURL != nil {
-            let sep = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
-            content += sep + "[\(f.filename)](\(f.uploadedURL!))"
-        }
+        let sep = content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\n"
+        content = content + sep + uploaded.joined(separator: "\n")
         pendingImages.removeAll()
         pendingFiles.removeAll()
+    }
+
+    private func attachmentMarkdown(existingText: String) -> [String] {
+        var parts: [String] = []
+        for p in pendingImages where p.uploadedURL != nil {
+            parts.append("![](\(p.uploadedURL!))")
+        }
+        for f in pendingFiles where f.uploadedURL != nil {
+            parts.append("[\(f.filename)](\(f.uploadedURL!))")
+        }
+        return parts
     }
 
     private func handleImageSelected(_ image: UIImage) {
@@ -464,18 +485,21 @@ struct NoteEditorView: View {
     }
 
     private func handleFileSelected(url: URL) {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else {
-            uploadError = "Could not read file."
-            return
-        }
         let filename = url.lastPathComponent
         let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
         var pending = PendingFile(filename: filename)
         pendingFiles.append(pending)
         let pendingID = pending.id
-        Task {
+        Task.detached(priority: .userInitiated) {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                await MainActor.run {
+                    self.pendingFiles.removeAll { $0.id == pendingID }
+                    self.uploadError = "Could not read file."
+                }
+                return
+            }
             do {
                 let result = try await MemosClient().uploadResource(
                     imageData: data, mimeType: mimeType, filename: filename,
@@ -485,13 +509,17 @@ struct NoteEditorView: View {
                 )
                 let base = AppSettings.endpointBaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
                 let resourceURL = "\(base)\(result.fileURLPath)"
-                if let idx = pendingFiles.firstIndex(where: { $0.id == pendingID }) {
-                    pendingFiles[idx].uploadedURL = resourceURL
-                    pendingFiles[idx].isUploading = false
+                await MainActor.run {
+                    if let idx = self.pendingFiles.firstIndex(where: { $0.id == pendingID }) {
+                        self.pendingFiles[idx].uploadedURL = resourceURL
+                        self.pendingFiles[idx].isUploading = false
+                    }
                 }
             } catch {
-                pendingFiles.removeAll { $0.id == pendingID }
-                uploadError = error.localizedDescription
+                await MainActor.run {
+                    self.pendingFiles.removeAll { $0.id == pendingID }
+                    self.uploadError = error.localizedDescription
+                }
             }
         }
     }
@@ -544,16 +572,7 @@ struct NoteEditorView: View {
     }
 
     private func extractTagsFromTexts(_ texts: [String]) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: #"#([A-Za-z0-9_-]+)"#) else { return [] }
-        var results: [String] = []
-        for text in texts {
-            let range = NSRange(text.startIndex..<text.endIndex, in: text)
-            for match in regex.matches(in: text, range: range) {
-                guard match.numberOfRanges > 1, let r = Range(match.range(at: 1), in: text) else { continue }
-                results.append(String(text[r]))
-            }
-        }
-        return results
+        TagExtractor.tags(inTexts: texts)
     }
 
     private func normalizeTag(_ raw: String) -> String {

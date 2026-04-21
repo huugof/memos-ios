@@ -39,25 +39,25 @@ struct AllNotesView: View {
         )
     }
 
-    private var displayedNotes: [UnifiedNote] {
-        var notes = allNotes
-        if filterByTags        { notes = notes.filter { !$0.tags.isEmpty } }
-        if filterByAttachments { notes = notes.filter { $0.hasAttachments } }
-        if filterByChecklists  { notes = notes.filter { $0.hasChecklists } }
-        return notes
+    private func displayedNotes(from notes: [UnifiedNote]) -> [UnifiedNote] {
+        var result = notes
+        if filterByTags        { result = result.filter { !$0.tags.isEmpty } }
+        if filterByAttachments { result = result.filter { $0.hasAttachments } }
+        if filterByChecklists  { result = result.filter { $0.hasChecklists } }
+        return result
     }
 
-    private var pinnedNotes: [UnifiedNote] {
-        displayedNotes.filter { pinnedStore.isPinned($0.id) }
+    private func pinnedNotes(from displayed: [UnifiedNote]) -> [UnifiedNote] {
+        displayed.filter { pinnedStore.isPinned($0.id) }
     }
 
-    private var unpinnedGroups: [NoteDateGrouping.Group] {
-        NoteDateGrouping.group(displayedNotes.filter { !pinnedStore.isPinned($0.id) })
+    private func unpinnedGroups(from displayed: [UnifiedNote]) -> [NoteDateGrouping.Group] {
+        NoteDateGrouping.group(displayed.filter { !pinnedStore.isPinned($0.id) })
     }
 
-    private var topTags: [String] {
+    private func topTags(from notes: [UnifiedNote]) -> [String] {
         var counts: [String: Int] = [:]
-        for note in allNotes {
+        for note in notes {
             for tag in note.tags { counts[tag, default: 0] += 1 }
         }
         return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(12).map(\.key)
@@ -74,18 +74,25 @@ struct AllNotesView: View {
     }
 
     var body: some View {
+        // Compute once per render; all sub-views receive this pre-computed value.
+        let notes = allNotes
+        let displayed = displayedNotes(from: notes)
+        let pinned = pinnedNotes(from: displayed)
+        let groups = unpinnedGroups(from: displayed)
+        let tags = topTags(from: notes)
+
         ZStack {
             if isSearchActive {
                 NoteSearchView(
                     searchText: $searchText,
                     searchFilter: $searchFilter,
-                    notes: allNotes,
-                    topTags: topTags,
+                    notes: notes,
+                    topTags: tags,
                     isLoadingMore: !serverMemosStore.reachedEnd
                 )
                 .transition(.opacity.animation(.easeInOut(duration: 0.12)))
             } else {
-                notesList
+                notesList(pinned: pinned, groups: groups)
                     .transition(.opacity.animation(.easeInOut(duration: 0.12)))
             }
         }
@@ -120,25 +127,27 @@ struct AllNotesView: View {
                 onSettings: { showSettings = true }
             )
         }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showAttachmentsBrowser) { attachmentsBrowserSheet }
+        .sheet(isPresented: $showSettings) { SettingsView(onBack: { showSettings = false }) }
+        .sheet(isPresented: $showAttachmentsBrowser) { attachmentsBrowserSheet(notes: notes) }
         .onAppear {
             searchFocused = false
             bottomBarID += 1  // force safeAreaInset re-render on navigation return
         }
+        .task(id: isSearchActive) {
+            guard isSearchActive else { return }
+            try? await Task.sleep(for: .milliseconds(50))
+            searchFocused = true
+        }
         .onChange(of: isSearchActive) { _, active in
-            if active {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { searchFocused = true }
-                if !serverMemosStore.reachedEnd {
-                    Task { await serverMemosStore.loadRemainingPages() }
-                }
+            if active, !serverMemosStore.reachedEnd {
+                Task { await serverMemosStore.loadRemainingPages() }
             }
         }
     }
 
     // MARK: Notes list
 
-    private var notesList: some View {
+    private func notesList(pinned: [UnifiedNote], groups: [NoteDateGrouping.Group]) -> some View {
         List {
             if let msg = serverMemosStore.errorMessage {
                 Section {
@@ -153,7 +162,7 @@ struct AllNotesView: View {
                 }
             }
 
-            if pinnedNotes.isEmpty && unpinnedGroups.isEmpty && !serverMemosStore.isLoading {
+            if pinned.isEmpty && groups.isEmpty && !serverMemosStore.isLoading {
                 Section {
                     Text(activeFilterLabel != nil
                          ? "No notes match this filter."
@@ -163,13 +172,13 @@ struct AllNotesView: View {
                 }
             }
 
-            if !pinnedNotes.isEmpty {
+            if !pinned.isEmpty {
                 Section("Pinned") {
-                    ForEach(pinnedNotes) { note in noteRow(for: note) }
+                    ForEach(pinned) { note in noteRow(for: note) }
                 }
             }
 
-            ForEach(unpinnedGroups) { group in
+            ForEach(groups) { group in
                 Section(group.header) {
                     ForEach(group.notes) { note in noteRow(for: note) }
                 }
@@ -189,7 +198,7 @@ struct AllNotesView: View {
         .listStyle(.insetGrouped)
         .refreshable { await serverMemosStore.loadAllPages() }
         .overlay(alignment: .center) {
-            if serverMemosStore.isLoading && pinnedNotes.isEmpty && unpinnedGroups.isEmpty { ProgressView() }
+            if serverMemosStore.isLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
         }
     }
 
@@ -350,9 +359,9 @@ struct AllNotesView: View {
 
     // MARK: Attachments browser
 
-    private var attachmentsBrowserSheet: some View {
+    private func attachmentsBrowserSheet(notes: [UnifiedNote]) -> some View {
         NavigationStack {
-            List(allNotes.filter { $0.hasAttachments }) { note in
+            List(notes.filter { $0.hasAttachments }) { note in
                 NavigationLink(value: NotesRoute.editor(note.editorTarget)) {
                     NoteRowView(note: note)
                 }

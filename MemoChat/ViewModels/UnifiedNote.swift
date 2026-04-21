@@ -73,13 +73,7 @@ enum UnifiedNote: Identifiable {
     }
 
     var tags: [String] {
-        var seen = Set<String>()
-        var result: [String] = []
-        for match in content.matches(of: /\#([A-Za-z0-9_\-]+)/) {
-            let tag = String(match.output.1).lowercased()
-            if seen.insert(tag).inserted { result.append(tag) }
-        }
-        return result
+        TagExtractor.tags(in: content)
     }
 
     var hasAttachments: Bool {

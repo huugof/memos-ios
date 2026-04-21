@@ -18,6 +18,7 @@
 		25B5165F6F78EEA7ED5E02FF /* ServerMemoDeleteQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3229B12ED0F0DE3D36FD9E /* ServerMemoDeleteQueueTests.swift */; };
 		26166F69E32EFFD664AA3D57 /* UnifiedNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE67B5643C362010CCEA361B /* UnifiedNote.swift */; };
 		AA11223344556677889900AA /* PinnedNotesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11223344556677889900BB /* PinnedNotesStore.swift */; };
+		CC22334455667788990011BB /* TagExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22334455667788990011CC /* TagExtractor.swift */; };
 		2BB0463EB4355A0C08269861 /* MarkdownLiteFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB531B9EF3898E85401D8394 /* MarkdownLiteFormatter.swift */; };
 		36629055536B015DB077F63D /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65FBBC64F5CB5CA5564743E4 /* DraftStore.swift */; };
 		3793421E9954AAA68FED875C /* ServerMemoDeleteTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC5F17C36786DF3D841776F /* ServerMemoDeleteTask.swift */; };
@@ -128,6 +129,7 @@
 		BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
 		BE67B5643C362010CCEA361B /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
 		BB11223344556677889900BB /* PinnedNotesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedNotesStore.swift; sourceTree = "<group>"; };
+		DD22334455667788990011CC /* TagExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagExtractor.swift; sourceTree = "<group>"; };
 		C2754C73B5E1334C36942906 /* ServerMemoSaveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveService.swift; sourceTree = "<group>"; };
 		C297709F3963255C5C4D2BBA /* DraftResumeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftResumeCoordinator.swift; sourceTree = "<group>"; };
 		C3D30B906F7228E420B8DC94 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 			children = (
 				BE67B5643C362010CCEA361B /* UnifiedNote.swift */,
 				BB11223344556677889900BB /* PinnedNotesStore.swift */,
+				DD22334455667788990011CC /* TagExtractor.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -540,6 +543,7 @@
 				FE37E292168E3B44C13A07B7 /* SpeechTranscriptionService.swift in Sources */,
 				26166F69E32EFFD664AA3D57 /* UnifiedNote.swift in Sources */,
 				AA11223344556677889900AA /* PinnedNotesStore.swift in Sources */,
+				CC22334455667788990011BB /* TagExtractor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -99,7 +99,6 @@ enum ServerMemoSaveService {
             return false
         }
 
-        editDraft.localContent = trimmed
         editDraft.saveState = .pending
         editDraft.lastError = nil
         editDraft.updatedAt = Date()
@@ -162,7 +161,8 @@ enum ServerMemoSaveService {
 
             editDraft.previousServerContent = editDraft.serverContent
             editDraft.serverContent = trimmed
-            editDraft.localContent = trimmed
+            // Leave localContent untouched — the user may have typed since the save started.
+            // hasLocalChanges will re-evaluate against the new serverContent.
             editDraft.saveState = .idle
             editDraft.lastError = nil
             editDraft.lastSyncedAt = Date()
