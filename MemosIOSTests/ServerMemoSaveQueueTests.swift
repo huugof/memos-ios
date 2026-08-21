@@ -1,7 +1,7 @@
 import XCTest
 import SwiftData
 import Foundation
-@testable import Memos
+@testable import MemoChat
 
 @MainActor
 final class ServerMemoSaveQueueTests: XCTestCase {

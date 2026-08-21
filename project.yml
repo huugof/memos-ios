@@ -2,10 +2,10 @@ name: MemosIOS
 options:
   minimumXcodeGenVersion: 2.44.0
   deploymentTarget:
-    iOS: 17.0
+    iOS: 26.0
 settings:
   base:
-    PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemosIOS
+    PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemoChat
     SWIFT_VERSION: 5.0
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0
@@ -15,24 +15,9 @@ settings:
     INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
     INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
-    INFOPLIST_KEY_CFBundleDisplayName: Memos
+    INFOPLIST_KEY_CFBundleDisplayName: MemoChat
     INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
 targets:
-  MemosIOS:
-    type: application
-    platform: iOS
-    sources:
-      - path: MemosIOS
-    settings:
-      base:
-        PRODUCT_NAME: Memos
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ENABLE_PREVIEWS: YES
-        DEVELOPMENT_ASSET_PATHS: '"MemosIOS/Resources"'
-        SUPPORTS_MACCATALYST: NO
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
-        INFOPLIST_KEY_UIRequiresFullScreen: NO
   MemoChat:
     type: application
     platform: iOS
@@ -43,14 +28,10 @@ targets:
       - path: MemosIOS/Storage
       - path: MemosIOS/Views/Components
         includes:
-          - NoteTextView.swift
-          - MarkdownLiteFormatter.swift
-          - KeyboardStateObserver.swift
+          - NoteListEditing.swift
       - path: MemosIOS/Views
         includes:
           - SettingsView.swift
-          - ServerMemosSheetView.swift
-          - ServerMemoEditorView.swift
     settings:
       base:
         PRODUCT_NAME: MemoChat
@@ -63,37 +44,26 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
-        INFOPLIST_KEY_UIRequiresFullScreen: NO
         INFOPLIST_KEY_NSMicrophoneUsageDescription: MemoChat uses the microphone for voice transcription.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: MemoChat uses speech recognition to transcribe your voice notes.
-        IPHONEOS_DEPLOYMENT_TARGET: 17.0
 
   MemosIOSTests:
     type: bundle.unit-test
     platform: iOS
-    hostApplication: MemosIOS
+    hostApplication: MemoChat
     sources:
       - path: MemosIOSTests
     dependencies:
-      - target: MemosIOS
+      - target: MemoChat
     settings:
       base:
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Memos.app/Memos"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MemoChat.app/MemoChat"
         BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
   MemoChat:
     build:
       targets:
         MemoChat: all
-    run:
-      config: Debug
-    archive:
-      config: Release
-
-  MemosIOS:
-    build:
-      targets:
-        MemosIOS: all
         MemosIOSTests: [test]
     test:
       config: Debug

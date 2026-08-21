@@ -8,7 +8,7 @@ struct MemoChatApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NotesNavigationRoot()
+            ComposeRootView()
         }
         .modelContainer(modelContainer)
     }

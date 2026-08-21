@@ -7,10 +7,6 @@ enum NoteEditorTarget: Hashable {
     case serverMemo(String) // memoID
 }
 
-enum NotesRoute: Hashable {
-    case editor(NoteEditorTarget)
-}
-
 enum UnifiedNote: Identifiable {
     case local(Draft)
     case server(ServerMemoSummary, editDraft: ServerMemoEditDraft?)

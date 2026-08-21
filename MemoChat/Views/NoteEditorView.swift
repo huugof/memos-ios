@@ -5,6 +5,15 @@ import UniformTypeIdentifiers
 
 struct NoteEditorView: View {
     let target: NoteEditorTarget
+    /// When true, this is the compose-first home screen (its own chrome: history, send, new).
+    var isHome: Bool = false
+    /// Home only: true while the notes drawer covers this screen. The compose screen stays
+    /// mounted underneath it, so focus has to be handed over explicitly.
+    var isMenuOpen: Bool = false
+    /// Invoked by the home "+" button to start a fresh note.
+    var onNewNote: () -> Void = {}
+    /// Invoked by the ☰ button and the home left-edge swipe to open the notes drawer.
+    var onOpenMenu: () -> Void = {}
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -44,6 +53,8 @@ struct NoteEditorView: View {
 
     @State private var showAttachMenu = false
     @State private var didTapDone = false
+    /// Last text sent via the home Send button — gates the button and double-sends.
+    @State private var lastSentText = ""
 
     private var currentDraft: Draft? {
         guard let id = localDraftID else { return nil }
@@ -89,7 +100,15 @@ struct NoteEditorView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbarContent }
-        .background { InteractivePopEnabler() }
+        .background {
+            if isHome {
+                // Root screen: the left edge opens the notes list (the system pop
+                // gesture is inert here anyway — nothing to pop back to).
+                NavigationGestures(edge: .left) { onOpenMenu() }
+            } else {
+                NavigationGestures()
+            }
+        }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItems,
                       maxSelectionCount: nil, matching: .images)
         .onChange(of: selectedPhotoItems) { _, items in
@@ -118,20 +137,32 @@ struct NoteEditorView: View {
             if let err = uploadError { Text(err) }
         }
         .task { await setup() }
-        .onChange(of: draftText) { _, _ in schedulePersist() }
-        .onChange(of: serverMemoContent) { _, _ in stageServerMemoContent() }
+        .onChange(of: draftText) { _, _ in
+            schedulePersist()
+            // Editing after a send re-arms auto-commit so leaving captures the new text.
+            if draftText != lastSentText { didTapDone = false }
+        }
+        .onChange(of: serverMemoContent) { _, _ in
+            stageServerMemoContent()
+            if serverMemoContent != lastSentText { didTapDone = false }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background { saveCurrentState() }
+        }
+        .onChange(of: isMenuOpen) { _, open in
+            // Hand the keyboard to the drawer and take it back on close — this screen
+            // never unmounts, so nothing else resigns first responder for us.
+            if open {
+                isFocused = false
+            } else {
+                isFocused = true
+                focusRequestID = UUID()
+            }
         }
         .onDisappear {
             persistDebounceTask?.cancel()
             persistDraftText()  // flush any pending debounced save before committing
-            if !didTapDone {
-                switch target {
-                case .newNote, .localDraft: commitDraft()
-                case .serverMemo: commitServerMemo()
-                }
-            }
+            if !didTapDone { commitCurrent() }
             cleanupBlankDraft()
             remoteTagTask?.cancel()
         }
@@ -141,14 +172,13 @@ struct NoteEditorView: View {
 
     private var editorBody: some View {
         ZStack(alignment: .bottom) {
-            EditableNoteTextView(
+            PlainNoteEditor(
                 text: textBinding,
                 isFocused: $isFocused,
                 focusRequestID: focusRequestID,
-                extraBottomScrollPadding: pendingAttachmentsHeight + 100,
+                extraBottomPadding: pendingAttachmentsHeight + 100,
                 tagSuggestions: tagSuggestions,
-                onTagAccepted: { rememberTag($0) },
-                onTagTapped: { _ in }
+                onTagAccepted: { rememberTag($0) }
             )
             .padding(.horizontal, 20)
 
@@ -257,6 +287,68 @@ struct NoteEditorView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        if isHome {
+            homeToolbarContent
+        } else {
+            editToolbarContent
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var homeToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button { onOpenMenu() } label: {
+                Image(systemName: "line.3.horizontal")
+                    .fontWeight(.semibold)
+            }
+            .tint(.primary)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 0) {
+                Button { showAttachMenu = true } label: {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
+                .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
+                    Button("Photo Library") { showPhotoPicker = true }
+                    Button("Choose File") { showFilePicker = true }
+                    Button("Cancel", role: .cancel) {}
+                }
+
+                Divider().frame(height: 16)
+
+                Button { resetToNewNote() } label: {
+                    Image(systemName: "square.and.pencil")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
+            }
+            .fixedSize()
+            .glassToolbarCapsule()
+        }
+        sendToolbarItem { sendHome() }
+    }
+
+    /// The ↑ send button — identical on both screens so it stays in the same spot.
+    @ToolbarContentBuilder
+    private func sendToolbarItem(action: @escaping () -> Void) -> some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: action) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(canSend ? appAccent : Color.secondary)
+            }
+            .disabled(!canSend)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var editToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button { handleBack() } label: {
                 Image(systemName: "chevron.left")
@@ -296,6 +388,7 @@ struct NoteEditorView: View {
             .fixedSize()
             .glassToolbarCapsule()
         }
+        sendToolbarItem { sendEdit() }
     }
 
     private func togglePin() {
@@ -303,21 +396,69 @@ struct NoteEditorView: View {
         pinnedStore.toggle(id)
     }
 
+    // MARK: Send
+
+    private var canSend: Bool {
+        let text = textBinding.wrappedValue
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && text != lastSentText
+    }
+
+    /// Home: enqueue the current draft and immediately hand back a blank note.
+    private func sendHome() {
+        guard canSend, let draft = currentDraft else { return }
+        persistDraftText()
+        appendPendingAttachments(to: draft)
+        sendQueue.enqueue(draft, in: modelContext)
+        didTapDone = true  // don't let onDisappear re-enqueue this same send
+        resetToNewNote()
+    }
+
+    /// Edit screen: push the change to the server, then pop back where we came from.
+    private func sendEdit() {
+        guard canSend else { return }
+        didTapDone = true
+        lastSentText = textBinding.wrappedValue
+        commitCurrent()
+        dismiss()
+    }
+
+    /// Swap the editor onto a fresh blank draft without rebuilding the view — the
+    /// UITextView (and the keyboard with it) stays alive, so capture stays instant.
+    private func resetToNewNote() {
+        persistDebounceTask?.cancel()
+        persistDraftText()
+        let draft = DraftStore.createDraft(in: modelContext)
+        localDraftID = draft.id
+        draftText = ""
+        lastSentText = ""
+        didTapDone = false
+        pendingImages = []
+        pendingFiles = []
+        isFocused = true
+        focusRequestID = UUID()
+    }
+
     // MARK: Actions
 
     private func handleBack() {
         didTapDone = true
+        commitCurrent()
+        dismiss()
+    }
+
+    private func commitCurrent() {
         switch target {
         case .newNote, .localDraft:
             commitDraft()
         case .serverMemo:
             commitServerMemo()
         }
-        dismiss()
     }
 
     private func commitDraft() {
         guard let draft = currentDraft else { return }
+        persistDraftText()
         appendPendingAttachments(to: draft)
         guard draft.hasStartedText else { return }
         sendQueue.enqueue(draft, in: modelContext)
@@ -429,6 +570,9 @@ struct NoteEditorView: View {
         draft.text = draft.text + sep + uploaded.joined(separator: "\n")
         draft.updatedAt = Date()
         modelContext.saveOrAssert()
+        // Keep the editor's copy in step: a later persistDraftText() would otherwise
+        // write the pre-attachment text back over the markdown we just appended.
+        draftText = draft.text
         pendingImages.removeAll()
         pendingFiles.removeAll()
     }
@@ -460,7 +604,7 @@ struct NoteEditorView: View {
     private func handleImageSelected(_ image: UIImage) {
         let resized = image.editorResizedToMaxEdge(1024)
         guard let data = resized.jpegData(compressionQuality: 0.75) else { return }
-        var pending = PendingImage(image: resized)
+        let pending = PendingImage(image: resized)
         pendingImages.append(pending)
         let pendingID = pending.id
         Task {
@@ -487,7 +631,7 @@ struct NoteEditorView: View {
     private func handleFileSelected(url: URL) {
         let filename = url.lastPathComponent
         let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-        var pending = PendingFile(filename: filename)
+        let pending = PendingFile(filename: filename)
         pendingFiles.append(pending)
         let pendingID = pending.id
         Task.detached(priority: .userInitiated) {
@@ -582,12 +726,122 @@ struct NoteEditorView: View {
     }
 }
 
-private struct InteractivePopEnabler: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
-    func updateUIViewController(_ vc: UIViewController, context: Context) {
-        DispatchQueue.main.async {
-            vc.navigationController?.interactivePopGestureRecognizer?.delegate = nil
-            vc.navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+/// Two jobs on the enclosing `UINavigationController`:
+///
+/// 1. Keeps the system swipe-back alive on screens that hide the back button, while
+///    refusing it at the stack root (a `nil` delegate there can strand the stack).
+/// 2. Optionally installs a screen-edge pan that runs `action` — the compose home uses
+///    the left edge to open the notes list, the list uses the right edge to close.
+///
+/// The recognizer lives on the nav controller's view, so it stays attached while the
+/// screen sits underneath a pushed one; `action` therefore only fires when this
+/// screen is the visible one.
+struct NavigationGestures: UIViewControllerRepresentable {
+    var edge: UIRectEdge?
+    var action: () -> Void = {}
+
+    init(edge: UIRectEdge? = nil, action: @escaping () -> Void = {}) {
+        self.edge = edge
+        self.action = action
+    }
+
+    func makeUIViewController(context: Context) -> HostController {
+        let controller = HostController()
+        let coordinator = context.coordinator
+        let edge = edge
+        // viewDidAppear is the first moment the navigation controller is reachable, and
+        // it fires again on every pop back — which re-claims the pop gesture's delegate.
+        controller.onAppear = { [weak controller] in
+            guard let controller, let nav = controller.navigationController else { return }
+            coordinator.adopt(nav: nav, host: controller, edge: edge)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ vc: HostController, context: Context) {
+        context.coordinator.action = action
+        if let nav = vc.navigationController {
+            context.coordinator.adopt(nav: nav, host: vc, edge: edge)
+        }
+    }
+
+    static func dismantleUIViewController(_ vc: HostController, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    final class HostController: UIViewController {
+        var onAppear: (() -> Void)?
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            onAppear?()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var action: () -> Void
+        private weak var navigationController: UINavigationController?
+        private weak var host: UIViewController?
+        private var edgeRecognizer: UIScreenEdgePanGestureRecognizer?
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        func adopt(nav: UINavigationController, host: UIViewController, edge: UIRectEdge?) {
+            navigationController = nav
+            self.host = host
+            nav.interactivePopGestureRecognizer?.delegate = self
+
+            guard let edge, edgeRecognizer == nil else { return }
+            let recognizer = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleEdgePan(_:)))
+            recognizer.edges = edge
+            recognizer.delegate = self
+            nav.view.addGestureRecognizer(recognizer)
+            edgeRecognizer = recognizer
+        }
+
+        func detach() {
+            if let recognizer = edgeRecognizer {
+                recognizer.view?.removeGestureRecognizer(recognizer)
+                edgeRecognizer = nil
+            }
+            if navigationController?.interactivePopGestureRecognizer?.delegate === self {
+                navigationController?.interactivePopGestureRecognizer?.delegate = nil
+            }
+        }
+
+        @objc private func handleEdgePan(_ recognizer: UIScreenEdgePanGestureRecognizer) {
+            guard recognizer.state == .began, isHostVisible else { return }
+            action()
+        }
+
+        /// True when the screen that owns this coordinator is the one on screen — the
+        /// recognizer outlives a push, and must go quiet while covered.
+        private var isHostVisible: Bool {
+            guard let top = navigationController?.topViewController else { return false }
+            var node = host
+            while let current = node {
+                if current === top { return true }
+                node = current.parent
+            }
+            return false
+        }
+
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            if recognizer === navigationController?.interactivePopGestureRecognizer {
+                return (navigationController?.viewControllers.count ?? 0) > 1
+            }
+            return true
+        }
+
+        func gestureRecognizer(
+            _ recognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            true
         }
     }
 }

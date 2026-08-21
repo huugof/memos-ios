@@ -21,20 +21,6 @@ struct NoteRowView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-
-            if !note.tags.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(note.tags.prefix(4), id: \.self) { tag in
-                        Label(tag, systemImage: "tag.fill")
-                            .labelStyle(.iconOnly)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Text(tag)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())

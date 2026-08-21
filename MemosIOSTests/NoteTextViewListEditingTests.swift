@@ -1,5 +1,5 @@
 import XCTest
-@testable import Memos
+@testable import MemoChat
 
 final class NoteTextViewListEditingTests: XCTestCase {
     func testNormalizesUnorderedListSpaceInsertionToTab() {

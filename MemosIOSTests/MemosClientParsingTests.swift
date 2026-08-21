@@ -1,6 +1,6 @@
 import XCTest
 import Foundation
-@testable import Memos
+@testable import MemoChat
 
 final class MemosClientParsingTests: XCTestCase {
     override func tearDownWithError() throws {

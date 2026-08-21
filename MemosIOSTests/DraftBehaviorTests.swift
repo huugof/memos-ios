@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import Memos
+@testable import MemoChat
 
 @MainActor
 final class DraftBehaviorTests: XCTestCase {
@@ -147,27 +147,6 @@ final class DraftBehaviorTests: XCTestCase {
         } else {
             XCTFail("Expected queued send to fail without endpoint/token configuration.")
         }
-    }
-
-    func testNotesSearchQueryParsesTagAndTextTokens() {
-        let query = NotesSearchQuery(rawValue: "tag:house kitchen TAG:work")
-
-        XCTAssertEqual(query.tagTokens, ["house", "work"])
-        XCTAssertEqual(query.textTokens, ["kitchen"])
-    }
-
-    func testNotesSearchQueryRequiresAllTokensAndTags() {
-        let query = NotesSearchQuery(rawValue: "tag:house lamp")
-
-        XCTAssertTrue(query.matches(text: "Living room lamp #house"))
-        XCTAssertFalse(query.matches(text: "Living room #house"))
-        XCTAssertFalse(query.matches(text: "Desk lamp #office"))
-    }
-
-    func testNotesSearchQueryExtractsNormalizedTags() {
-        let tags = NotesSearchQuery.extractTags(from: "Alpha #Home and #work_item")
-
-        XCTAssertEqual(tags, ["Home", "work_item"])
     }
 
     private func allDrafts() throws -> [Draft] {
