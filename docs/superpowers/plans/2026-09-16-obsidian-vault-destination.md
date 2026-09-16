@@ -2447,6 +2447,36 @@ In the `.onChange(of: scenePhase)` `.active` branch, replace the trailing
                 }
 ```
 
+**Observe destination changes.** `AppSettings.destinationKind` is a plain static `UserDefaults` read — not observable — and the `.task` above runs once, priming only the store that was active at launch. Flipping the picker in Settings would leave the list stale and the new store unprimed. So in `ComposeRootView` add:
+
+```swift
+    @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
+    @AppStorage("vaultBookmark") private var vaultBookmark: Data?
+```
+
+and after `.task`:
+
+```swift
+        .onChange(of: destinationRaw) { _, _ in
+            Task {
+                switch AppSettings.destinationKind {
+                case .memos:
+                    await serverMemosStore.refreshIfStale()
+                case .vault:
+                    vaultStore.loadFromIndex()
+                    await vaultStore.refresh()
+                }
+            }
+        }
+        .onChange(of: vaultBookmark) { _, _ in
+            // A different vault was picked: the index describes the old one.
+            guard AppSettings.destinationKind == .vault else { return }
+            Task { await vaultStore.refresh() }
+        }
+```
+
+In `NotesListView`, add the same `@AppStorage("destinationKind")` property and switch on `DestinationKind(rawValue: destinationRaw) ?? .memos` inside `notes` (Step 4) instead of reading `AppSettings.destinationKind`, so the list re-renders when the destination changes.
+
 - [ ] **Step 2: Route the send**
 
 In `MemoChat/Views/NoteEditorView.swift`, add the store next to the existing environment objects (after `@EnvironmentObject private var pinnedStore: PinnedNotesStore`, around line 26):
@@ -2492,7 +2522,7 @@ There are **two** call sites of `sendQueue.enqueue(draft, in: modelContext)` in 
 
 - [ ] **Step 3: Add the vault editing target**
 
-Adding `NoteEditorTarget.vaultFile` in Task 8 makes **five** `switch target` statements in this file non-exhaustive. The compiler will flag each; here is every one and what it needs.
+Task 8 added **minimal placeholder** `.vaultFile` branches to the five `switch target` statements in this file (so the target compiled): `noteID` already returns `"v-\(path)"` (final); `textBinding` returns `.constant("")`; `commitCurrent`, `saveCurrentState`, and `setup` just `break`. **Replace** those four placeholders with the branches below.
 
 `noteID` (line 66) — the pinned-note identifier must match `UnifiedNote.id`:
 
