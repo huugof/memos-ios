@@ -24,6 +24,7 @@ struct NoteEditorView: View {
     @EnvironmentObject private var sendQueue: DraftSendQueueController
     @EnvironmentObject private var saveQueue: ServerMemoSaveQueueController
     @EnvironmentObject private var pinnedStore: PinnedNotesStore
+    @EnvironmentObject private var vaultStore: VaultStore
 
     // Draft editing state
     @State private var localDraftID: UUID?
@@ -36,6 +37,11 @@ struct NoteEditorView: View {
     @State private var serverMemoContent: String = ""
     @State private var isLoadingServerMemo = false
     @State private var serverMemoError: String?
+
+    // Vault note editing state
+    @State private var loadedVaultNote: VaultNote?
+    @State private var vaultNoteBody: String = ""
+    @State private var vaultError: String?
 
     // Attachment state
     @State private var pendingImages: [PendingImage] = []
@@ -50,6 +56,7 @@ struct NoteEditorView: View {
     @State private var tagSuggestions: [String] = []
     @State private var remoteTagTask: Task<Void, Never>?
     @State private var persistDebounceTask: Task<Void, Never>?
+    @State private var vaultSaveTask: Task<Void, Never>?
 
     @State private var showAttachMenu = false
     @State private var didTapDone = false
@@ -86,7 +93,7 @@ struct NoteEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let err = serverMemoError {
+            if let err = serverMemoError ?? vaultError {
                 Text(err)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -147,6 +154,9 @@ struct NoteEditorView: View {
         .onChange(of: serverMemoContent) { _, _ in
             stageServerMemoContent()
             if serverMemoContent != lastSentText { didTapDone = false }
+        }
+        .onChange(of: vaultNoteBody) { _, _ in
+            scheduleVaultSave()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background { saveCurrentState() }
@@ -218,7 +228,7 @@ struct NoteEditorView: View {
         case .serverMemo:
             return $serverMemoContent
         case .vaultFile:
-            return .constant("")
+            return $vaultNoteBody
         }
     }
 
@@ -413,7 +423,7 @@ struct NoteEditorView: View {
         guard canSend, let draft = currentDraft else { return }
         persistDraftText()
         appendPendingAttachments(to: draft)
-        sendQueue.enqueue(draft, in: modelContext)
+        dispatchSend(draft)
         didTapDone = true  // don't let onDisappear re-enqueue this same send
         resetToNewNote()
     }
@@ -458,7 +468,9 @@ struct NoteEditorView: View {
         case .serverMemo:
             commitServerMemo()
         case .vaultFile:
-            break
+            vaultSaveTask?.cancel()
+            vaultSaveTask = nil
+            saveVaultNote()
         }
     }
 
@@ -467,7 +479,29 @@ struct NoteEditorView: View {
         persistDraftText()
         appendPendingAttachments(to: draft)
         guard draft.hasStartedText else { return }
-        sendQueue.enqueue(draft, in: modelContext)
+        dispatchSend(draft)
+    }
+
+    /// Sends the current draft to whichever destination is active. The Memos
+    /// path keeps its queue; the vault path writes the file immediately.
+    private func dispatchSend(_ draft: Draft) {
+        switch AppSettings.destinationKind {
+        case .memos:
+            sendQueue.enqueue(draft, in: modelContext)
+        case .vault:
+            do {
+                try vaultStore.create(body: draft.text)
+                draft.isArchived = true
+                draft.lastSentAt = Date()
+                draft.sendState = .sent
+                draft.lastError = nil
+            } catch {
+                // Leave the draft unarchived so no text is lost.
+                draft.sendState = .failed
+                draft.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+            modelContext.saveOrAssert()
+        }
     }
 
     private func commitServerMemo() {
@@ -486,7 +520,9 @@ struct NoteEditorView: View {
                 _ = ServerMemoSaveService.stageLocalContent(serverMemoContent, for: ed, in: modelContext, persist: true)
             }
         case .vaultFile:
-            break
+            vaultSaveTask?.cancel()
+            vaultSaveTask = nil
+            saveVaultNote()
         }
     }
 
@@ -535,8 +571,8 @@ struct NoteEditorView: View {
             }
         case .serverMemo(let memoID):
             await loadServerMemo(memoID: memoID)
-        case .vaultFile:
-            break
+        case .vaultFile(let path):
+            loadVaultNote(path)
         }
         fetchRemoteTagsOnce()
         refreshTagSuggestions()
@@ -565,6 +601,53 @@ struct NoteEditorView: View {
         let ed = ServerMemoSaveService.upsertEditDraft(for: fm, in: modelContext)
         editDraft = ed
         serverMemoContent = ed.hasLocalChanges ? ed.localContent : fm.content
+    }
+
+    /// Loads a vault note's body on demand. The list holds only index entries —
+    /// in an iCloud vault, reading bodies to draw rows would download the vault.
+    private func loadVaultNote(_ relativePath: String) {
+        do {
+            let note = try vaultStore.read(relativePath: relativePath)
+            loadedVaultNote = note
+            vaultNoteBody = note.body
+            vaultError = nil
+        } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Saves the open vault note. A conflict is reported, not retried — the
+    /// user's text is already safely on disk under the conflict name.
+    private func saveVaultNote() {
+        guard let note = loadedVaultNote else { return }
+        // Nothing changed since load (or since the last save) — writing anyway
+        // would bump `updated` and produce a sync diff for a note nobody edited.
+        guard vaultNoteBody != note.body else { return }
+        do {
+            let result = try vaultStore.update(note: note, body: vaultNoteBody)
+            switch result {
+            case .written:
+                vaultError = nil
+                // Re-read so the next save compares against current metadata.
+                loadedVaultNote = try? vaultStore.read(relativePath: note.relativePath)
+            case .conflictCopy(let path, _):
+                vaultError = "This note changed elsewhere. Your version was saved as \(path)."
+                // Keep editing the copy. Left pointing at the original, every
+                // further debounced save would spawn yet another conflict copy.
+                loadedVaultNote = try? vaultStore.read(relativePath: path)
+            }
+        } catch {
+            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func scheduleVaultSave() {
+        vaultSaveTask?.cancel()
+        vaultSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            saveVaultNote()
+        }
     }
 
     // MARK: Attachment upload

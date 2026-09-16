@@ -17,6 +17,10 @@ struct ComposeRootView: View {
     @StateObject private var saveQueue = ServerMemoSaveQueueController()
     @StateObject private var serverDeleteQueue = ServerMemoDeleteQueueController()
     @StateObject private var pinnedStore = PinnedNotesStore()
+    @StateObject private var vaultStore = VaultStore()
+
+    @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
+    @AppStorage("vaultBookmark") private var vaultBookmark: Data?
 
     var body: some View {
         ZStack {
@@ -43,13 +47,36 @@ struct ComposeRootView: View {
         .environmentObject(saveQueue)
         .environmentObject(serverDeleteQueue)
         .environmentObject(pinnedStore)
+        .environmentObject(vaultStore)
         .preferredColorScheme(.dark)
         .task {
-            serverMemosStore.loadFromCache(MemoCache.load())
-            serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
-            await serverMemosStore.refresh(force: true)
+            switch AppSettings.destinationKind {
+            case .memos:
+                serverMemosStore.loadFromCache(MemoCache.load())
+                serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
+                await serverMemosStore.refresh(force: true)
+            case .vault:
+                vaultStore.loadFromIndex()
+                await vaultStore.refresh()
+            }
         }
         .task { await autoSyncLoop() }
+        .onChange(of: destinationRaw) { _, _ in
+            Task {
+                switch AppSettings.destinationKind {
+                case .memos:
+                    await serverMemosStore.refreshIfStale()
+                case .vault:
+                    vaultStore.loadFromIndex()
+                    await vaultStore.refresh()
+                }
+            }
+        }
+        .onChange(of: vaultBookmark) { _, _ in
+            // A different vault was picked: the index describes the old one.
+            guard AppSettings.destinationKind == .vault else { return }
+            Task { await vaultStore.refresh() }
+        }
         .onAppear {
             sendQueue.startProcessing(in: modelContext)
             serverDeleteQueue.startProcessing(in: modelContext)
@@ -80,7 +107,12 @@ struct ComposeRootView: View {
                 saveQueue.startProcessing(in: modelContext)
                 saveQueue.retryNow(in: modelContext)
                 handleForegroundResume()
-                Task { await serverMemosStore.refreshIfStale() }
+                switch AppSettings.destinationKind {
+                case .memos:
+                    Task { await serverMemosStore.refreshIfStale() }
+                case .vault:
+                    Task { await vaultStore.refreshIfStale(maxAge: 5) }
+                }
             default:
                 break
             }
@@ -136,7 +168,12 @@ struct ComposeRootView: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(45))
             guard !Task.isCancelled else { return }
-            await serverMemosStore.refreshIfStale(maxAge: 30)
+            switch AppSettings.destinationKind {
+            case .memos:
+                await serverMemosStore.refreshIfStale(maxAge: 30)
+            case .vault:
+                await vaultStore.refreshIfStale(maxAge: 30)
+            }
         }
     }
 }

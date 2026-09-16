@@ -14,20 +14,45 @@ struct NotesListView: View {
     @EnvironmentObject private var serverMemosStore: ServerMemosStore
     @EnvironmentObject private var serverDeleteQueue: ServerMemoDeleteQueueController
     @EnvironmentObject private var pinnedStore: PinnedNotesStore
+    @EnvironmentObject private var vaultStore: VaultStore
+    @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
 
     @State private var showSettings = false
+
+    private var destination: DestinationKind {
+        DestinationKind(rawValue: destinationRaw) ?? .memos
+    }
 
     private var hiddenMemoIDs: Set<String> {
         Set(allDeleteTasks.filter { $0.deleteState != .resolved }.map { $0.memoID })
     }
 
     private var allNotes: [UnifiedNote] {
-        UnifiedNote.merge(
-            drafts: allDrafts,
-            memos: serverMemosStore.memos,
-            editDrafts: allEditDrafts,
-            hiddenMemoIDs: hiddenMemoIDs
-        )
+        switch destination {
+        case .memos:
+            return UnifiedNote.merge(
+                drafts: allDrafts,
+                memos: serverMemosStore.memos,
+                editDrafts: allEditDrafts,
+                hiddenMemoIDs: hiddenMemoIDs
+            )
+        case .vault:
+            return UnifiedNote.merge(vaultEntries: vaultStore.entries, drafts: allDrafts)
+        }
+    }
+
+    private var activeErrorMessage: String? {
+        switch destination {
+        case .memos: return serverMemosStore.errorMessage
+        case .vault: return vaultStore.errorMessage
+        }
+    }
+
+    private var activeIsLoading: Bool {
+        switch destination {
+        case .memos: return serverMemosStore.isLoading
+        case .vault: return vaultStore.isLoading
+        }
     }
 
     var body: some View {
@@ -36,14 +61,14 @@ struct NotesListView: View {
         let groups = NoteDateGrouping.group(notes.filter { !pinnedStore.isPinned($0.id) })
 
         List {
-            if let msg = serverMemosStore.errorMessage {
+            if let msg = activeErrorMessage {
                 Section {
                     Text(msg).font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
             }
 
-            if pinned.isEmpty && groups.isEmpty && !serverMemosStore.isLoading {
+            if pinned.isEmpty && groups.isEmpty && !activeIsLoading {
                 Section {
                     Text("No notes yet.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -77,7 +102,7 @@ struct NotesListView: View {
         .listStyle(.insetGrouped)
         .refreshable { await serverMemosStore.loadAllPages() }
         .overlay(alignment: .center) {
-            if serverMemosStore.isLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
+            if activeIsLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
         }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)
@@ -126,8 +151,12 @@ struct NotesListView: View {
                 resourceName: memo.resourceName ?? memo.id,
                 in: modelContext
             )
-        case .vault:
-            break
+        case .vault(let entry):
+            do {
+                try vaultStore.delete(relativePath: entry.relativePath)
+            } catch {
+                vaultStore.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
         }
     }
 }
