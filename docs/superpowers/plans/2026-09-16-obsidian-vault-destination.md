@@ -661,7 +661,7 @@ Persists access to a folder the user picked. Security-scoped bookmarks go stale 
 **Interfaces:**
 - Consumes: nothing.
 - Produces:
-  - `enum VaultAccessError: LocalizedError` — `.notConfigured`, `.stale`, `.accessDenied`
+  - `enum VaultAccessError: LocalizedError, Equatable` — `.notConfigured`, `.stale`
   - `enum VaultBookmarkStore`
   - `static func save(url: URL) throws`
   - `static func resolve() throws -> URL`
@@ -761,19 +761,20 @@ In `MemosIOS/Storage/AppSettings.swift`, add `static let vaultBookmark = "vaultB
 ```swift
 import Foundation
 
+/// The spec routes "bookmark stale / vault moved" and "folder access revoked" to
+/// identical handling ("Same path" — the Reconnect vault banner), so there is no
+/// separate access-denied case: `.stale` covers every resolution failure, including
+/// a revoked permission or corrupted bookmark data.
 enum VaultAccessError: LocalizedError, Equatable {
     case notConfigured
     case stale
-    case accessDenied
 
     var errorDescription: String? {
         switch self {
         case .notConfigured:
             return "No vault folder has been selected yet."
         case .stale:
-            return "The vault folder moved or is no longer available. Reconnect it in Settings."
-        case .accessDenied:
-            return "MemoChat can't access the vault folder. Reconnect it in Settings."
+            return "MemoChat can't access the vault folder anymore. Reconnect it in Settings."
         }
     }
 }
