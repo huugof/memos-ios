@@ -2619,30 +2619,46 @@ Finally, surface `vaultError` wherever the view already presents `serverMemoErro
 
 - [ ] **Step 4: Render vault notes in the list**
 
-In `MemoChat/Views/NotesListView.swift`, add:
+In `MemoChat/Views/NotesListView.swift` (the real property names are `allNotes`, `allDrafts`, `allEditDrafts`, `hiddenMemoIDs`), add next to the other environment objects:
 
 ```swift
     @EnvironmentObject private var vaultStore: VaultStore
+    @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
+
+    private var destination: DestinationKind {
+        DestinationKind(rawValue: destinationRaw) ?? .memos
+    }
 ```
 
-Where the view builds its notes via `UnifiedNote.merge(drafts:memos:editDrafts:)`, branch on destination:
+Replace `allNotes` so it branches on the observed destination:
 
 ```swift
-    private var notes: [UnifiedNote] {
-        switch AppSettings.destinationKind {
+    private var allNotes: [UnifiedNote] {
+        switch destination {
         case .memos:
             return UnifiedNote.merge(
-                drafts: drafts,
+                drafts: allDrafts,
                 memos: serverMemosStore.memos,
-                editDrafts: editDrafts
+                editDrafts: allEditDrafts,
+                hiddenMemoIDs: hiddenMemoIDs
             )
         case .vault:
-            return UnifiedNote.merge(
-                vaultEntries: vaultStore.entries,
-                drafts: drafts
-            )
+            return UnifiedNote.merge(vaultEntries: vaultStore.entries, drafts: allDrafts)
         }
     }
+```
+
+The error row and the empty-state check at the top of `body` read `serverMemosStore.errorMessage` / `serverMemosStore.isLoading`. In vault mode they must read `vaultStore.errorMessage` / `vaultStore.isLoading` instead — the spec requires a stale or revoked bookmark to surface as a visible "Reconnect it in Settings" message, never a silent empty list. Introduce two small computed properties (`activeErrorMessage`, `activeIsLoading`) that switch on `destination`, and use them in those two places.
+
+Swipe-delete: Task 8 left `deleteNote`'s `.vault` branch as `break`, which would silently no-op now that vault rows render. Replace it:
+
+```swift
+        case .vault(let entry):
+            do {
+                try vaultStore.delete(relativePath: entry.relativePath)
+            } catch {
+                vaultStore.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
 ```
 
 - [ ] **Step 5: Build and run the full suite**
