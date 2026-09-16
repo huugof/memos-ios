@@ -281,7 +281,7 @@ struct Frontmatter: Equatable {
         for case .entry(let k, let raw) in blocks where k == key {
             guard let colon = raw.firstIndex(of: ":") else { return nil }
             let after = raw[raw.index(after: colon)...]
-            let firstLine = after.prefix(while: { $0 != "\n" && $0 != "\r" })
+            let firstLine = after.prefix(while: { !$0.isNewline })
             let trimmed = firstLine.trimmingCharacters(in: .whitespaces)
             return trimmed.isEmpty ? nil : trimmed
         }
@@ -324,7 +324,9 @@ private extension String {
         var current = ""
         for character in self {
             current.append(character)
-            if character == "\n" {
+            // isNewline, not == "\n": Swift's Character is an extended grapheme
+            // cluster, so "\r\n" is a SINGLE Character and never equals "\n".
+            if character.isNewline {
                 lines.append(current)
                 current = ""
             }
