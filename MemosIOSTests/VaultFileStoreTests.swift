@@ -123,6 +123,37 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(copy, "mine\n")
     }
 
+    /// Regression for round 2: conflictPath stamps at minute granularity with
+    /// no disambiguator, and write() atomically *replaces* an existing file
+    /// rather than failing — so two conflicts on the same note inside one
+    /// wall-clock minute must not let the second destroy the first.
+    func testWriteCheckedSecondConflictInSameMinuteDoesNotDestroyFirst() throws {
+        try writeFile("note.md", "original\n")
+
+        let first = try store.writeChecked("first conflict\n", to: "note.md", expectedText: "not what's on disk\n")
+        guard case .conflictCopy(let firstPath, _) = first else {
+            return XCTFail("expected .conflictCopy, got \(first)")
+        }
+
+        let second = try store.writeChecked("second conflict\n", to: "note.md", expectedText: "still not what's on disk\n")
+        guard case .conflictCopy(let secondPath, _) = second else {
+            return XCTFail("expected .conflictCopy, got \(second)")
+        }
+
+        XCTAssertNotEqual(firstPath, secondPath, "the two conflict copies must not share a path")
+
+        // Both survive on disk with their own distinct content — the actual
+        // bytes, not just two distinct paths.
+        let firstContents = try String(contentsOf: root.appendingPathComponent(firstPath), encoding: .utf8)
+        XCTAssertEqual(firstContents, "first conflict\n")
+        let secondContents = try String(contentsOf: root.appendingPathComponent(secondPath), encoding: .utf8)
+        XCTAssertEqual(secondContents, "second conflict\n")
+
+        // And the original itself is still untouched throughout.
+        let original = try String(contentsOf: root.appendingPathComponent("note.md"), encoding: .utf8)
+        XCTAssertEqual(original, "original\n")
+    }
+
     /// A note deleted on the desktop must not be resurrected at its old path.
     func testWriteCheckedOnMissingFileWritesFresh() throws {
         let result = try store.writeChecked("text\n", to: "gone.md", expectedText: "whatever was there before\n")

@@ -137,7 +137,14 @@ struct VaultFileStore {
             return .written(try write(text, to: relativePath))
         }
 
-        let conflictPath = Self.conflictPath(for: relativePath, at: Date())
+        // Disambiguate against what's already on disk in the *original's*
+        // directory (which may be nested — not the vault root), so a second
+        // conflict inside the same minute gets " 2" appended instead of
+        // silently replacing the first conflict copy via write()'s atomic
+        // replace semantics.
+        let directory = (relativePath as NSString).deletingLastPathComponent
+        let existing = try existingFilenames(inSubfolder: directory)
+        let conflictPath = Self.conflictPath(for: relativePath, at: Date(), existing: existing)
         let metadata = try write(text, to: conflictPath)
         return .conflictCopy(path: conflictPath, metadata: metadata)
     }
@@ -163,7 +170,13 @@ struct VaultFileStore {
 
     // MARK: - Helpers
 
-    static func conflictPath(for relativePath: String, at date: Date) -> String {
+    /// Builds a conflict-copy path, disambiguating against `existing` filenames
+    /// in the original's directory the same way `VaultNoteSerializer.filename`
+    /// disambiguates timestamp filenames: append " 2", " 3", … before the
+    /// extension on collision. `existing` must be scoped to the original's
+    /// directory (see `existingFilenames(inSubfolder:)`), not the vault root,
+    /// or collisions in nested folders go undetected.
+    static func conflictPath(for relativePath: String, at date: Date, existing: Set<String>) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HHmm"
@@ -172,8 +185,15 @@ struct VaultFileStore {
         let path = relativePath as NSString
         let directory = path.deletingLastPathComponent
         let stem = (path.lastPathComponent as NSString).deletingPathExtension
-        let name = "\(stem) (conflict \(stamp)).md"
-        return directory.isEmpty ? name : "\(directory)/\(name)"
+        let baseName = "\(stem) (conflict \(stamp))"
+
+        var candidate = "\(baseName).md"
+        var suffix = 2
+        while existing.contains(candidate) {
+            candidate = "\(baseName) \(suffix).md"
+            suffix += 1
+        }
+        return directory.isEmpty ? candidate : "\(directory)/\(candidate)"
     }
 
     private func relativePath(for url: URL) -> String? {
