@@ -517,6 +517,13 @@ struct VaultNote: Identifiable, Equatable {
     var modifiedAt: Date
     var fileSize: Int
 
+    /// The exact bytes this note was read from, used by Task 4's `writeChecked` to
+    /// detect external edits on save. Empty means "unknown" — treated as changed,
+    /// so the fail-safe direction is a conflict copy rather than a clobber.
+    /// (Added during Task 4 by ruling; defaulted so Task 5/7 construction sites
+    /// that never save through this value keep compiling.)
+    var originalText: String = ""
+
     var id: String { relativePath }
 
     /// Prefers the frontmatter title, falling back to the first body line and
@@ -871,7 +878,7 @@ All file I/O, including conflict detection. Takes its root as an injected `URL`,
   - `func listMarkdownFiles() throws -> [VaultFileMetadata]`
   - `func read(relativePath: String) throws -> VaultNote`
   - `func write(_ text: String, to relativePath: String) throws -> VaultFileMetadata`
-  - `func writeChecked(_ text: String, to relativePath: String, expecting: VaultFileMetadata) throws -> VaultWriteResult`
+  - `func writeChecked(_ text: String, to relativePath: String, expectedText: String) throws -> VaultWriteResult`
   - `func delete(relativePath: String) throws`
   - `func existingFilenames(inSubfolder: String) throws -> Set<String>`
 
@@ -1144,6 +1151,19 @@ struct VaultFileStore {
         return try metadata(for: url, relativePath: relativePath)
     }
 
+    /// SUPERSEDED DURING IMPLEMENTATION — see commits 6cf4368 and 116b35c.
+    /// The mtime+size comparison below was proven unsound by a probe test: an
+    /// external edit preserving byte count within the same second slipped through
+    /// and clobbered the user's desktop edit. Worse, some file providers preserve a
+    /// file's original mtime when materializing a downloaded change, which would
+    /// make this fail systematically rather than rarely. What shipped compares the
+    /// file's actual current content against `expectedText: String` (the bytes the
+    /// note was read from, carried on `VaultNote.originalText`), and disambiguates
+    /// the conflict-copy filename against `existingFilenames` scoped to the note's
+    /// own directory — because `write(to:atomically:)` REPLACES an existing file,
+    /// so two conflicts in the same minute otherwise destroyed the first copy.
+    /// The code below is retained only as the historical record of what was planned.
+    ///
     /// Writes only if the file still matches `expecting`. If it changed
     /// externally, the in-app version is saved beside it as a conflict copy and
     /// the external edit is left untouched — the Dropbox/Obsidian Sync
@@ -1900,12 +1920,16 @@ final class VaultStore: ObservableObject {
             updated: now
         )
 
-        let expecting = VaultFileMetadata(
-            relativePath: note.relativePath,
-            modifiedAt: note.modifiedAt,
-            fileSize: note.fileSize
+        // Conflict detection compares the file's actual current content against the
+        // bytes this note was read from — not mtime+size, which some file providers
+        // preserve when materializing a downloaded change. `originalText` empty means
+        // "unknown", which compares as changed and yields a conflict copy: the
+        // fail-safe direction.
+        let result = try fileStore.writeChecked(
+            text,
+            to: note.relativePath,
+            expectedText: note.originalText
         )
-        let result = try fileStore.writeChecked(text, to: note.relativePath, expecting: expecting)
 
         switch result {
         case .written(let metadata):
