@@ -69,6 +69,8 @@ struct NoteEditorView: View {
             return "d-\(id.uuidString)"
         case .serverMemo(let memoID):
             return "m-\(memoID)"
+        case .vaultFile(let path):
+            return "v-\(path)"
         }
     }
 
@@ -215,6 +217,8 @@ struct NoteEditorView: View {
             return $draftText
         case .serverMemo:
             return $serverMemoContent
+        case .vaultFile:
+            return .constant("")
         }
     }
 
@@ -453,6 +457,8 @@ struct NoteEditorView: View {
             commitDraft()
         case .serverMemo:
             commitServerMemo()
+        case .vaultFile:
+            break
         }
     }
 
@@ -479,6 +485,8 @@ struct NoteEditorView: View {
             if let ed = editDraft ?? editDraftFromQuery {
                 _ = ServerMemoSaveService.stageLocalContent(serverMemoContent, for: ed, in: modelContext, persist: true)
             }
+        case .vaultFile:
+            break
         }
     }
 
@@ -527,6 +535,8 @@ struct NoteEditorView: View {
             }
         case .serverMemo(let memoID):
             await loadServerMemo(memoID: memoID)
+        case .vaultFile:
+            break
         }
         fetchRemoteTagsOnce()
         refreshTagSuggestions()

@@ -5,16 +5,19 @@ enum NoteEditorTarget: Hashable {
     case newNote
     case localDraft(UUID)
     case serverMemo(String) // memoID
+    case vaultFile(String)  // relative path inside the vault
 }
 
 enum UnifiedNote: Identifiable {
     case local(Draft)
     case server(ServerMemoSummary, editDraft: ServerMemoEditDraft?)
+    case vault(VaultIndexEntry)
 
     var id: String {
         switch self {
         case .local(let draft): return "d-\(draft.id.uuidString)"
         case .server(let memo, _): return "m-\(memo.id)"
+        case .vault(let entry): return "v-\(entry.relativePath)"
         }
     }
 
@@ -22,6 +25,7 @@ enum UnifiedNote: Identifiable {
         switch self {
         case .local(let draft): return .localDraft(draft.id)
         case .server(let memo, _): return .serverMemo(memo.id)
+        case .vault(let entry): return .vaultFile(entry.relativePath)
         }
     }
 
@@ -35,10 +39,15 @@ enum UnifiedNote: Identifiable {
                 return local.isEmpty ? memo.preferredDisplayText : local
             }
             return memo.preferredDisplayText
+        case .vault(let entry):
+            // The index holds no body — the list only needs title and preview,
+            // and reading content here would force an iCloud download per row.
+            return "\(entry.title)\n\(entry.preview)"
         }
     }
 
     var title: String {
+        if case .vault(let entry) = self { return entry.title }
         let lines = content.components(separatedBy: "\n")
         let firstNonEmpty = lines.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? ""
         var line = firstNonEmpty
@@ -48,6 +57,7 @@ enum UnifiedNote: Identifiable {
     }
 
     var preview: String {
+        if case .vault(let entry) = self { return entry.preview }
         let lines = content.components(separatedBy: "\n")
         var pastTitle = false
         for line in lines {
@@ -65,17 +75,20 @@ enum UnifiedNote: Identifiable {
         switch self {
         case .local(let draft): return draft.createdAt
         case .server(let memo, _): return memo.updatedAt ?? .distantPast
+        case .vault(let entry): return entry.modifiedAt
         }
     }
 
     var tags: [String] {
-        TagExtractor.tags(in: content)
+        if case .vault(let entry) = self { return entry.tags }
+        return TagExtractor.tags(in: content)
     }
 
     var hasAttachments: Bool {
         switch self {
         case .local(let draft): return draft.text.contains("![")
         case .server(let memo, _): return memo.hasAttachments || memo.content.contains("![")
+        case .vault: return false
         }
     }
 
@@ -85,7 +98,7 @@ enum UnifiedNote: Identifiable {
 
     var hasFiles: Bool {
         switch self {
-        case .local: return false
+        case .local, .vault: return false
         case .server(let memo, _): return memo.attachmentCount > 0
         }
     }
@@ -145,6 +158,20 @@ enum UnifiedNote: Identifiable {
             notes.append(.local(draft))
         }
 
+        return notes.sorted { $0.date > $1.date }
+    }
+
+    /// Vault-mode merge: filed notes come from the index, plus any local draft
+    /// that hasn't been written out yet.
+    static func merge(
+        vaultEntries: [VaultIndexEntry],
+        drafts: [Draft],
+        excludeDraftID: UUID? = nil
+    ) -> [UnifiedNote] {
+        var notes = vaultEntries.map { UnifiedNote.vault($0) }
+        for draft in drafts where !draft.isBlank && !draft.isArchived && draft.id != excludeDraftID {
+            notes.append(.local(draft))
+        }
         return notes.sorted { $0.date > $1.date }
     }
 }

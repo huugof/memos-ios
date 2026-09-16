@@ -126,6 +126,8 @@ struct NotesListView: View {
                 resourceName: memo.resourceName ?? memo.id,
                 in: modelContext
             )
+        case .vault:
+            break
         }
     }
 }
