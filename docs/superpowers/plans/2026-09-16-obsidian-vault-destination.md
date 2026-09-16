@@ -2558,6 +2558,9 @@ Then add the two methods, next to `loadServerMemo(memoID:)`:
                 loadedVaultNote = try? vaultStore.read(relativePath: note.relativePath)
             case .conflictCopy(let path, _):
                 vaultError = "This note changed elsewhere. Your version was saved as \(path)."
+                // Keep editing the copy. Left pointing at the original, every
+                // further debounced save would spawn yet another conflict copy.
+                loadedVaultNote = try? vaultStore.read(relativePath: path)
             }
         } catch {
             vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -2644,7 +2647,7 @@ Completes the feature, then verifies the parts no unit test can reach.
   - `enum VaultAttachmentWriter`
   - `static func filename(forNoteNamed:index:fileExtension:) -> String`
   - `static func wikilink(for filename: String) -> String`
-  - `static func write(data:filename:using:folder:) throws -> String`
+  - `static func write(data:filename:using:folder:) throws -> String` — returns the relative path actually written, which may differ from `filename` (see collision handling)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2696,6 +2699,21 @@ final class VaultAttachmentWriterTests: XCTestCase {
         XCTAssertEqual(written, data)
     }
 
+    func testWriteNeverOverwritesAnExistingAttachment() throws {
+        // Two notes captured in the same minute derive the same stem, so their
+        // first images would otherwise both be "… 1.png".
+        let store = VaultFileStore(root: root)
+        let first = try VaultAttachmentWriter.write(
+            data: Data([0x01]), filename: "2026-09-16 2130 1.png", using: store, folder: "attachments")
+        let second = try VaultAttachmentWriter.write(
+            data: Data([0x02]), filename: "2026-09-16 2130 1.png", using: store, folder: "attachments")
+
+        XCTAssertEqual(first, "attachments/2026-09-16 2130 1.png")
+        XCTAssertEqual(second, "attachments/2026-09-16 2130 1 2.png")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(first)), Data([0x01]))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(second)), Data([0x02]))
+    }
+
     func testWriteToVaultRootWhenFolderIsEmpty() throws {
         let store = VaultFileStore(root: root)
         let path = try VaultAttachmentWriter.write(
@@ -2737,6 +2755,10 @@ enum VaultAttachmentWriter {
     }
 
     /// Writes the data and returns the path it landed at, relative to the vault root.
+    ///
+    /// Never replaces an existing file: if `filename` is taken, " 2", " 3", …
+    /// is appended before the extension. Callers must build the wikilink from
+    /// the returned path, not from the filename they asked for.
     @discardableResult
     static func write(
         data: Data,
@@ -2744,13 +2766,25 @@ enum VaultAttachmentWriter {
         using store: VaultFileStore,
         folder: String
     ) throws -> String {
-        let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
+        let existing = try store.existingFilenames(inSubfolder: folder)
+        let stem = (filename as NSString).deletingPathExtension
+        let ext = (filename as NSString).pathExtension
+        var candidate = filename
+        var suffix = 2
+        while existing.contains(candidate) {
+            candidate = ext.isEmpty ? "\(stem) \(suffix)" : "\(stem) \(suffix).\(ext)"
+            suffix += 1
+        }
+
+        let relativePath = folder.isEmpty ? candidate : "\(folder)/\(candidate)"
         let url = store.root.appendingPathComponent(relativePath)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try data.write(to: url, options: .atomic)
+        // .withoutOverwriting backstops the existence check against a file
+        // that appears in between.
+        try data.write(to: url, options: [.atomic, .withoutOverwriting])
         return relativePath
     }
 }
@@ -2767,26 +2801,30 @@ Add this method and call it from `appendPendingAttachments(to:)` when `AppSettin
     /// Images that fail to write are skipped rather than aborting the note —
     /// losing an attachment is recoverable, losing the text is not.
     private func vaultAttachmentMarkdown(forNoteNamed noteName: String) -> [String] {
-        guard let fileStore = try? VaultFileStore(root: VaultBookmarkStore.resolve()) else { return [] }
         let folder = AppSettings.vaultAttachmentsFolder
-
-        var links: [String] = []
-        for (offset, image) in pendingImages.enumerated() {
-            guard let data = image.pngData() else { continue }
-            let filename = VaultAttachmentWriter.filename(
-                forNoteNamed: noteName,
-                index: offset + 1,
-                fileExtension: "png"
-            )
-            guard (try? VaultAttachmentWriter.write(
-                data: data,
-                filename: filename,
-                using: fileStore,
-                folder: folder
-            )) != nil else { continue }
-            links.append(VaultAttachmentWriter.wikilink(for: filename))
+        // withAccess opens the security scope; without it every write to an
+        // iCloud or file-provider vault fails on device.
+        let links = try? VaultBookmarkStore.withAccess { root -> [String] in
+            let fileStore = VaultFileStore(root: root)
+            var links: [String] = []
+            for (offset, image) in pendingImages.enumerated() {
+                guard let data = image.pngData() else { continue }
+                let filename = VaultAttachmentWriter.filename(
+                    forNoteNamed: noteName,
+                    index: offset + 1,
+                    fileExtension: "png"
+                )
+                guard let written = try? VaultAttachmentWriter.write(
+                    data: data,
+                    filename: filename,
+                    using: fileStore,
+                    folder: folder
+                ) else { continue }
+                links.append(VaultAttachmentWriter.wikilink(for: (written as NSString).lastPathComponent))
+            }
+            return links
         }
-        return links
+        return links ?? []
     }
 ```
 
@@ -2800,14 +2838,14 @@ The links must be appended to the draft text **before** `dispatchSend(draft)` ru
 xcodegen generate
 xcodebuild test -scheme MemoChat -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:MemosIOSTests/VaultAttachmentWriterTests
 ```
-Expected: PASS, 4 tests.
+Expected: PASS, 5 tests.
 
 - [ ] **Step 6: Run the whole suite**
 
 ```bash
 xcodebuild test -scheme MemoChat -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
-Expected: all tests PASS — 28 pre-existing plus 69 new (14 + 10 + 4 + 11 + 7 + 5 + 8 + 6 + 4).
+Expected: all tests PASS, 0 failures. (Counts drifted during implementation — review fixes added tests — so check for zero failures, not a specific total.)
 
 - [ ] **Step 7: Manual device verification**
 
