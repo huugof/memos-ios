@@ -1,0 +1,229 @@
+import SwiftUI
+
+/// The vault's answer to ServerMemosStore: an observable list of notes the
+/// views render, backed by the persisted index and the file store.
+///
+/// Deliberately queue-free. Network writes deserve retry and backoff; file
+/// writes fail structurally — a stale bookmark is not fixed by trying again in
+/// fifteen seconds — so failures surface as messages instead.
+@MainActor
+final class VaultStore: ObservableObject {
+
+    @Published private(set) var entries: [VaultIndexEntry] = []
+    @Published private(set) var isLoading = false
+    @Published var errorMessage: String?
+    /// Set when a save had to go to a conflict copy, so the UI can say so.
+    @Published private(set) var lastConflictPath: String?
+
+    private let storeProvider: () throws -> VaultFileStore
+    private var lastRefreshAt: Date?
+
+    /// Resolves the file store through the user's saved bookmark. Tests inject
+    /// a temp-directory store instead.
+    ///
+    /// `nonisolated`: a default-argument expression (used below in `init`) is
+    /// evaluated outside of `VaultStore`'s main-actor isolation, so a plain
+    /// `@MainActor`-isolated `static let` here would warn under Swift 6 mode.
+    /// The closure body only calls `VaultBookmarkStore.resolve()`, which
+    /// isn't actor-isolated, so this is safe to leave unisolated.
+    nonisolated static let bookmarkStoreProvider: () throws -> VaultFileStore = {
+        VaultFileStore(root: try VaultBookmarkStore.resolve())
+    }
+
+    init(storeProvider: @escaping () throws -> VaultFileStore = VaultStore.bookmarkStoreProvider) {
+        self.storeProvider = storeProvider
+    }
+
+    // MARK: - Loading
+
+    /// Renders the drawer from the persisted index — no I/O wait, no download.
+    func loadFromIndex() {
+        guard entries.isEmpty else { return }
+        entries = VaultIndex.load().sorted { $0.modifiedAt > $1.modifiedAt }
+    }
+
+    func refreshIfStale(maxAge: TimeInterval = 60) async {
+        if let lastRefreshAt, Date().timeIntervalSince(lastRefreshAt) < maxAge { return }
+        await refresh()
+    }
+
+    /// Reconciles the index against the vault, reading content only for files
+    /// that are new or changed.
+    ///
+    /// The enumerate/read work happens off the main actor: reading a
+    /// not-yet-downloaded iCloud file blocks under `NSFileCoordinator` until
+    /// the download completes, and doing that on the main actor would freeze
+    /// the UI at launch. The security scope is opened and closed inside that
+    /// detached work; only the published-state assignment and the index save
+    /// happen back on the main actor.
+    func refresh() async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+
+        let root: URL
+        do {
+            root = try storeProvider().root
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return
+        }
+
+        let result = await Task.detached(priority: .utility) {
+            Self.performRefresh(root: root)
+        }.value
+
+        switch result {
+        case .success(let refreshed):
+            entries = refreshed
+            VaultIndex.save(refreshed)
+            lastRefreshAt = Date()
+            errorMessage = nil
+        case .failure(let error):
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Off-main-actor body of `refresh()`. A `VaultFileStore` is rebuilt from
+    /// `root` here rather than captured from the main actor, since the
+    /// `storeProvider` closure that produced it is not `Sendable`.
+    private nonisolated static func performRefresh(root: URL) -> Result<[VaultIndexEntry], Error> {
+        let fileStore = VaultFileStore(root: root)
+        return Result {
+            try withSecurityScope(of: fileStore) { fileStore in
+                let index = VaultIndex.load()
+                let onDisk = try fileStore.listMarkdownFiles()
+                let diff = VaultIndex.diff(index: index, disk: onDisk)
+                let priorByPath = Dictionary(index.map { ($0.relativePath, $0) }, uniquingKeysWith: { first, _ in first })
+
+                var refreshed = diff.unchanged
+                for path in diff.needsRead {
+                    if let note = try? fileStore.read(relativePath: path) {
+                        refreshed.append(VaultIndexEntry.make(from: note))
+                    } else if let prior = priorByPath[path] {
+                        // A single unreadable file must not make the note
+                        // vanish from the drawer: in an iCloud vault a
+                        // download can fail transiently, so keep the last
+                        // known entry instead of dropping it.
+                        refreshed.append(prior)
+                    }
+                }
+
+                refreshed.sort { $0.modifiedAt > $1.modifiedAt }
+                return refreshed
+            }
+        }
+    }
+
+    // MARK: - Writing
+
+    @discardableResult
+    func create(body: String, now: Date = Date()) throws -> VaultIndexEntry {
+        try withFileStore { fileStore in
+            let folder = AppSettings.vaultNotesFolder
+            let existing = try fileStore.existingFilenames(inSubfolder: folder)
+            let filename = VaultNoteSerializer.filename(for: now, existing: existing)
+            let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
+
+            let text = VaultNoteSerializer.render(body: body, existing: nil, created: now, updated: now)
+            let metadata = try fileStore.write(text, to: relativePath)
+
+            let entry = self.entry(from: text, path: metadata.relativePath, metadata: metadata)
+            self.upsert(entry)
+            return entry
+        }
+    }
+
+    func read(relativePath: String) throws -> VaultNote {
+        try withFileStore { fileStore in
+            try fileStore.read(relativePath: relativePath)
+        }
+    }
+
+    /// Saves an edit, preserving unknown frontmatter and writing a conflict
+    /// copy if the file changed externally since `note` was read.
+    @discardableResult
+    func update(note: VaultNote, body: String, now: Date = Date()) throws -> VaultWriteResult {
+        try withFileStore { fileStore in
+            let text = VaultNoteSerializer.render(
+                body: body,
+                existing: note.frontmatter,
+                created: note.frontmatter.flatMap { fm in
+                    fm.value(for: "created").flatMap(VaultNoteSerializer.iso8601.date(from:))
+                } ?? now,
+                updated: now
+            )
+
+            // Conflict detection compares the file's actual current content against the
+            // bytes this note was read from — not mtime+size, which misses an external
+            // edit landing in the same second at the same size. `originalText` empty means
+            // "unknown", which compares as changed and yields a conflict copy: the
+            // fail-safe direction.
+            let result = try fileStore.writeChecked(
+                text,
+                to: note.relativePath,
+                expectedText: note.originalText
+            )
+
+            switch result {
+            case .written(let metadata):
+                self.lastConflictPath = nil
+                self.upsert(self.entry(from: text, path: metadata.relativePath, metadata: metadata))
+            case .conflictCopy(let path, let metadata):
+                self.lastConflictPath = path
+                self.upsert(self.entry(from: text, path: path, metadata: metadata))
+            }
+            return result
+        }
+    }
+
+    func delete(relativePath: String) throws {
+        try withFileStore { fileStore in
+            try fileStore.delete(relativePath: relativePath)
+        }
+        entries.removeAll { $0.relativePath == relativePath }
+        VaultIndex.save(entries)
+    }
+
+    // MARK: - Helpers
+
+    /// Resolves the file store and runs `body` with its security scope held
+    /// open for the duration. On a real device the vault root is a
+    /// security-scoped bookmark URL; without this, every read/write against
+    /// an iCloud Drive or file-provider folder fails with a permission error
+    /// (a temp-directory root, as used in tests, doesn't need the scope, so
+    /// `startAccessingSecurityScopedResource()` there simply returns false).
+    private func withFileStore<T>(_ body: (VaultFileStore) throws -> T) throws -> T {
+        let store = try storeProvider()
+        return try Self.withSecurityScope(of: store, body)
+    }
+
+    /// Shared by `withFileStore` (main actor) and `performRefresh` (detached)
+    /// so both open/close the same balanced security scope around file work.
+    private nonisolated static func withSecurityScope<T>(
+        of store: VaultFileStore,
+        _ body: (VaultFileStore) throws -> T
+    ) throws -> T {
+        let needsScope = store.root.startAccessingSecurityScopedResource()
+        defer { if needsScope { store.root.stopAccessingSecurityScopedResource() } }
+        return try body(store)
+    }
+
+    private func entry(from text: String, path: String, metadata: VaultFileMetadata) -> VaultIndexEntry {
+        let (frontmatter, body) = Frontmatter.parse(text)
+        return VaultIndexEntry.make(from: VaultNote(
+            relativePath: path,
+            frontmatter: frontmatter,
+            body: body,
+            modifiedAt: metadata.modifiedAt,
+            fileSize: metadata.fileSize
+        ))
+    }
+
+    private func upsert(_ entry: VaultIndexEntry) {
+        entries.removeAll { $0.relativePath == entry.relativePath }
+        entries.append(entry)
+        entries.sort { $0.modifiedAt > $1.modifiedAt }
+        VaultIndex.save(entries)
+    }
+}

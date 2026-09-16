@@ -27,6 +27,7 @@
 		468D3AA946979E884F82782D /* PlainNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54AC3A9167E670BEE2499CCE /* PlainNoteEditor.swift */; };
 		47ECD5BD98B74A91B9AB5C74 /* ChatAppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62DC846BE9F8496E0BE346CF /* ChatAppContainer.swift */; };
 		4875456A362F95EDBD0AE949 /* ComposeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD785E0D6C9AAAF473AA228 /* ComposeRootView.swift */; };
+		4E4EE9405640FD0B714F8D4A /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA5B3F12BC01ED4ACAB7204 /* VaultStore.swift */; };
 		588B0E5CA8BDED950A89449D /* Draft.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF48999B27985424D924F108 /* Draft.swift */; };
 		5A32BA101D7C22DC12ABBF1F /* TagExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EFDDCFF4E0614156B4DED06 /* TagExtractor.swift */; };
 		65D14EF9DDFD38B98FA17C9E /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C99B6D6B8B8C6D10D9D4CC4 /* NoteEditorView.swift */; };
@@ -36,6 +37,7 @@
 		85CEB425464E4C87B790B87E /* VaultFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E382C3BD9C48BDF87C580742 /* VaultFileStoreTests.swift */; };
 		860EA76FD9C7DADE8818D0AB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7B1F6B54399A8275E32B41 /* AppSettings.swift */; };
 		8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */; };
+		9206B904D685033533240A6E /* VaultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79172BAAF487A4687DE86A02 /* VaultStoreTests.swift */; };
 		A5D3D651093084069CE6D2E1 /* PinnedNotesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB21E0BA79D3C80FE8D1A4B /* PinnedNotesStore.swift */; };
 		AA677B67E4C5BC9F91AFE104 /* ServerMemosStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7294024745068CCCA97341DA /* ServerMemosStore.swift */; };
 		B04FB6DBAD88EDC3009804C5 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AEAF0DFB16D85E341A64626 /* KeychainTokenStore.swift */; };
@@ -94,8 +96,10 @@
 		76BC8D87763C2A0A92B1AB06 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		78045225F7A285619686489E /* NoteDateGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDateGrouping.swift; sourceTree = "<group>"; };
 		78D8B7E7868EAFD042C29FF6 /* VaultBookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStoreTests.swift; sourceTree = "<group>"; };
+		79172BAAF487A4687DE86A02 /* VaultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStoreTests.swift; sourceTree = "<group>"; };
 		7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
 		7CD785E0D6C9AAAF473AA228 /* ComposeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeRootView.swift; sourceTree = "<group>"; };
+		7DA5B3F12BC01ED4ACAB7204 /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
 		7FD2990D40B7E9E7A71F0BF2 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
 		893CFD5BCB8923BACCC72663 /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
 		9297158AFBF42A6F09FBE012 /* VaultIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndexTests.swift; sourceTree = "<group>"; };
@@ -135,6 +139,7 @@
 				E382C3BD9C48BDF87C580742 /* VaultFileStoreTests.swift */,
 				9297158AFBF42A6F09FBE012 /* VaultIndexTests.swift */,
 				3A901D4990FC43277550BE6A /* VaultNoteSerializerTests.swift */,
+				79172BAAF487A4687DE86A02 /* VaultStoreTests.swift */,
 			);
 			path = MemosIOSTests;
 			sourceTree = "<group>";
@@ -174,6 +179,7 @@
 				0E6313222B0FB09E77351324 /* VaultFileStore.swift */,
 				CAF5272D22C70CDA914A8069 /* VaultIndex.swift */,
 				17FE193B4659A1EA1C29822B /* VaultNote.swift */,
+				7DA5B3F12BC01ED4ACAB7204 /* VaultStore.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -405,6 +411,7 @@
 				85CEB425464E4C87B790B87E /* VaultFileStoreTests.swift in Sources */,
 				2A2B0A212BD9D4432D4F1498 /* VaultIndexTests.swift in Sources */,
 				DD6173A0FD656402A6899305 /* VaultNoteSerializerTests.swift in Sources */,
+				9206B904D685033533240A6E /* VaultStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -448,6 +455,7 @@
 				DA3BCD32260C54507B50BE45 /* VaultFileStore.swift in Sources */,
 				C7AB537885F09A10010FDECD /* VaultIndex.swift in Sources */,
 				2FE0C2371702E4C396B15C92 /* VaultNote.swift in Sources */,
+				4E4EE9405640FD0B714F8D4A /* VaultStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
