@@ -3,18 +3,30 @@ import XCTest
 
 final class DestinationSettingsTests: XCTestCase {
 
-    private var original: (DestinationKind, String, String)!
+    private var originalDestinationKind: Any?
+    private var originalVaultNotesFolder: Any?
+    private var originalVaultAttachmentsFolder: Any?
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        original = (AppSettings.destinationKind, AppSettings.vaultNotesFolder, AppSettings.vaultAttachmentsFolder)
+        originalDestinationKind = UserDefaults.standard.object(forKey: "destinationKind")
+        originalVaultNotesFolder = UserDefaults.standard.object(forKey: "vaultNotesFolder")
+        originalVaultAttachmentsFolder = UserDefaults.standard.object(forKey: "vaultAttachmentsFolder")
     }
 
     override func tearDownWithError() throws {
-        AppSettings.destinationKind = original.0
-        AppSettings.vaultNotesFolder = original.1
-        AppSettings.vaultAttachmentsFolder = original.2
+        Self.restore(originalDestinationKind, forKey: "destinationKind")
+        Self.restore(originalVaultNotesFolder, forKey: "vaultNotesFolder")
+        Self.restore(originalVaultAttachmentsFolder, forKey: "vaultAttachmentsFolder")
         try super.tearDownWithError()
+    }
+
+    private static func restore(_ value: Any?, forKey key: String) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     func testDefaultDestinationIsMemos() {
