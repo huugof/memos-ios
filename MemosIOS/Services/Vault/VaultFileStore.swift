@@ -112,13 +112,14 @@ struct VaultFileStore {
     /// external edit is left untouched — the Dropbox/Obsidian Sync convention.
     /// Never prompts, never clobbers.
     ///
-    /// Content comparison, not mtime/size, is deliberate: some file providers
-    /// preserve a file's original modification date when materializing a
-    /// downloaded change, which would make an mtime-based check fail to
-    /// detect a real external edit — not just in a narrow same-second race,
-    /// but systematically. A save must never destroy a vault edit, so the
-    /// detector has to be one that can't miss, not merely one that rarely
-    /// does.
+    /// Content comparison, not mtime/size, is deliberate. A metadata check
+    /// misses any external edit that lands in the same second and leaves the
+    /// file the same size — a `VaultFileStoreTests` probe reproduced exactly
+    /// that, silently clobbering the external edit. The window is narrow, but
+    /// the cost of losing to it is a destroyed vault edit, so the detector
+    /// here has to be one that cannot miss rather than one that rarely does.
+    /// Reading the file back is affordable because a note being saved is
+    /// already materialized.
     func writeChecked(
         _ text: String,
         to relativePath: String,

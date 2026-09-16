@@ -1154,9 +1154,13 @@ struct VaultFileStore {
     /// SUPERSEDED DURING IMPLEMENTATION — see commits 6cf4368 and 116b35c.
     /// The mtime+size comparison below was proven unsound by a probe test: an
     /// external edit preserving byte count within the same second slipped through
-    /// and clobbered the user's desktop edit. Worse, some file providers preserve a
-    /// file's original mtime when materializing a downloaded change, which would
-    /// make this fail systematically rather than rarely. What shipped compares the
+    /// and clobbered the user's desktop edit. The window is narrow, but losing to
+    /// it destroys a vault edit, so the detector must be one that cannot miss.
+    /// (An earlier version of this note also claimed some file providers preserve
+    /// a file's original mtime when materializing a downloaded change. That was an
+    /// unverified controller assertion and is withdrawn — iCloud syncs mtime, and a
+    /// remote edit's updated mtime is what reaches the device. The fix stands on the
+    /// probe test alone.) What shipped compares the
     /// file's actual current content against `expectedText: String` (the bytes the
     /// note was read from, carried on `VaultNote.originalText`), and disambiguates
     /// the conflict-copy filename against `existingFilenames` scoped to the note's
@@ -1921,8 +1925,8 @@ final class VaultStore: ObservableObject {
         )
 
         // Conflict detection compares the file's actual current content against the
-        // bytes this note was read from — not mtime+size, which some file providers
-        // preserve when materializing a downloaded change. `originalText` empty means
+        // bytes this note was read from — not mtime+size, which misses an external
+        // edit landing in the same second at the same size. `originalText` empty means
         // "unknown", which compares as changed and yields a conflict copy: the
         // fail-safe direction.
         let result = try fileStore.writeChecked(
