@@ -514,6 +514,7 @@ struct NoteEditorView: View {
         case .vaultFile:
             vaultSaveTask?.cancel()
             vaultSaveTask = nil
+            appendPendingAttachments(toText: &vaultNoteBody)
             saveVaultNote()
         }
     }
@@ -574,7 +575,7 @@ struct NoteEditorView: View {
 
     private func commitServerMemo() {
         guard let ed = editDraft ?? editDraftFromQuery else { return }
-        appendPendingAttachmentsToServerMemo(content: &serverMemoContent)
+        appendPendingAttachments(toText: &serverMemoContent)
         _ = ServerMemoSaveService.stageLocalContent(serverMemoContent, for: ed, in: modelContext, persist: true)
         saveQueue.enqueue(ed, in: modelContext)
     }
@@ -590,6 +591,7 @@ struct NoteEditorView: View {
         case .vaultFile:
             vaultSaveTask?.cancel()
             vaultSaveTask = nil
+            appendPendingAttachments(toText: &vaultNoteBody)
             saveVaultNote()
         }
     }
@@ -736,6 +738,17 @@ struct NoteEditorView: View {
         }
     }
 
+    /// Names an image after the note it's attached to. When editing an
+    /// existing vault note, attachments are named after that note's file;
+    /// otherwise after the timestamp the new note will get (an occasional
+    /// one-minute skew is harmless — the writer never overwrites).
+    private func vaultAttachmentStem() -> String {
+        if case .vaultFile(let path) = target {
+            return (path as NSString).lastPathComponent
+        }
+        return VaultNoteSerializer.filename(for: Date(), existing: [])
+    }
+
     // MARK: Attachment upload
 
     private func appendPendingAttachments(to draft: Draft) {
@@ -756,7 +769,7 @@ struct NoteEditorView: View {
         pendingFiles.removeAll()
     }
 
-    private func appendPendingAttachmentsToServerMemo(content: inout String) {
+    private func appendPendingAttachments(toText content: inout String) {
         let uploaded = attachmentMarkdown(existingText: content)
         guard !uploaded.isEmpty else {
             pendingImages.removeAll()
@@ -772,7 +785,11 @@ struct NoteEditorView: View {
     private func attachmentMarkdown(existingText: String) -> [String] {
         var parts: [String] = []
         for p in pendingImages where p.uploadedURL != nil {
-            parts.append("![](\(p.uploadedURL!))")
+            if AppSettings.destinationKind == .vault {
+                parts.append(VaultAttachmentWriter.wikilink(for: (p.uploadedURL! as NSString).lastPathComponent))
+            } else {
+                parts.append("![](\(p.uploadedURL!))")
+            }
         }
         for f in pendingFiles where f.uploadedURL != nil {
             parts.append("[\(f.filename)](\(f.uploadedURL!))")
@@ -786,6 +803,30 @@ struct NoteEditorView: View {
         let pending = PendingImage(image: resized)
         pendingImages.append(pending)
         let pendingID = pending.id
+        if AppSettings.destinationKind == .vault {
+            do {
+                let written = try VaultBookmarkStore.withAccess { root in
+                    try VaultAttachmentWriter.write(
+                        data: data,
+                        filename: VaultAttachmentWriter.filename(
+                            forNoteNamed: vaultAttachmentStem(),
+                            index: pendingImages.count,
+                            fileExtension: "jpg"
+                        ),
+                        using: VaultFileStore(root: root),
+                        folder: AppSettings.vaultAttachmentsFolder
+                    )
+                }
+                if let idx = pendingImages.firstIndex(where: { $0.id == pendingID }) {
+                    pendingImages[idx].uploadedURL = written
+                    pendingImages[idx].isUploading = false
+                }
+            } catch {
+                pendingImages.removeAll { $0.id == pendingID }
+                uploadError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+            return
+        }
         Task {
             do {
                 let result = try await MemosClient().uploadResource(
@@ -808,6 +849,10 @@ struct NoteEditorView: View {
     }
 
     private func handleFileSelected(url: URL) {
+        if AppSettings.destinationKind == .vault {
+            uploadError = "File attachments aren't supported for vault notes yet."
+            return
+        }
         let filename = url.lastPathComponent
         let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
         let pending = PendingFile(filename: filename)
