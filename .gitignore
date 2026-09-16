@@ -5,3 +5,5 @@ build/
 xcuserdata/
 .idea/
 .vscode/
+.claude/worktrees/
+.superpowers/
