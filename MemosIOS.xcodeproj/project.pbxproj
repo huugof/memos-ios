@@ -23,6 +23,7 @@
 		359D4116493B62A5CF468D96 /* FrontmatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */; };
 		383092388C022C0CE8575D67 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA699330B9650D5F7C0C4F91 /* ModelContext+Persist.swift */; };
 		3A9B7096ED4BA01670C09E19 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BC8D87763C2A0A92B1AB06 /* SettingsView.swift */; };
+		43D3DC0485E78FC797DA87E4 /* NoteDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED3C9CBCB8C6E375FE430637 /* NoteDestination.swift */; };
 		468D3AA946979E884F82782D /* PlainNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54AC3A9167E670BEE2499CCE /* PlainNoteEditor.swift */; };
 		47ECD5BD98B74A91B9AB5C74 /* ChatAppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62DC846BE9F8496E0BE346CF /* ChatAppContainer.swift */; };
 		4875456A362F95EDBD0AE949 /* ComposeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD785E0D6C9AAAF473AA228 /* ComposeRootView.swift */; };
@@ -39,6 +40,7 @@
 		AA677B67E4C5BC9F91AFE104 /* ServerMemosStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7294024745068CCCA97341DA /* ServerMemosStore.swift */; };
 		B04FB6DBAD88EDC3009804C5 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AEAF0DFB16D85E341A64626 /* KeychainTokenStore.swift */; };
 		B7F690E7BF8E3F08ACCC9DEC /* ServerMemoSaveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC20AA64E7D9615C7031F08 /* ServerMemoSaveService.swift */; };
+		BC018628E784704F91CE39A2 /* DestinationSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD97E5AEE07507A8DDBE9DE8 /* DestinationSettingsTests.swift */; };
 		BC6C7823C2A221CF997BA83C /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B986071B582B8AEE9BFBE67E /* ServerMemoEditDraft.swift */; };
 		C7AB537885F09A10010FDECD /* VaultIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5272D22C70CDA914A8069 /* VaultIndex.swift */; };
 		D871FE8D7C9715659CAC623C /* NoteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68E753E5640FC44ADB0AB7C /* NoteRowView.swift */; };
@@ -99,6 +101,7 @@
 		9297158AFBF42A6F09FBE012 /* VaultIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndexTests.swift; sourceTree = "<group>"; };
 		94F73BC9FB5EC9BA77A3319D /* VaultBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStore.swift; sourceTree = "<group>"; };
 		AB84C34061555C29A9FA1534 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
+		AD97E5AEE07507A8DDBE9DE8 /* DestinationSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestinationSettingsTests.swift; sourceTree = "<group>"; };
 		B986071B582B8AEE9BFBE67E /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
 		BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
 		BE67B5643C362010CCEA361B /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
@@ -112,6 +115,7 @@
 		E005AEC764A8BD5CD067A9DD /* Frontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frontmatter.swift; sourceTree = "<group>"; };
 		E382C3BD9C48BDF87C580742 /* VaultFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFileStoreTests.swift; sourceTree = "<group>"; };
 		EA699330B9650D5F7C0C4F91 /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
+		ED3C9CBCB8C6E375FE430637 /* NoteDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDestination.swift; sourceTree = "<group>"; };
 		F51DFF135F91000CC84D5E9F /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
 		FF48999B27985424D924F108 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -120,6 +124,7 @@
 		15756E40DDDDB75361A37819 /* MemosIOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				AD97E5AEE07507A8DDBE9DE8 /* DestinationSettingsTests.swift */,
 				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
 				C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */,
 				BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */,
@@ -137,6 +142,7 @@
 		1D04FD8D6E96D538E85F98B9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				ED3C9CBCB8C6E375FE430637 /* NoteDestination.swift */,
 				AB84C34061555C29A9FA1534 /* SpeechTranscriptionService.swift */,
 			);
 			path = Services;
@@ -388,6 +394,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC018628E784704F91CE39A2 /* DestinationSettingsTests.swift in Sources */,
 				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
 				359D4116493B62A5CF468D96 /* FrontmatterTests.swift in Sources */,
 				73977F06AEBB33D0A9B537A0 /* MemosClientParsingTests.swift in Sources */,
@@ -419,6 +426,7 @@
 				D9D2FC60FF42932E8E6936B4 /* MemosClient.swift in Sources */,
 				383092388C022C0CE8575D67 /* ModelContext+Persist.swift in Sources */,
 				0716B1894F5CCCC66A1696DC /* NoteDateGrouping.swift in Sources */,
+				43D3DC0485E78FC797DA87E4 /* NoteDestination.swift in Sources */,
 				65D14EF9DDFD38B98FA17C9E /* NoteEditorView.swift in Sources */,
 				2CF6F93B07338FF3CFE5F32D /* NoteListEditing.swift in Sources */,
 				D871FE8D7C9715659CAC623C /* NoteRowView.swift in Sources */,

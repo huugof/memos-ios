@@ -15,6 +15,9 @@ enum AppSettings {
         static let lastRouteRaw = "lastRouteRaw"
         static let quickCaptureMode = "quickCaptureMode"
         static let vaultBookmark = "vaultBookmark"
+        static let destinationKind = "destinationKind"
+        static let vaultNotesFolder = "vaultNotesFolder"
+        static let vaultAttachmentsFolder = "vaultAttachmentsFolder"
     }
 
     private static let defaults = UserDefaults.standard
@@ -182,5 +185,39 @@ enum AppSettings {
                 defaults.removeObject(forKey: Keys.vaultBookmark)
             }
         }
+    }
+
+    static var destinationKind: DestinationKind {
+        get {
+            guard let raw = defaults.string(forKey: Keys.destinationKind),
+                  let kind = DestinationKind(rawValue: raw)
+            else { return .memos }
+            return kind
+        }
+        set { defaults.set(newValue.rawValue, forKey: Keys.destinationKind) }
+    }
+
+    /// Subfolder new notes are written into. Empty means the vault root.
+    /// Stored without leading or trailing slashes so path joining stays simple.
+    static var vaultNotesFolder: String {
+        get { defaults.string(forKey: Keys.vaultNotesFolder) ?? "" }
+        set { defaults.set(Self.normalizedFolder(newValue), forKey: Keys.vaultNotesFolder) }
+    }
+
+    static var vaultAttachmentsFolder: String {
+        get { defaults.string(forKey: Keys.vaultAttachmentsFolder) ?? "attachments" }
+        set { defaults.set(Self.normalizedFolder(newValue), forKey: Keys.vaultAttachmentsFolder) }
+    }
+
+    /// Splits on "/", trims whitespace/newlines from each component, and drops
+    /// empty, "." and ".." components so a free-text Settings value can never
+    /// escape the vault root via path traversal when later joined onto it.
+    /// Note: "inbox/../notes" becomes "inbox/notes", not "notes" — ".."
+    /// components are dropped, not resolved.
+    private static func normalizedFolder(_ value: String) -> String {
+        value.split(separator: "/", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0 != "." && $0 != ".." }
+            .joined(separator: "/")
     }
 }
