@@ -3,16 +3,13 @@ import Foundation
 enum VaultAccessError: LocalizedError, Equatable {
     case notConfigured
     case stale
-    case accessDenied
 
     var errorDescription: String? {
         switch self {
         case .notConfigured:
             return "No vault folder has been selected yet."
         case .stale:
-            return "The vault folder moved or is no longer available. Reconnect it in Settings."
-        case .accessDenied:
-            return "MemoChat can't access the vault folder. Reconnect it in Settings."
+            return "MemoChat can't access the vault folder anymore. Reconnect it in Settings."
         }
     }
 }
