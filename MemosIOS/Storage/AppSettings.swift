@@ -14,6 +14,7 @@ enum AppSettings {
         static let resumeDeadlineAt = "resumeDeadlineAt"
         static let lastRouteRaw = "lastRouteRaw"
         static let quickCaptureMode = "quickCaptureMode"
+        static let vaultBookmark = "vaultBookmark"
     }
 
     private static let defaults = UserDefaults.standard
@@ -168,6 +169,17 @@ enum AppSettings {
                 defaults.set(newValue, forKey: Keys.lastRouteRaw)
             } else {
                 defaults.removeObject(forKey: Keys.lastRouteRaw)
+            }
+        }
+    }
+
+    static var vaultBookmark: Data? {
+        get { defaults.data(forKey: Keys.vaultBookmark) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: Keys.vaultBookmark)
+            } else {
+                defaults.removeObject(forKey: Keys.vaultBookmark)
             }
         }
     }
