@@ -3,6 +3,18 @@ import XCTest
 
 final class VaultIndexTests: XCTestCase {
 
+    private var originalIndex: [VaultIndexEntry] = []
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        originalIndex = VaultIndex.load()
+    }
+
+    override func tearDownWithError() throws {
+        VaultIndex.save(originalIndex)
+        try super.tearDownWithError()
+    }
+
     private func entry(_ path: String, modified: TimeInterval, size: Int) -> VaultIndexEntry {
         VaultIndexEntry(
             relativePath: path,
@@ -77,6 +89,22 @@ final class VaultIndexTests: XCTestCase {
         VaultIndex.save(entries)
         // save() writes synchronously to Application Support.
         XCTAssertEqual(VaultIndex.load(), entries)
-        VaultIndex.save([])
+        // tearDownWithError restores whatever real index existed before this test.
+    }
+
+    func testSubSecondModifiedDateDeltaIsUnchanged() {
+        let index = [entry("a.md", modified: 100.0, size: 10)]
+        let disk = [metadata("a.md", modified: 100.4, size: 10)]
+        let diff = VaultIndex.diff(index: index, disk: disk)
+        XCTAssertTrue(diff.needsRead.isEmpty)
+        XCTAssertEqual(diff.unchanged.map(\.relativePath), ["a.md"])
+    }
+
+    func testOverOneSecondModifiedDateDeltaNeedsRead() {
+        let index = [entry("a.md", modified: 100.0, size: 10)]
+        let disk = [metadata("a.md", modified: 101.5, size: 10)]
+        let diff = VaultIndex.diff(index: index, disk: disk)
+        XCTAssertEqual(diff.needsRead, ["a.md"])
+        XCTAssertTrue(diff.unchanged.isEmpty)
     }
 }
