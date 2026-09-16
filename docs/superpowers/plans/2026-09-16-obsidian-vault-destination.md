@@ -2829,8 +2829,9 @@ enum VaultAttachmentWriter {
             withIntermediateDirectories: true
         )
         // .withoutOverwriting backstops the existence check against a file
-        // that appears in between.
-        try data.write(to: url, options: [.atomic, .withoutOverwriting])
+        // that appears in between. It cannot be combined with .atomic
+        // (Foundation traps), and a brand-new file has nothing to protect.
+        try data.write(to: url, options: [.withoutOverwriting])
         return relativePath
     }
 }
