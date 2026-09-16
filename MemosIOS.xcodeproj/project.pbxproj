@@ -17,6 +17,7 @@
 		26166F69E32EFFD664AA3D57 /* UnifiedNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE67B5643C362010CCEA361B /* UnifiedNote.swift */; };
 		2C3D203BBB3ABB5BE11AEF6E /* MemoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26034333BC345BD75CD1D3E3 /* MemoCache.swift */; };
 		2CF6F93B07338FF3CFE5F32D /* NoteListEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D291B56495575E9D3F7C9E9A /* NoteListEditing.swift */; };
+		359D4116493B62A5CF468D96 /* FrontmatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */; };
 		383092388C022C0CE8575D67 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA699330B9650D5F7C0C4F91 /* ModelContext+Persist.swift */; };
 		3A9B7096ED4BA01670C09E19 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BC8D87763C2A0A92B1AB06 /* SettingsView.swift */; };
 		468D3AA946979E884F82782D /* PlainNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54AC3A9167E670BEE2499CCE /* PlainNoteEditor.swift */; };
@@ -42,6 +43,7 @@
 		EBE2D06DA7ED48916DA3B4BD /* ServerMemoSaveQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAE0AE7205801EC57D37A5F /* ServerMemoSaveQueueTests.swift */; };
 		F012B632D05002001D6F2547 /* NotesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD2990D40B7E9E7A71F0BF2 /* NotesListView.swift */; };
 		F4B344FF45DE6D6A2F3FF5B0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 47E7E7B5F96B2E3E6CB4A4FC /* Assets.xcassets */; };
+		F975D28304605164B30F5C28 /* Frontmatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E005AEC764A8BD5CD067A9DD /* Frontmatter.swift */; };
 		FE37E292168E3B44C13A07B7 /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB84C34061555C29A9FA1534 /* SpeechTranscriptionService.swift */; };
 /* End PBXBuildFile section */
 
@@ -86,11 +88,13 @@
 		B986071B582B8AEE9BFBE67E /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
 		BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
 		BE67B5643C362010CCEA361B /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
+		C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterTests.swift; sourceTree = "<group>"; };
 		CEF288C63232381A9D25194B /* MemosIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MemosIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D291B56495575E9D3F7C9E9A /* NoteListEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListEditing.swift; sourceTree = "<group>"; };
 		D3A550D943535D939AE662EA /* PendingAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingAttachments.swift; sourceTree = "<group>"; };
 		D68E753E5640FC44ADB0AB7C /* NoteRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRowView.swift; sourceTree = "<group>"; };
 		DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftBehaviorTests.swift; sourceTree = "<group>"; };
+		E005AEC764A8BD5CD067A9DD /* Frontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frontmatter.swift; sourceTree = "<group>"; };
 		EA699330B9650D5F7C0C4F91 /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
 		F51DFF135F91000CC84D5E9F /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
 		FF48999B27985424D924F108 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
@@ -101,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
+				C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */,
 				BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */,
 				53D1BC6FB62BE2579DAE6DB6 /* NoteTextViewListEditingTests.swift */,
 				3F3229B12ED0F0DE3D36FD9E /* ServerMemoDeleteQueueTests.swift */,
@@ -133,6 +138,14 @@
 				47E7E7B5F96B2E3E6CB4A4FC /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		530B0830B648DBF3DE24F4A1 /* Vault */ = {
+			isa = PBXGroup;
+			children = (
+				E005AEC764A8BD5CD067A9DD /* Frontmatter.swift */,
+			);
+			path = Vault;
 			sourceTree = "<group>";
 		};
 		576ADF521F6AA1AC710B5891 /* Products */ = {
@@ -188,6 +201,7 @@
 				16260DC10C4930EFDC07B643 /* ServerMemoDeleteService.swift */,
 				6FC20AA64E7D9615C7031F08 /* ServerMemoSaveService.swift */,
 				7294024745068CCCA97341DA /* ServerMemosStore.swift */,
+				530B0830B648DBF3DE24F4A1 /* Vault */,
 			);
 			name = Services;
 			path = MemosIOS/Services;
@@ -351,6 +365,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
+				359D4116493B62A5CF468D96 /* FrontmatterTests.swift in Sources */,
 				73977F06AEBB33D0A9B537A0 /* MemosClientParsingTests.swift in Sources */,
 				D94C83889EA3A08921380B60 /* NoteTextViewListEditingTests.swift in Sources */,
 				25B5165F6F78EEA7ED5E02FF /* ServerMemoDeleteQueueTests.swift in Sources */,
@@ -369,6 +384,7 @@
 				22044053F3050BE24E6EF0BA /* DraftResumeCoordinator.swift in Sources */,
 				06B097F672DC1DDB15033AA5 /* DraftSendService.swift in Sources */,
 				E697FDE83D79B7C3DC26CA1E /* DraftStore.swift in Sources */,
+				F975D28304605164B30F5C28 /* Frontmatter.swift in Sources */,
 				B04FB6DBAD88EDC3009804C5 /* KeychainTokenStore.swift in Sources */,
 				2C3D203BBB3ABB5BE11AEF6E /* MemoCache.swift in Sources */,
 				E9A7E3C967CDEA582EB2B668 /* MemoChatApp.swift in Sources */,
