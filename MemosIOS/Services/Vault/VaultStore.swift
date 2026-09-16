@@ -18,6 +18,16 @@ final class VaultStore: ObservableObject {
     private let storeProvider: () throws -> VaultFileStore
     private var lastRefreshAt: Date?
 
+    /// create/update/delete calls that land on the main actor while a
+    /// refresh() is in flight (i.e. while suspended at the detached-work
+    /// `await`). refresh()'s background pass computes its result from a
+    /// snapshot of the index taken before any such write, so without
+    /// tracking these separately, merging that stale result back in would
+    /// silently revert a concurrent write (or resurrect a concurrent
+    /// delete) until the next refresh happens to run. `nil` value means the
+    /// path was deleted during the window.
+    private var localChangesDuringRefresh: [String: VaultIndexEntry?] = [:]
+
     /// Resolves the file store through the user's saved bookmark. Tests inject
     /// a temp-directory store instead.
     ///
@@ -56,9 +66,16 @@ final class VaultStore: ObservableObject {
     /// the UI at launch. The security scope is opened and closed inside that
     /// detached work; only the published-state assignment and the index save
     /// happen back on the main actor.
+    ///
+    /// Because that detached work suspends this method, a `create`/`update`/
+    /// `delete` call can run to completion on the main actor before this
+    /// resumes. Those are recorded in `localChangesDuringRefresh` and
+    /// replayed onto the detached result below, so a concurrent write can't
+    /// be reverted (or a concurrent delete resurrected) by this refresh.
     func refresh() async {
         guard !isLoading else { return }
         isLoading = true
+        localChangesDuringRefresh = [:]
         defer { isLoading = false }
 
         let root: URL
@@ -66,6 +83,7 @@ final class VaultStore: ObservableObject {
             root = try storeProvider().root
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            localChangesDuringRefresh = [:]
             return
         }
 
@@ -74,7 +92,17 @@ final class VaultStore: ObservableObject {
         }.value
 
         switch result {
-        case .success(let refreshed):
+        case .success(var refreshed):
+            // Replay writes that landed on the main actor while the above
+            // detached work was in flight — see `localChangesDuringRefresh`.
+            for (path, change) in localChangesDuringRefresh {
+                refreshed.removeAll { $0.relativePath == path }
+                if let change {
+                    refreshed.append(change)
+                }
+            }
+            refreshed.sort { $0.modifiedAt > $1.modifiedAt }
+
             entries = refreshed
             VaultIndex.save(refreshed)
             lastRefreshAt = Date()
@@ -82,6 +110,7 @@ final class VaultStore: ObservableObject {
         case .failure(let error):
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+        localChangesDuringRefresh = [:]
     }
 
     /// Off-main-actor body of `refresh()`. A `VaultFileStore` is rebuilt from
@@ -183,6 +212,11 @@ final class VaultStore: ObservableObject {
         }
         entries.removeAll { $0.relativePath == relativePath }
         VaultIndex.save(entries)
+        if isLoading {
+            // A refresh is in flight; make sure its result doesn't
+            // resurrect this path when it's merged back in refresh().
+            localChangesDuringRefresh.updateValue(nil, forKey: relativePath)
+        }
     }
 
     // MARK: - Helpers
@@ -225,5 +259,10 @@ final class VaultStore: ObservableObject {
         entries.append(entry)
         entries.sort { $0.modifiedAt > $1.modifiedAt }
         VaultIndex.save(entries)
+        if isLoading {
+            // A refresh is in flight; make sure its result doesn't drop
+            // this write when it's merged back in refresh().
+            localChangesDuringRefresh.updateValue(entry, forKey: entry.relativePath)
+        }
     }
 }

@@ -138,4 +138,39 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.map(\.relativePath), [entry.relativePath])
         XCTAssertEqual(store.entries.first?.title, originalTitle)
     }
+
+    /// A create() landing on the main actor while refresh()'s detached work
+    /// is still in flight must survive the merge back — not get reverted by
+    /// the stale-relative-to-this-write snapshot the background pass
+    /// computed. `store.isLoading` flips to true synchronously before
+    /// refresh() suspends at its detached `await`, so once the polling loop
+    /// below observes it, refresh() is guaranteed to be parked there and
+    /// cannot resume until this task yields again.
+    func testCreateDuringRefreshIsNotLost() async throws {
+        let refreshing = Task { await store.refresh() }
+        while !store.isLoading { await Task.yield() }
+
+        let entry = try store.create(body: "Made mid-refresh\n", now: Date())
+
+        await refreshing.value
+
+        XCTAssertTrue(store.entries.contains { $0.relativePath == entry.relativePath })
+        XCTAssertTrue(VaultIndex.load().contains { $0.relativePath == entry.relativePath })
+    }
+
+    /// Symmetric case: a delete() during an in-flight refresh must not be
+    /// undone by the merge, resurrecting a note the user just removed.
+    func testDeleteDuringRefreshIsNotResurrected() async throws {
+        let entry = try store.create(body: "To be deleted mid-refresh\n", now: Date())
+
+        let refreshing = Task { await store.refresh() }
+        while !store.isLoading { await Task.yield() }
+
+        try store.delete(relativePath: entry.relativePath)
+
+        await refreshing.value
+
+        XCTAssertFalse(store.entries.contains { $0.relativePath == entry.relativePath })
+        XCTAssertFalse(VaultIndex.load().contains { $0.relativePath == entry.relativePath })
+    }
 }
