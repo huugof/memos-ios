@@ -2684,7 +2684,7 @@ Completes the feature, then verifies the parts no unit test can reach.
 
 **Files:**
 - Create: `MemosIOS/Services/Vault/VaultAttachmentWriter.swift`
-- Modify: `MemoChat/Views/NoteEditorView.swift` (`attachmentMarkdown(existingText:)` line 593)
+- Modify: `MemoChat/Views/NoteEditorView.swift` (`handleImageSelected`, `handleFileSelected`, `attachmentMarkdown(existingText:)`, the `.vaultFile` commit branches)
 - Test: `MemosIOSTests/VaultAttachmentWriterTests.swift`
 
 **Interfaces:**
@@ -2838,45 +2838,69 @@ enum VaultAttachmentWriter {
 
 - [ ] **Step 4: Wire attachments into the editor**
 
-In `MemoChat/Views/NoteEditorView.swift`, `appendPendingAttachments(to:)` (line 562) currently uploads images to the Memos server and inserts the markdown returned by `attachmentMarkdown(existingText:)` (line 593). In vault mode there is no upload — the bytes go straight into the vault folder.
+**How the editor actually handles attachments** (`MemoChat/Views/NoteEditorView.swift`): uploads happen at *selection* time, not at send time. `handleImageSelected(_:)` resizes the image, appends a `PendingImage` (`image: UIImage`, `uploadedURL: String?`, `isUploading: Bool`), and uploads it to the Memos server in a `Task`, filling `uploadedURL` on success or removing the pending image and setting `uploadError` on failure. Later, `attachmentMarkdown(existingText:)` turns every pending item with a non-nil `uploadedURL` into markdown, and `appendPendingAttachments(to:)` (drafts) / `appendPendingAttachmentsToServerMemo(content:)` (server edits) append it.
 
-Add this method and call it from `appendPendingAttachments(to:)` when `AppSettings.destinationKind == .vault`, in place of the server upload branch:
+The vault path mirrors that shape: **write at selection time**, then let the existing append paths emit the link.
+
+1. In `handleImageSelected(_:)`, branch on `AppSettings.destinationKind` before the upload `Task`. In vault mode, write the image into the vault instead of uploading, and store the vault-relative path in `uploadedURL`:
 
 ```swift
-    /// Writes pending images into the vault and returns their wikilinks.
-    /// Images that fail to write are skipped rather than aborting the note —
-    /// losing an attachment is recoverable, losing the text is not.
-    private func vaultAttachmentMarkdown(forNoteNamed noteName: String) -> [String] {
-        let folder = AppSettings.vaultAttachmentsFolder
-        // withAccess opens the security scope; without it every write to an
-        // iCloud or file-provider vault fails on device.
-        let links = try? VaultBookmarkStore.withAccess { root -> [String] in
-            let fileStore = VaultFileStore(root: root)
-            var links: [String] = []
-            for (offset, image) in pendingImages.enumerated() {
-                guard let data = image.pngData() else { continue }
-                let filename = VaultAttachmentWriter.filename(
-                    forNoteNamed: noteName,
-                    index: offset + 1,
-                    fileExtension: "png"
-                )
-                guard let written = try? VaultAttachmentWriter.write(
-                    data: data,
-                    filename: filename,
-                    using: fileStore,
-                    folder: folder
-                ) else { continue }
-                links.append(VaultAttachmentWriter.wikilink(for: (written as NSString).lastPathComponent))
+        if AppSettings.destinationKind == .vault {
+            do {
+                let written = try VaultBookmarkStore.withAccess { root in
+                    try VaultAttachmentWriter.write(
+                        data: data,
+                        filename: VaultAttachmentWriter.filename(
+                            forNoteNamed: vaultAttachmentStem(),
+                            index: pendingImages.count,
+                            fileExtension: "jpg"
+                        ),
+                        using: VaultFileStore(root: root),
+                        folder: AppSettings.vaultAttachmentsFolder
+                    )
+                }
+                if let idx = pendingImages.firstIndex(where: { $0.id == pendingID }) {
+                    pendingImages[idx].uploadedURL = written
+                    pendingImages[idx].isUploading = false
+                }
+            } catch {
+                pendingImages.removeAll { $0.id == pendingID }
+                uploadError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
-            return links
+            return
         }
-        return links ?? []
+```
+
+   `withAccess` opens the security scope — without it the write fails on device. The data is the existing resized JPEG, so the extension is `jpg`. `pendingImages.count` is taken *after* the append, so the first image is index 1.
+
+2. Add the stem helper. When editing an existing vault note, attachments are named after that note's file; otherwise after the timestamp the new note will get (an occasional one-minute skew is harmless — the writer never overwrites):
+
+```swift
+    private func vaultAttachmentStem() -> String {
+        if case .vaultFile(let path) = target {
+            return (path as NSString).lastPathComponent
+        }
+        return VaultNoteSerializer.filename(for: Date(), existing: [])
     }
 ```
 
-For `noteName`, pass `VaultNoteSerializer.filename(for: Date(), existing: [])`. That derives the same `YYYY-MM-DD HHmm` stem the note itself will get, without coupling the attachment write to the note write — the two only need to *look* related in the vault, and an occasional one-minute skew is harmless.
+3. In `attachmentMarkdown(existingText:)`, emit a wikilink for images in vault mode:
 
-The links must be appended to the draft text **before** `dispatchSend(draft)` runs, so they are part of the body `VaultStore.create` serializes.
+```swift
+        for p in pendingImages where p.uploadedURL != nil {
+            if AppSettings.destinationKind == .vault {
+                parts.append(VaultAttachmentWriter.wikilink(for: (p.uploadedURL! as NSString).lastPathComponent))
+            } else {
+                parts.append("![](\(p.uploadedURL!))")
+            }
+        }
+```
+
+4. **Editing an existing vault note.** The vault save path (`saveVaultNote()`, Task 10) does not append pending attachments, so images picked while editing a vault note would be written to the vault but never linked. In the `.vaultFile` branches of `commitCurrent()` and `saveCurrentState()`, before `saveVaultNote()`, append them to `vaultNoteBody` the same way `appendPendingAttachmentsToServerMemo(content:)` does for server memos — reuse that function: `appendPendingAttachmentsToServerMemo(content: &vaultNoteBody)` (it is destination-neutral apart from its name; rename it to `appendPendingAttachments(toText:)` and update its existing call site).
+
+5. **Files (non-image) in vault mode.** The spec covers images only. `handleFileSelected(url:)` would upload a vault note's file to the Memos server. In vault mode, don't upload: set `uploadError = "File attachments aren't supported for vault notes yet."` and return before appending a `PendingFile`. Memos mode is unchanged.
+
+`sendHome()` and `commitDraft()` already call `appendPendingAttachments(to:)` before `dispatchSend(draft)`, so vault links land in the body `VaultStore.create` serializes.
 
 - [ ] **Step 5: Run the tests**
 
