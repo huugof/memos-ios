@@ -41,6 +41,8 @@ struct SettingsView: View {
             .padding(.top, 20)
 
             Form {
+                VaultSettingsSection()
+
                 Section("Memos") {
                     TextField("https://example.com", text: $endpointBaseURL)
                         .keyboardType(.URL)
