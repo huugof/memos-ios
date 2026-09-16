@@ -67,19 +67,7 @@ struct VaultFileStore {
 
     func read(relativePath: String) throws -> VaultNote {
         let url = root.appendingPathComponent(relativePath)
-        var text = ""
-        var coordinationError: NSError?
-        var readError: Error?
-
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
-            do {
-                text = try String(contentsOf: readURL, encoding: .utf8)
-            } catch {
-                readError = error
-            }
-        }
-        if let coordinationError { throw coordinationError }
-        if let readError { throw readError }
+        let text = try readText(at: url)
 
         let (frontmatter, body) = Frontmatter.parse(text)
         let meta = try metadata(for: url, relativePath: relativePath)
@@ -88,7 +76,8 @@ struct VaultFileStore {
             frontmatter: frontmatter,
             body: body,
             modifiedAt: meta.modifiedAt,
-            fileSize: meta.fileSize
+            fileSize: meta.fileSize,
+            originalText: text
         )
     }
 
@@ -117,14 +106,23 @@ struct VaultFileStore {
         return try metadata(for: url, relativePath: relativePath)
     }
 
-    /// Writes only if the file still matches `expecting`. If it changed
-    /// externally, the in-app version is saved beside it as a conflict copy and
-    /// the external edit is left untouched — the Dropbox/Obsidian Sync
-    /// convention. Never prompts, never clobbers.
+    /// Writes only if the file's current content still matches `expectedText`
+    /// — the exact text the note was last read as. If it changed externally,
+    /// the in-app version is saved beside it as a conflict copy and the
+    /// external edit is left untouched — the Dropbox/Obsidian Sync convention.
+    /// Never prompts, never clobbers.
+    ///
+    /// Content comparison, not mtime/size, is deliberate: some file providers
+    /// preserve a file's original modification date when materializing a
+    /// downloaded change, which would make an mtime-based check fail to
+    /// detect a real external edit — not just in a narrow same-second race,
+    /// but systematically. A save must never destroy a vault edit, so the
+    /// detector has to be one that can't miss, not merely one that rarely
+    /// does.
     func writeChecked(
         _ text: String,
         to relativePath: String,
-        expecting: VaultFileMetadata
+        expectedText: String
     ) throws -> VaultWriteResult {
         let url = root.appendingPathComponent(relativePath)
 
@@ -133,11 +131,9 @@ struct VaultFileStore {
             return .written(try write(text, to: relativePath))
         }
 
-        let current = try metadata(for: url, relativePath: relativePath)
-        let unchanged = abs(current.modifiedAt.timeIntervalSince(expecting.modifiedAt)) < 1
-            && current.fileSize == expecting.fileSize
+        let currentText = try readText(at: url)
 
-        if unchanged {
+        if currentText == expectedText {
             return .written(try write(text, to: relativePath))
         }
 
@@ -185,6 +181,25 @@ struct VaultFileStore {
         let filePath = url.standardizedFileURL.path
         guard filePath.hasPrefix(rootPath) else { return nil }
         return String(filePath.dropFirst(rootPath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    /// Coordinated read of a file's raw text. Shared by `read(relativePath:)`
+    /// and `writeChecked`'s content comparison.
+    private func readText(at url: URL) throws -> String {
+        var text = ""
+        var coordinationError: NSError?
+        var readError: Error?
+
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
+            do {
+                text = try String(contentsOf: readURL, encoding: .utf8)
+            } catch {
+                readError = error
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        if let readError { throw readError }
+        return text
     }
 
     private func metadata(for url: URL, relativePath: String) throws -> VaultFileMetadata {

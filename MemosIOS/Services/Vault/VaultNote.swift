@@ -8,6 +8,11 @@ struct VaultNote: Identifiable, Equatable {
     var modifiedAt: Date
     var fileSize: Int
 
+    /// The exact bytes this note was read from, used to detect external edits on
+    /// save. Empty means "unknown" — treat that as changed, so the fail-safe
+    /// direction is a conflict copy rather than a clobber.
+    var originalText: String = ""
+
     var id: String { relativePath }
 
     /// Prefers the frontmatter title, falling back to the first body line and

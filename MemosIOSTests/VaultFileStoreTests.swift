@@ -74,9 +74,8 @@ final class VaultFileStoreTests: XCTestCase {
 
     func testWriteCheckedWritesWhenFileUnchanged() throws {
         try writeFile("note.md", "original\n")
-        let metadata = try store.listMarkdownFiles().first { $0.relativePath == "note.md" }!
 
-        let result = try store.writeChecked("updated\n", to: "note.md", expecting: metadata)
+        let result = try store.writeChecked("updated\n", to: "note.md", expectedText: "original\n")
         guard case .written = result else {
             return XCTFail("expected .written, got \(result)")
         }
@@ -87,13 +86,8 @@ final class VaultFileStoreTests: XCTestCase {
     /// The whole point of the conflict policy: the external edit survives.
     func testWriteCheckedMakesConflictCopyWhenFileChangedExternally() throws {
         try writeFile("note.md", "original\n")
-        let stale = VaultFileMetadata(
-            relativePath: "note.md",
-            modifiedAt: Date(timeIntervalSince1970: 0),
-            fileSize: 999
-        )
 
-        let result = try store.writeChecked("mine\n", to: "note.md", expecting: stale)
+        let result = try store.writeChecked("mine\n", to: "note.md", expectedText: "stale content\n")
         guard case .conflictCopy(let path, _) = result else {
             return XCTFail("expected .conflictCopy, got \(result)")
         }
@@ -107,14 +101,31 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(copy, "mine\n")
     }
 
+    /// Regression for the conflict-detection hole found in round 1: mtime+size
+    /// missed an external edit that preserved byte count and landed within the
+    /// same wall-clock second as the read. Content comparison must not.
+    func testWriteCheckedDetectsSameSecondSameSizeExternalEdit() throws {
+        try writeFile("note.md", "aaaaaa\n")
+
+        // "External" edit: same byte count, happens well within the same
+        // second as the read below — exactly the case mtime+size could miss.
+        try writeFile("note.md", "bbbbbb\n")
+
+        let result = try store.writeChecked("mine\n", to: "note.md", expectedText: "aaaaaa\n")
+        guard case .conflictCopy(let path, _) = result else {
+            return XCTFail("expected .conflictCopy, got \(result)")
+        }
+
+        // The external edit must survive untouched, not just the enum case.
+        let original = try String(contentsOf: root.appendingPathComponent("note.md"), encoding: .utf8)
+        XCTAssertEqual(original, "bbbbbb\n")
+        let copy = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        XCTAssertEqual(copy, "mine\n")
+    }
+
     /// A note deleted on the desktop must not be resurrected at its old path.
     func testWriteCheckedOnMissingFileWritesFresh() throws {
-        let stale = VaultFileMetadata(
-            relativePath: "gone.md",
-            modifiedAt: Date(timeIntervalSince1970: 0),
-            fileSize: 10
-        )
-        let result = try store.writeChecked("text\n", to: "gone.md", expecting: stale)
+        let result = try store.writeChecked("text\n", to: "gone.md", expectedText: "whatever was there before\n")
         guard case .written = result else {
             return XCTFail("expected .written, got \(result)")
         }
