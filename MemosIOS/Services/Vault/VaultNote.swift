@@ -105,19 +105,48 @@ enum VaultNoteSerializer {
 }
 
 private extension String {
+    /// YAML 1.1 scalars that parse as bool/null rather than string, checked
+    /// case-insensitively against the whole (trimmed) value.
+    static let yamlReservedScalars: Set<String> = ["~", "null", "true", "false", "yes", "no", "on", "off"]
+
+    /// Whether the whole string would parse as a YAML number (int or float).
+    var looksLikeYAMLNumber: Bool {
+        !isEmpty && Double(self) != nil
+    }
+
     /// Quotes a scalar only when YAML would otherwise misread it.
+    ///
+    /// Verified against a real YAML parser (Ruby's Psych): an unquoted mid-string
+    /// " #" is read as a comment (silently truncating everything after it), a
+    /// leading "-" (or "?", "@", "`", "%") either starts a block-sequence/mapping
+    /// construct or is a reserved indicator and breaks parsing, and bare
+    /// true/false/yes/no/on/off/null/~ or a numeric literal parse as their
+    /// non-string type instead of the text the app wrote. Over-quoting here is
+    /// harmless; under-quoting silently corrupts the user's note.
     func yamlScalar() -> String {
-        let needsQuoting = contains(": ") || hasPrefix("#") || hasPrefix("[") || hasPrefix("{")
-            || hasPrefix("&") || hasPrefix("*") || hasPrefix("!") || hasPrefix("|") || hasPrefix(">")
+        let needsQuoting = contains(": ") || contains(" #") || hasPrefix("#")
+            || hasPrefix("[") || hasPrefix("{") || hasPrefix("&") || hasPrefix("*")
+            || hasPrefix("!") || hasPrefix("|") || hasPrefix(">") || hasPrefix("-")
+            || hasPrefix("?") || hasPrefix("@") || hasPrefix("`") || hasPrefix("%")
             || hasSuffix(":")
+            || String.yamlReservedScalars.contains(lowercased())
+            || looksLikeYAMLNumber
         guard needsQuoting else { return self }
         return "\"\(replacingOccurrences(of: "\"", with: "\\\""))\""
     }
 
+    /// Reverses `yamlScalar()`: strips a matching outer quote pair and, for
+    /// double quotes, un-escapes the `\"` sequences `yamlScalar()` introduced.
+    /// Single-quoted values are left as-is since this app never writes them.
     func trimmingQuotes() -> String {
-        guard count >= 2, (hasPrefix("\"") && hasSuffix("\"")) || (hasPrefix("'") && hasSuffix("'")) else {
-            return self
+        guard count >= 2 else { return self }
+        if hasPrefix("\"") && hasSuffix("\"") {
+            let inner = String(dropFirst().dropLast())
+            return inner.replacingOccurrences(of: "\\\"", with: "\"")
         }
-        return String(dropFirst().dropLast())
+        if hasPrefix("'") && hasSuffix("'") {
+            return String(dropFirst().dropLast())
+        }
+        return self
     }
 }
