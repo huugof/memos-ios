@@ -536,7 +536,10 @@ struct NoteEditorView: View {
     private func dispatchSend(_ draft: Draft) -> Bool {
         switch AppSettings.destinationKind {
         case .memos:
-            return sendQueue.enqueue(draft, in: modelContext)
+            // Result deliberately ignored, as before this destination split:
+            // the Memos path's reset-after-send behavior must stay unchanged.
+            sendQueue.enqueue(draft, in: modelContext)
+            return true
         case .vault:
             // A draft still in flight to the Memos queue (sent just before a
             // destination switch) must not also be written to the vault —
