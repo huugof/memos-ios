@@ -89,7 +89,8 @@ struct NotesListView: View {
             }
 
             // Pagination sentinel — lazy-loads older pages when scrolled into view.
-            if !serverMemosStore.reachedEnd {
+            // Vault mode has no pages; the whole vault is reconciled by refresh().
+            if destination == .memos && !serverMemosStore.reachedEnd {
                 Section {
                     Color.clear
                         .frame(height: 1)
@@ -100,7 +101,12 @@ struct NotesListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await serverMemosStore.loadAllPages() }
+        .refreshable {
+            switch destination {
+            case .memos: await serverMemosStore.loadAllPages()
+            case .vault: await vaultStore.refresh()
+            }
+        }
         .overlay(alignment: .center) {
             if activeIsLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
         }

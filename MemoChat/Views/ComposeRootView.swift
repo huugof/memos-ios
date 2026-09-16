@@ -21,6 +21,11 @@ struct ComposeRootView: View {
 
     @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
     @AppStorage("vaultBookmark") private var vaultBookmark: Data?
+    /// Tracks whether `serverMemosStore` has had its cache-load/save-hook
+    /// priming (as `.task` does) run this session — `.task` only runs it
+    /// when Memos is the destination at launch, so a later switch into Memos
+    /// from a vault-first launch needs to do that priming itself once.
+    @State private var memosPrimed = false
 
     var body: some View {
         ZStack {
@@ -54,6 +59,7 @@ struct ComposeRootView: View {
             case .memos:
                 serverMemosStore.loadFromCache(MemoCache.load())
                 serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
+                memosPrimed = true
                 await serverMemosStore.refresh(force: true)
             case .vault:
                 vaultStore.loadFromIndex()
@@ -65,7 +71,17 @@ struct ComposeRootView: View {
             Task {
                 switch AppSettings.destinationKind {
                 case .memos:
-                    await serverMemosStore.refreshIfStale()
+                    if !memosPrimed {
+                        // Launched in vault mode, so the `.task` above never
+                        // ran this — do the same cache-load/save-hook setup
+                        // now, on the first switch into Memos this session.
+                        serverMemosStore.loadFromCache(MemoCache.load())
+                        serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
+                        memosPrimed = true
+                        await serverMemosStore.refresh(force: true)
+                    } else {
+                        await serverMemosStore.refreshIfStale()
+                    }
                 case .vault:
                     vaultStore.loadFromIndex()
                     await vaultStore.refresh()

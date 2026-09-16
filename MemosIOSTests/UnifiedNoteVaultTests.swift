@@ -61,4 +61,20 @@ final class UnifiedNoteVaultTests: XCTestCase {
         let notes = UnifiedNote.merge(vaultEntries: [], drafts: [composing], excludeDraftID: composing.id)
         XCTAssertTrue(notes.isEmpty)
     }
+
+    /// Switching destinations migrates nothing: a draft still in flight to
+    /// the Memos queue must not show up as a vault-sendable draft.
+    func testMergeExcludesPendingMemosDraft() {
+        let pending = Draft(text: "Sending to Memos")
+        pending.sendState = .pending
+        let notes = UnifiedNote.merge(vaultEntries: [], drafts: [pending])
+        XCTAssertTrue(notes.isEmpty)
+    }
+
+    func testMergeExcludesSendingMemosDraft() {
+        let sending = Draft(text: "Sending to Memos")
+        sending.sendState = .sending
+        let notes = UnifiedNote.merge(vaultEntries: [], drafts: [sending])
+        XCTAssertTrue(notes.isEmpty)
+    }
 }

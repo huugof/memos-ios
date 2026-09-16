@@ -107,10 +107,12 @@ struct VaultFileStore {
     }
 
     /// Writes only if the file's current content still matches `expectedText`
-    /// — the exact text the note was last read as. If it changed externally,
-    /// the in-app version is saved beside it as a conflict copy and the
-    /// external edit is left untouched — the Dropbox/Obsidian Sync convention.
-    /// Never prompts, never clobbers.
+    /// — the exact text the note was last read as. If it changed externally
+    /// — including having been deleted — the in-app version is saved beside
+    /// it (or, if the original is gone, under a fresh conflict-style name) as
+    /// a conflict copy, and the external state is left untouched — the
+    /// Dropbox/Obsidian Sync convention. Never prompts, never clobbers, and
+    /// never resurrects a path the desktop just deleted.
     ///
     /// Content comparison, not mtime/size, is deliberate. A metadata check
     /// misses any external edit that lands in the same second and leaves the
@@ -128,8 +130,10 @@ struct VaultFileStore {
         let url = root.appendingPathComponent(relativePath)
 
         guard fileManager.fileExists(atPath: url.path) else {
-            // Deleted externally: write fresh rather than resurrect the path.
-            return .written(try write(text, to: relativePath))
+            // Deleted externally: save as a new file rather than resurrect
+            // the path — writing straight back would silently erase the
+            // fact that the original was removed out from under us.
+            return try writeConflictCopy(text, originalRelativePath: relativePath)
         }
 
         let currentText = try readText(at: url)
@@ -138,14 +142,20 @@ struct VaultFileStore {
             return .written(try write(text, to: relativePath))
         }
 
-        // Disambiguate against what's already on disk in the *original's*
-        // directory (which may be nested — not the vault root), so a second
-        // conflict inside the same minute gets " 2" appended instead of
-        // silently replacing the first conflict copy via write()'s atomic
-        // replace semantics.
-        let directory = (relativePath as NSString).deletingLastPathComponent
+        return try writeConflictCopy(text, originalRelativePath: relativePath)
+    }
+
+    /// Writes `text` as a conflict copy of `originalRelativePath`, disambiguated
+    /// against what's already on disk in the *original's* directory (which may
+    /// be nested — not the vault root), so a second conflict inside the same
+    /// minute gets " 2" appended instead of silently replacing the first
+    /// conflict copy via `write()`'s atomic replace semantics. Shared by both
+    /// `writeChecked` branches that need one: an external edit, and an
+    /// external deletion.
+    private func writeConflictCopy(_ text: String, originalRelativePath: String) throws -> VaultWriteResult {
+        let directory = (originalRelativePath as NSString).deletingLastPathComponent
         let existing = try existingFilenames(inSubfolder: directory)
-        let conflictPath = Self.conflictPath(for: relativePath, at: Date(), existing: existing)
+        let conflictPath = Self.conflictPath(for: originalRelativePath, at: Date(), existing: existing)
         let metadata = try write(text, to: conflictPath)
         return .conflictCopy(path: conflictPath, metadata: metadata)
     }

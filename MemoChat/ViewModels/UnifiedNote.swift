@@ -162,14 +162,23 @@ enum UnifiedNote: Identifiable {
     }
 
     /// Vault-mode merge: filed notes come from the index, plus any local draft
-    /// that hasn't been written out yet.
+    /// that hasn't been written out yet. A draft still `.pending`/`.sending`
+    /// on the Memos queue (in flight from before a destination switch) is
+    /// excluded too — switching destinations migrates nothing, so it must not
+    /// be shown as a vault-sendable draft while it's still owned by the other
+    /// destination's queue.
     static func merge(
         vaultEntries: [VaultIndexEntry],
         drafts: [Draft],
         excludeDraftID: UUID? = nil
     ) -> [UnifiedNote] {
         var notes = vaultEntries.map { UnifiedNote.vault($0) }
-        for draft in drafts where !draft.isBlank && !draft.isArchived && draft.id != excludeDraftID {
+        for draft in drafts
+        where !draft.isBlank
+            && !draft.isArchived
+            && draft.id != excludeDraftID
+            && draft.sendState != .pending
+            && draft.sendState != .sending {
             notes.append(.local(draft))
         }
         return notes.sorted { $0.date > $1.date }

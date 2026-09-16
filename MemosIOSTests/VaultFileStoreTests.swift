@@ -154,12 +154,18 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(original, "original\n")
     }
 
-    /// A note deleted on the desktop must not be resurrected at its old path.
-    func testWriteCheckedOnMissingFileWritesFresh() throws {
+    /// A note deleted on the desktop must not be resurrected at its old path —
+    /// the in-app edit is saved as a conflict copy instead, exactly like an
+    /// external edit, so nothing silently reappears where the desktop just
+    /// deleted it.
+    func testWriteCheckedOnMissingFileWritesConflictCopyNotOriginalPath() throws {
         let result = try store.writeChecked("text\n", to: "gone.md", expectedText: "whatever was there before\n")
-        guard case .written = result else {
-            return XCTFail("expected .written, got \(result)")
+        guard case .conflictCopy(let path, _) = result else {
+            return XCTFail("expected .conflictCopy, got \(result)")
         }
+        XCTAssertNotEqual(path, "gone.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(path).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("gone.md").path))
     }
 
     func testDeleteRemovesFile() throws {

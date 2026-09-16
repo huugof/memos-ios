@@ -41,7 +41,13 @@ struct NoteEditorView: View {
     // Vault note editing state
     @State private var loadedVaultNote: VaultNote?
     @State private var vaultNoteBody: String = ""
-    @State private var vaultError: String?
+    /// The note couldn't be loaded — nothing to edit, so this blocks the
+    /// editor the same way `serverMemoError` does.
+    @State private var vaultLoadError: String?
+    /// A save conflict or write failure. Non-blocking — shown as a
+    /// dismissible banner over the still-editable text, never full-screen,
+    /// so it never interrupts typing.
+    @State private var vaultSaveMessage: String?
 
     // Attachment state
     @State private var pendingImages: [PendingImage] = []
@@ -93,7 +99,7 @@ struct NoteEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let err = serverMemoError ?? vaultError {
+            if let err = serverMemoError ?? vaultLoadError {
                 Text(err)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -109,6 +115,11 @@ struct NoteEditorView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbarContent }
+        .overlay(alignment: .top) {
+            if let message = vaultSaveMessage {
+                vaultSaveBanner(message)
+            }
+        }
         .background {
             if isHome {
                 // Root screen: the left edge opens the notes list (the system pop
@@ -219,6 +230,31 @@ struct NoteEditorView: View {
             .ignoresSafeArea(edges: .top)
             .allowsHitTesting(false)
         }
+    }
+
+    /// Non-blocking, dismissible banner for a vault save conflict/failure.
+    /// Sits over the editor without hiding it — a save problem must never
+    /// interrupt typing.
+    private func vaultSaveBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button {
+                vaultSaveMessage = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 
     private var textBinding: Binding<String> {
@@ -419,11 +455,19 @@ struct NoteEditorView: View {
     }
 
     /// Home: enqueue the current draft and immediately hand back a blank note.
+    /// A failed vault write leaves the draft (and its text) on screen instead —
+    /// see `dispatchSend`.
     private func sendHome() {
         guard canSend, let draft = currentDraft else { return }
         persistDraftText()
         appendPendingAttachments(to: draft)
-        dispatchSend(draft)
+        guard dispatchSend(draft) else {
+            // Vault write failed: leave text/draft exactly as they are so
+            // Send can be tapped again (canSend is still true — neither
+            // the text nor lastSentText changed), and don't let onDisappear
+            // treat this as handled.
+            return
+        }
         didTapDone = true  // don't let onDisappear re-enqueue this same send
         resetToNewNote()
     }
@@ -484,23 +528,44 @@ struct NoteEditorView: View {
 
     /// Sends the current draft to whichever destination is active. The Memos
     /// path keeps its queue; the vault path writes the file immediately.
-    private func dispatchSend(_ draft: Draft) {
+    /// Returns `false` only when a vault write failed, so callers (namely
+    /// `sendHome()`) know not to archive/reset — the draft and its text stay
+    /// on screen, with the failure surfaced via `vaultSaveMessage`, for a
+    /// retry.
+    @discardableResult
+    private func dispatchSend(_ draft: Draft) -> Bool {
         switch AppSettings.destinationKind {
         case .memos:
-            sendQueue.enqueue(draft, in: modelContext)
+            return sendQueue.enqueue(draft, in: modelContext)
         case .vault:
+            // A draft still in flight to the Memos queue (sent just before a
+            // destination switch) must not also be written to the vault —
+            // switching destinations migrates nothing. Treat it as a no-op,
+            // not a failure: there is nothing wrong to report here.
+            guard draft.sendState != .pending && draft.sendState != .sending else {
+                return true
+            }
             do {
                 try vaultStore.create(body: draft.text)
                 draft.isArchived = true
                 draft.lastSentAt = Date()
                 draft.sendState = .sent
                 draft.lastError = nil
+                modelContext.saveOrAssert()
+                vaultSaveMessage = nil
+                return true
             } catch {
                 // Leave the draft unarchived so no text is lost.
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 draft.sendState = .failed
-                draft.lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                draft.lastError = message
+                modelContext.saveOrAssert()
+                // Surface on this screen (non-blocking banner) and in the
+                // list's error row — a failed vault send must never be silent.
+                vaultSaveMessage = message
+                vaultStore.errorMessage = message
+                return false
             }
-            modelContext.saveOrAssert()
         }
     }
 
@@ -610,9 +675,9 @@ struct NoteEditorView: View {
             let note = try vaultStore.read(relativePath: relativePath)
             loadedVaultNote = note
             vaultNoteBody = note.body
-            vaultError = nil
+            vaultLoadError = nil
         } catch {
-            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            vaultLoadError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
@@ -627,17 +692,35 @@ struct NoteEditorView: View {
             let result = try vaultStore.update(note: note, body: vaultNoteBody)
             switch result {
             case .written:
-                vaultError = nil
-                // Re-read so the next save compares against current metadata.
-                loadedVaultNote = try? vaultStore.read(relativePath: note.relativePath)
+                // Re-read so the next save compares against current content.
+                // If the re-read itself throws (e.g. a transient iCloud
+                // hiccup right after the write), KEEP the previous
+                // `loadedVaultNote` rather than nil it out — nil would make
+                // every future save silently no-op (the guard above would
+                // just return). Its `originalText` is now stale relative to
+                // what we just wrote, but that fails *safe*: the next save's
+                // conflict check sees a mismatch and produces a conflict copy
+                // instead of silently losing an edit.
+                if let reread = try? vaultStore.read(relativePath: note.relativePath) {
+                    loadedVaultNote = reread
+                    vaultSaveMessage = nil
+                } else {
+                    vaultSaveMessage = "Saved, but couldn't confirm the write — further edits may save as a new file."
+                }
             case .conflictCopy(let path, _):
-                vaultError = "This note changed elsewhere. Your version was saved as \(path)."
                 // Keep editing the copy. Left pointing at the original, every
                 // further debounced save would spawn yet another conflict copy.
-                loadedVaultNote = try? vaultStore.read(relativePath: path)
+                // Same "never nil" rule applies if this re-read also fails.
+                if let reread = try? vaultStore.read(relativePath: path) {
+                    loadedVaultNote = reread
+                    vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path)."
+                } else {
+                    vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path), " +
+                        "but it couldn't be reopened here — further edits may save as another new file."
+                }
             }
         } catch {
-            vaultError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            vaultSaveMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
