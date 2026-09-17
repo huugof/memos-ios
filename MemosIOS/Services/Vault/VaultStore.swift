@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// What `VaultStore.update` did, plus the note as it now exists on disk.
+struct VaultSaveOutcome: Equatable {
+    let result: VaultWriteResult
+    let note: VaultNote
+}
+
 /// The vault's answer to ServerMemosStore: an observable list of notes the
 /// views render, backed by the persisted index and the file store.
 ///
@@ -157,8 +163,9 @@ final class VaultStore: ObservableObject {
             let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: now, updated: now)
             let metadata = try fileStore.write(text, to: relativePath)
 
-            let entry = self.entry(from: text, path: metadata.relativePath, metadata: metadata)
+            let entry = VaultIndexEntry.make(from: Self.note(from: text, path: metadata.relativePath, metadata: metadata))
             self.upsert(entry)
+            self.errorMessage = nil
             return entry
         }
     }
@@ -171,8 +178,14 @@ final class VaultStore: ObservableObject {
 
     /// Saves an edit, preserving unknown frontmatter and writing a conflict
     /// copy if the file changed externally since `note` was read.
+    ///
+    /// The returned outcome carries the note built from the exact text that
+    /// was written (at the copy's path for a conflict). Callers use it as
+    /// their next baseline; re-reading the file instead could adopt a
+    /// desktop write that landed in between, which the next save would then
+    /// silently clobber.
     @discardableResult
-    func update(note: VaultNote, body: String, now: Date = Date()) throws -> VaultWriteResult {
+    func update(note: VaultNote, body: String, now: Date = Date()) throws -> VaultSaveOutcome {
         try withFileStore { fileStore in
             let text = VaultNoteSerializer.render(
                 body: body,
@@ -195,15 +208,18 @@ final class VaultStore: ObservableObject {
                 expectedText: note.originalText
             )
 
+            let written: VaultNote
             switch result {
             case .written(let metadata):
                 self.lastConflictPath = nil
-                self.upsert(self.entry(from: text, path: metadata.relativePath, metadata: metadata))
+                written = Self.note(from: text, path: metadata.relativePath, metadata: metadata)
             case .conflictCopy(let path, let metadata):
                 self.lastConflictPath = path
-                self.upsert(self.entry(from: text, path: path, metadata: metadata))
+                written = Self.note(from: text, path: path, metadata: metadata)
             }
-            return result
+            self.upsert(VaultIndexEntry.make(from: written))
+            self.errorMessage = nil
+            return VaultSaveOutcome(result: result, note: written)
         }
     }
 
@@ -244,15 +260,17 @@ final class VaultStore: ObservableObject {
         return try body(store)
     }
 
-    private func entry(from text: String, path: String, metadata: VaultFileMetadata) -> VaultIndexEntry {
+    /// The note exactly as `text` was written to `path`.
+    private static func note(from text: String, path: String, metadata: VaultFileMetadata) -> VaultNote {
         let (frontmatter, body) = Frontmatter.parse(text)
-        return VaultIndexEntry.make(from: VaultNote(
+        return VaultNote(
             relativePath: path,
             frontmatter: frontmatter,
             body: body,
             modifiedAt: metadata.modifiedAt,
-            fileSize: metadata.fileSize
-        ))
+            fileSize: metadata.fileSize,
+            originalText: text
+        )
     }
 
     private func upsert(_ entry: VaultIndexEntry) {

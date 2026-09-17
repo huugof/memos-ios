@@ -79,7 +79,7 @@ final class VaultStoreTests: XCTestCase {
         let entry = try store.create(body: "Original\n", now: Date(timeIntervalSince1970: 1_000_000))
         let note = try store.read(relativePath: entry.relativePath)
 
-        let result = try store.update(note: note, body: "Revised\n", now: Date(timeIntervalSince1970: 2_000_000))
+        let result = try store.update(note: note, body: "Revised\n", now: Date(timeIntervalSince1970: 2_000_000)).result
         guard case .written = result else {
             return XCTFail("expected .written, got \(result)")
         }
@@ -97,7 +97,7 @@ final class VaultStoreTests: XCTestCase {
         try "---\ntitle: Theirs\n---\nTheirs\n"
             .write(to: root.appendingPathComponent(entry.relativePath), atomically: true, encoding: .utf8)
 
-        let result = try store.update(note: note, body: "Mine revised\n", now: Date())
+        let result = try store.update(note: note, body: "Mine revised\n", now: Date()).result
         guard case .conflictCopy(let path, _) = result else {
             return XCTFail("expected .conflictCopy, got \(result)")
         }
@@ -105,6 +105,56 @@ final class VaultStoreTests: XCTestCase {
 
         let theirs = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
         XCTAssertTrue(theirs.contains("Theirs\n"))
+    }
+
+    /// D9/I6: the editor's next baseline is the exact text written, never a
+    /// re-read that could pick up a concurrent desktop write.
+    func testUpdateReturnsNoteBuiltFromWrittenText() throws {
+        let entry = try store.create(body: "Original\n", now: Date())
+        let note = try store.read(relativePath: entry.relativePath)
+
+        let outcome = try store.update(note: note, body: "Revised #tag\n", now: Date())
+        guard case .written(let metadata) = outcome.result else {
+            return XCTFail("expected .written, got \(outcome.result)")
+        }
+        let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
+        XCTAssertEqual(outcome.note.originalText, onDisk)
+        XCTAssertEqual(outcome.note.relativePath, entry.relativePath)
+        XCTAssertEqual(outcome.note.body, "Revised #tag\n")
+        XCTAssertEqual(outcome.note.fileSize, metadata.fileSize)
+        XCTAssertEqual(outcome.note.frontmatter, Frontmatter.parse(onDisk).frontmatter)
+
+        // A second save from the returned note is a plain write, not a conflict.
+        let second = try store.update(note: outcome.note, body: "Again\n", now: Date())
+        guard case .written = second.result else {
+            return XCTFail("expected .written, got \(second.result)")
+        }
+    }
+
+    func testConflictOutcomeNoteIsTheCopy() throws {
+        let entry = try store.create(body: "Mine\n", now: Date())
+        let note = try store.read(relativePath: entry.relativePath)
+        try "external\n".write(to: root.appendingPathComponent(entry.relativePath), atomically: true, encoding: .utf8)
+
+        let outcome = try store.update(note: note, body: "Mine revised\n", now: Date())
+        guard case .conflictCopy(let path, _) = outcome.result else {
+            return XCTFail("expected .conflictCopy, got \(outcome.result)")
+        }
+        XCTAssertEqual(outcome.note.relativePath, path)
+        let copy = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        XCTAssertEqual(outcome.note.originalText, copy)
+    }
+
+    /// Minor 3: a successful write clears a stale error.
+    func testSuccessfulCreateAndUpdateClearErrorMessage() throws {
+        store.errorMessage = "old failure"
+        let entry = try store.create(body: "Hi\n", now: Date())
+        XCTAssertNil(store.errorMessage)
+
+        store.errorMessage = "old failure"
+        let note = try store.read(relativePath: entry.relativePath)
+        try store.update(note: note, body: "Hi again\n", now: Date())
+        XCTAssertNil(store.errorMessage)
     }
 
     func testDeleteRemovesFileAndEntry() throws {

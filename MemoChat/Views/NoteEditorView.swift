@@ -694,35 +694,18 @@ struct NoteEditorView: View {
         // would bump `updated` and produce a sync diff for a note nobody edited.
         guard vaultNoteBody != note.body else { return }
         do {
-            let result = try vaultStore.update(note: note, body: vaultNoteBody)
-            switch result {
+            let outcome = try vaultStore.update(note: note, body: vaultNoteBody)
+            // The next save's baseline is exactly what was written — never a
+            // re-read, which could adopt a desktop write that landed in
+            // between and let the next save silently clobber it. For a
+            // conflict, the outcome's note is the copy, so further edits keep
+            // going to the copy instead of spawning a new one per save.
+            loadedVaultNote = outcome.note
+            switch outcome.result {
             case .written:
-                // Re-read so the next save compares against current content.
-                // If the re-read itself throws (e.g. a transient iCloud
-                // hiccup right after the write), KEEP the previous
-                // `loadedVaultNote` rather than nil it out — nil would make
-                // every future save silently no-op (the guard above would
-                // just return). Its `originalText` is now stale relative to
-                // what we just wrote, but that fails *safe*: the next save's
-                // conflict check sees a mismatch and produces a conflict copy
-                // instead of silently losing an edit.
-                if let reread = try? vaultStore.read(relativePath: note.relativePath) {
-                    loadedVaultNote = reread
-                    vaultSaveMessage = nil
-                } else {
-                    vaultSaveMessage = "Saved, but couldn't confirm the write — further edits may save as a new file."
-                }
+                vaultSaveMessage = nil
             case .conflictCopy(let path, _):
-                // Keep editing the copy. Left pointing at the original, every
-                // further debounced save would spawn yet another conflict copy.
-                // Same "never nil" rule applies if this re-read also fails.
-                if let reread = try? vaultStore.read(relativePath: path) {
-                    loadedVaultNote = reread
-                    vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path)."
-                } else {
-                    vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path), " +
-                        "but it couldn't be reopened here — further edits may save as another new file."
-                }
+                vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path)."
             }
         } catch {
             vaultSaveMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
