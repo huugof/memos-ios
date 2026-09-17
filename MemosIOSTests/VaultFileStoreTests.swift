@@ -40,6 +40,31 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(files.map(\.relativePath), ["daily/note.md"])
     }
 
+    /// Minor 6: a file whose metadata can't be read must not fail the whole
+    /// listing — it should just be skipped, leaving every other file intact.
+    ///
+    /// A genuine OS-level `resourceValues` failure for an entry that
+    /// `FileManager`'s enumerator has already yielded turns out to be
+    /// impossible to force deterministically in a plain temp directory:
+    /// the enumerator eagerly `lstat`s every entry as part of producing it
+    /// (confirmed experimentally — symlink loops up to depth 40, dangling
+    /// symlink targets, POSIX mode 000, and an ACL `deny readattr` entry all
+    /// still resolve without error). The real trigger is a transient
+    /// iCloud/file-provider failure, which needs a real ubiquitous
+    /// container. So this test instead pins the *contract*: `listMarkdownFiles`
+    /// never throws just because a listed entry is unusual (here, a symlink
+    /// whose target doesn't exist), and every real file is still returned.
+    func testListToleratesUnusualDirectoryEntriesWithoutFailing() throws {
+        try writeFile("good.md", "# Good\n")
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("dangling.md"),
+            withDestinationURL: root.appendingPathComponent("does-not-exist.md")
+        )
+
+        let files = try store.listMarkdownFiles()
+        XCTAssertEqual(Set(files.map(\.relativePath)), ["good.md", "dangling.md"])
+    }
+
     func testListSkipsObsidianConfigFolder() throws {
         let config = root.appendingPathComponent(".obsidian", isDirectory: true)
         try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)

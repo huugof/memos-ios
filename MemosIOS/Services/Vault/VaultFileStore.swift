@@ -51,7 +51,11 @@ struct VaultFileStore {
             }
             guard url.pathExtension.lowercased() == "md" else { continue }
             guard let relativePath = relativePath(for: url) else { continue }
-            results.append(try metadata(for: url, relativePath: relativePath))
+            // A single file whose metadata can't be read (a transient
+            // iCloud/file-provider failure, a race with an external delete,
+            // …) must not fail the whole listing — just skip that one file.
+            guard let fileMetadata = try? metadata(for: url, relativePath: relativePath) else { continue }
+            results.append(fileMetadata)
         }
         return results
     }
