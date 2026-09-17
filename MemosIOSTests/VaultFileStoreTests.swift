@@ -193,10 +193,45 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("gone.md").path))
     }
 
+    /// I3: a swipe-delete moves the file to `.trash/` (Obsidian's own trash
+    /// convention) rather than deleting it outright, so it isn't
+    /// unrecoverable for a note that also lives on the desktop vault.
     func testDeleteRemovesFile() throws {
         try writeFile("bye.md", "x\n")
         try store.delete(relativePath: "bye.md")
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("bye.md").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(".trash/bye.md").path))
+    }
+
+    /// I3: a second delete of a same-named file must not clobber the first
+    /// trashed copy — disambiguate with " 2", " 3", … the same way conflict
+    /// copies and new attachment files do.
+    func testDeleteDisambiguatesAgainstExistingTrashName() throws {
+        try writeFile("note.md", "first\n")
+        try store.delete(relativePath: "note.md")
+
+        try writeFile("note.md", "second\n")
+        try store.delete(relativePath: "note.md")
+
+        let firstTrashed = try String(contentsOf: root.appendingPathComponent(".trash/note.md"), encoding: .utf8)
+        let secondTrashed = try String(contentsOf: root.appendingPathComponent(".trash/note 2.md"), encoding: .utf8)
+        XCTAssertEqual(firstTrashed, "first\n")
+        XCTAssertEqual(secondTrashed, "second\n")
+    }
+
+    /// I3: deleting a path that's already missing counts as success.
+    func testDeleteOfMissingSourceDoesNotThrow() throws {
+        XCTAssertNoThrow(try store.delete(relativePath: "never-existed.md"))
+    }
+
+    /// I3: trashed files must never resurface in the note listing.
+    func testListSkipsTrashFolder() throws {
+        try writeFile("keep.md", "# Keep\n")
+        try writeFile("gone.md", "# Gone\n")
+        try store.delete(relativePath: "gone.md")
+
+        let files = try store.listMarkdownFiles()
+        XCTAssertEqual(files.map(\.relativePath), ["keep.md"])
     }
 
     func testExistingFilenamesInSubfolder() throws {

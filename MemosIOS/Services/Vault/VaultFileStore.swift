@@ -44,8 +44,10 @@ struct VaultFileStore {
 
         var results: [VaultFileMetadata] = []
         for case let url as URL in enumerator {
-            // .obsidian holds vault config, not notes.
-            if url.pathComponents.contains(".obsidian") {
+            // .obsidian holds vault config, not notes; .trash holds files
+            // deleted from within the app (see `delete(relativePath:)`).
+            // Neither belongs in the note list.
+            if url.pathComponents.contains(".obsidian") || url.pathComponents.contains(".trash") {
                 enumerator.skipDescendants()
                 continue
             }
@@ -164,26 +166,63 @@ struct VaultFileStore {
         return .conflictCopy(path: conflictPath, metadata: metadata)
     }
 
+    /// Moves the file to `<root>/.trash/`, Obsidian's own "move to Obsidian
+    /// trash" convention, rather than deleting it outright — a swipe-delete
+    /// in the app must not be unrecoverable for a note that also lives on
+    /// the user's desktop vault.
+    ///
+    /// A source that's already missing counts as success: deleting something
+    /// that's already gone is the outcome the caller wanted.
     func delete(relativePath: String) throws {
         let url = root.appendingPathComponent(relativePath)
+        guard fileManager.fileExists(atPath: url.path) else { return }
+
+        let trashFolder = root.appendingPathComponent(".trash", isDirectory: true)
+        try fileManager.createDirectory(at: trashFolder, withIntermediateDirectories: true)
+
+        let filename = (relativePath as NSString).lastPathComponent
+        let existing = try existingFilenames(inSubfolder: ".trash")
+        let destName = Self.disambiguatedName(filename, existing: existing)
+        let destURL = trashFolder.appendingPathComponent(destName)
+
         var coordinationError: NSError?
-        var deleteError: Error?
+        var moveError: Error?
         NSFileCoordinator().coordinate(
-            writingItemAt: url,
-            options: .forDeleting,
+            writingItemAt: url, options: .forMoving,
+            writingItemAt: destURL, options: .forReplacing,
             error: &coordinationError
-        ) { deleteURL in
+        ) { readURL, writeURL in
             do {
-                try fileManager.removeItem(at: deleteURL)
+                try fileManager.moveItem(at: readURL, to: writeURL)
+            } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+                // Vanished between the existence check above and the move:
+                // still counts as a successful delete.
             } catch {
-                deleteError = error
+                moveError = error
             }
         }
         if let coordinationError { throw coordinationError }
-        if let deleteError { throw deleteError }
+        if let moveError { throw moveError }
     }
 
     // MARK: - Helpers
+
+    /// Disambiguates a full filename (with extension) against `existing`
+    /// filenames in the same directory by appending " 2", " 3", … before the
+    /// extension until it's unique. Shared by conflict-copy naming and trash
+    /// naming so the " 2"/" 3" rule lives in one place.
+    static func disambiguatedName(_ name: String, existing: Set<String>) -> String {
+        guard existing.contains(name) else { return name }
+        let stem = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var candidate = name
+        var suffix = 2
+        while existing.contains(candidate) {
+            candidate = ext.isEmpty ? "\(stem) \(suffix)" : "\(stem) \(suffix).\(ext)"
+            suffix += 1
+        }
+        return candidate
+    }
 
     /// Builds a conflict-copy path, disambiguating against `existing` filenames
     /// in the original's directory the same way `VaultNoteSerializer.filename`
@@ -200,14 +239,9 @@ struct VaultFileStore {
         let path = relativePath as NSString
         let directory = path.deletingLastPathComponent
         let stem = (path.lastPathComponent as NSString).deletingPathExtension
-        let baseName = "\(stem) (conflict \(stamp))"
+        let baseName = "\(stem) (conflict \(stamp)).md"
 
-        var candidate = "\(baseName).md"
-        var suffix = 2
-        while existing.contains(candidate) {
-            candidate = "\(baseName) \(suffix).md"
-            suffix += 1
-        }
+        let candidate = disambiguatedName(baseName, existing: existing)
         return directory.isEmpty ? candidate : "\(directory)/\(candidate)"
     }
 

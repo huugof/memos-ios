@@ -157,11 +157,14 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
     }
 
+    /// I3: delete moves the file to `.trash/` rather than removing it —
+    /// gone from its original path, but recoverable on disk.
     func testDeleteRemovesFileAndEntry() throws {
         let entry = try store.create(body: "Bye\n", now: Date())
         try store.delete(relativePath: entry.relativePath)
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(entry.relativePath).path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(".trash/\(entry.relativePath)").path))
         XCTAssertTrue(store.entries.isEmpty)
     }
 
