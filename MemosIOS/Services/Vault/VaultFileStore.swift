@@ -134,21 +134,62 @@ struct VaultFileStore {
         expectedText: String
     ) throws -> VaultWriteResult {
         let url = root.appendingPathComponent(relativePath)
+        try fileManager.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
 
-        guard fileManager.fileExists(atPath: url.path) else {
-            // Deleted externally: save as a new file rather than resurrect
-            // the path — writing straight back would silently erase the
-            // fact that the original was removed out from under us.
+        // The read-and-compare and the write happen inside one coordinated
+        // access, not two separate coordinated calls, so an external write
+        // can't land in the gap between them. Inside the accessor, use plain
+        // FileManager/String I/O only — a nested NSFileCoordinator call here
+        // would deadlock.
+        var coordinationError: NSError?
+        var opError: Error?
+        var writtenMetadata: VaultFileMetadata?
+        var needsConflictCopy = false
+
+        NSFileCoordinator().coordinate(writingItemAt: url, options: [], error: &coordinationError) { writeURL in
+            do {
+                guard fileManager.fileExists(atPath: writeURL.path) else {
+                    // Deleted externally: save as a new file rather than
+                    // resurrect the path — writing straight back would
+                    // silently erase the fact that the original was removed
+                    // out from under us.
+                    needsConflictCopy = true
+                    return
+                }
+
+                let currentText = try String(contentsOf: writeURL, encoding: .utf8)
+                guard currentText == expectedText else {
+                    needsConflictCopy = true
+                    return
+                }
+
+                try text.write(to: writeURL, atomically: true, encoding: .utf8)
+                let values = try writeURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                writtenMetadata = VaultFileMetadata(
+                    relativePath: relativePath,
+                    modifiedAt: values.contentModificationDate ?? .distantPast,
+                    fileSize: values.fileSize ?? 0
+                )
+            } catch {
+                opError = error
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        if let opError { throw opError }
+
+        if needsConflictCopy {
+            // The conflict-copy write happens after this coordinated block —
+            // it targets a different path, so it needs its own coordination.
             return try writeConflictCopy(text, originalRelativePath: relativePath)
         }
-
-        let currentText = try readText(at: url)
-
-        if currentText == expectedText {
-            return .written(try write(text, to: relativePath))
+        guard let writtenMetadata else {
+            // Defensive: neither branch above produced an outcome.
+            return try writeConflictCopy(text, originalRelativePath: relativePath)
         }
-
-        return try writeConflictCopy(text, originalRelativePath: relativePath)
+        return .written(writtenMetadata)
     }
 
     /// Writes `text` as a conflict copy of `originalRelativePath`, disambiguated
@@ -296,8 +337,10 @@ struct VaultFileStore {
         return String(filePath.dropFirst(rootPath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-    /// Coordinated read of a file's raw text. Shared by `read(relativePath:)`
-    /// and `writeChecked`'s content comparison.
+    /// Coordinated read of a file's raw text. Used by `read(relativePath:)`;
+    /// `writeChecked` does its own read-compare-write inside a single
+    /// coordinated block instead, so an external write can't land between a
+    /// separate read and write.
     private func readText(at url: URL) throws -> String {
         var text = ""
         var coordinationError: NSError?
