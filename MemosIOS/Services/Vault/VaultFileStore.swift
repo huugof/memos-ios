@@ -205,12 +205,56 @@ struct VaultFileStore {
         if let moveError { throw moveError }
     }
 
+    // MARK: - Writing new files
+
+    /// Writes `data` as a new file, never overwriting an existing one.
+    ///
+    /// Used for attachments and anything else that's writing brand-new bytes
+    /// rather than updating a known note: the data is written to a temp file
+    /// first, then moved into place inside a coordinated write. `moveItem`
+    /// fails if the destination already exists, which is what preserves the
+    /// no-overwrite guarantee here (a plain `Data.write` can't give that
+    /// atomically together with `.atomic`, which Foundation forbids pairing
+    /// with `.withoutOverwriting`). The temp file is removed if the move
+    /// fails.
+    func writeNewFile(_ data: Data, preferredName: String, inSubfolder subfolder: String) throws -> String {
+        let existing = try existingFilenames(inSubfolder: subfolder)
+        let candidate = Self.disambiguatedName(preferredName, existing: existing)
+        let relativePath = subfolder.isEmpty ? candidate : "\(subfolder)/\(candidate)"
+        let destURL = root.appendingPathComponent(relativePath)
+        try fileManager.createDirectory(
+            at: destURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try data.write(to: tempURL)
+
+        var coordinationError: NSError?
+        var moveError: Error?
+        NSFileCoordinator().coordinate(writingItemAt: destURL, options: [], error: &coordinationError) { writeURL in
+            do {
+                try fileManager.moveItem(at: tempURL, to: writeURL)
+            } catch {
+                moveError = error
+            }
+        }
+
+        if coordinationError != nil || moveError != nil {
+            try? fileManager.removeItem(at: tempURL)
+            if let coordinationError { throw coordinationError }
+            if let moveError { throw moveError }
+        }
+
+        return relativePath
+    }
+
     // MARK: - Helpers
 
     /// Disambiguates a full filename (with extension) against `existing`
     /// filenames in the same directory by appending " 2", " 3", … before the
-    /// extension until it's unique. Shared by conflict-copy naming and trash
-    /// naming so the " 2"/" 3" rule lives in one place.
+    /// extension until it's unique. Shared by conflict-copy naming, trash
+    /// naming, and new-file writing so the " 2"/" 3" rule lives in one place.
     static func disambiguatedName(_ name: String, existing: Set<String>) -> String {
         guard existing.contains(name) else { return name }
         let stem = (name as NSString).deletingPathExtension

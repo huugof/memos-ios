@@ -234,6 +234,50 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(files.map(\.relativePath), ["keep.md"])
     }
 
+    /// I5: attachment (and other new-file) writes go through a temp file and
+    /// a coordinated move, but the visible behavior is the same as a direct
+    /// write: the bytes land at the requested path.
+    func testWriteNewFileWritesDataAtPreferredName() throws {
+        let data = Data([0x01, 0x02, 0x03])
+        let path = try store.writeNewFile(data, preferredName: "shot.png", inSubfolder: "attachments")
+
+        XCTAssertEqual(path, "attachments/shot.png")
+        let onDisk = try Data(contentsOf: root.appendingPathComponent(path))
+        XCTAssertEqual(onDisk, data)
+    }
+
+    /// I5: reuses the shared " 2"/" 3" disambiguation rather than overwriting.
+    func testWriteNewFileDisambiguatesAgainstExistingFile() throws {
+        let first = try store.writeNewFile(Data([0x01]), preferredName: "shot.png", inSubfolder: "attachments")
+        let second = try store.writeNewFile(Data([0x02]), preferredName: "shot.png", inSubfolder: "attachments")
+
+        XCTAssertEqual(first, "attachments/shot.png")
+        XCTAssertEqual(second, "attachments/shot 2.png")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(first)), Data([0x01]))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(second)), Data([0x02]))
+    }
+
+    /// I5: the temp file used for the coordinated move must not survive a
+    /// failed move. Force the move to fail with a read-only destination
+    /// directory (existence check and listing still succeed; only the
+    /// `moveItem` write is refused), which is what actually happens on
+    /// `moveItem` failure — a directory-vs-file name collision would just
+    /// get disambiguated to a different, non-colliding name instead.
+    func testWriteNewFileCleansUpTempFileOnFailure() throws {
+        let attachments = root.appendingPathComponent("attachments", isDirectory: true)
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: attachments.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: attachments.path) }
+
+        let tempDir = FileManager.default.temporaryDirectory
+        let before = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+
+        XCTAssertThrowsError(try store.writeNewFile(Data([0x01]), preferredName: "shot.png", inSubfolder: "attachments"))
+
+        let after = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+        XCTAssertEqual(Set(after).subtracting(before), [], "the temp file created for the failed move must be cleaned up")
+    }
+
     func testExistingFilenamesInSubfolder() throws {
         let inbox = root.appendingPathComponent("inbox", isDirectory: true)
         try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)

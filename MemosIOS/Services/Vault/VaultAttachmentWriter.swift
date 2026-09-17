@@ -22,6 +22,10 @@ enum VaultAttachmentWriter {
     /// Never replaces an existing file: if `filename` is taken, " 2", " 3", …
     /// is appended before the extension. Callers must build the wikilink from
     /// the returned path, not from the filename they asked for.
+    ///
+    /// Delegates to `VaultFileStore.writeNewFile`, which writes through a
+    /// temp file and a coordinated move rather than a raw `Data.write` — the
+    /// same coordination every other vault write goes through.
     @discardableResult
     static func write(
         data: Data,
@@ -29,27 +33,6 @@ enum VaultAttachmentWriter {
         using store: VaultFileStore,
         folder: String
     ) throws -> String {
-        let existing = try store.existingFilenames(inSubfolder: folder)
-        let stem = (filename as NSString).deletingPathExtension
-        let ext = (filename as NSString).pathExtension
-        var candidate = filename
-        var suffix = 2
-        while existing.contains(candidate) {
-            candidate = ext.isEmpty ? "\(stem) \(suffix)" : "\(stem) \(suffix).\(ext)"
-            suffix += 1
-        }
-
-        let relativePath = folder.isEmpty ? candidate : "\(folder)/\(candidate)"
-        let url = store.root.appendingPathComponent(relativePath)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        // .withoutOverwriting backstops the existence check against a file
-        // that appears in between. It cannot be combined with .atomic —
-        // Foundation traps at runtime if both are passed together — so this
-        // write is non-atomic; the existence check is still race-safe.
-        try data.write(to: url, options: [.withoutOverwriting])
-        return relativePath
+        try store.writeNewFile(data, preferredName: filename, inSubfolder: folder)
     }
 }
