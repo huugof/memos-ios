@@ -46,6 +46,7 @@ final class VaultNoteSerializerTests: XCTestCase {
         let text = VaultNoteSerializer.render(
             body: "My note\nwith #inbox and #ideas\n",
             existing: nil,
+            loadedBody: nil,
             created: created,
             updated: updated
         )
@@ -57,11 +58,14 @@ final class VaultNoteSerializerTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("My note\nwith #inbox and #ideas\n"))
     }
 
+    /// The loaded body's first line is "Old", so `title: Old` is app-derived
+    /// and follows the new first line (C1 made the loaded body an input).
     func testRenderPreservesUnknownKeys() {
-        let (existing, _) = Frontmatter.parse("---\ncustom: keep me\n# and this comment\ntitle: Old\n---\nold body\n")
+        let (existing, loadedBody) = Frontmatter.parse("---\ncustom: keep me\n# and this comment\ntitle: Old\n---\nOld\nbody\n")
         let text = VaultNoteSerializer.render(
             body: "New body\n",
             existing: existing,
+            loadedBody: loadedBody,
             created: created,
             updated: updated
         )
@@ -73,27 +77,146 @@ final class VaultNoteSerializerTests: XCTestCase {
 
     /// created is stamped once and never rewritten on later saves.
     func testRenderKeepsOriginalCreated() {
-        let (existing, _) = Frontmatter.parse("---\ncreated: 2020-01-01T00:00:00Z\n---\nbody\n")
-        let text = VaultNoteSerializer.render(body: "body\n", existing: existing, created: created, updated: updated)
+        let (existing, loadedBody) = Frontmatter.parse("---\ncreated: 2020-01-01T00:00:00Z\n---\nbody\n")
+        let text = VaultNoteSerializer.render(body: "body\n", existing: existing, loadedBody: loadedBody, created: created, updated: updated)
         XCTAssertTrue(text.contains("created: 2020-01-01T00:00:00Z\n"))
         XCTAssertFalse(text.contains("created: 2026-09-16"))
     }
 
-    /// The drift rule: tags are app-maintained, so removing an inline tag
-    /// removes it from frontmatter.
+    /// The drift rule: tags the app wrote (they equal the loaded body's tags)
+    /// are app-maintained, so removing an inline tag removes it from frontmatter.
     func testRemovingInlineTagRemovesItFromFrontmatter() {
-        let (existing, _) = Frontmatter.parse("---\ntags: [inbox, ideas]\n---\nold\n")
-        let text = VaultNoteSerializer.render(body: "now only #inbox\n", existing: existing, created: created, updated: updated)
+        let (existing, loadedBody) = Frontmatter.parse("---\ntags: [inbox, ideas]\n---\nold #inbox #ideas\n")
+        let text = VaultNoteSerializer.render(body: "now only #inbox\n", existing: existing, loadedBody: loadedBody, created: created, updated: updated)
         XCTAssertTrue(text.contains("tags: [inbox]\n"))
     }
 
+    // MARK: - C1: user-owned title and tags survive a save
+
+    private func renderEdit(file: String, newBody: String) -> String {
+        let (existing, loadedBody) = Frontmatter.parse(file)
+        return VaultNoteSerializer.render(
+            body: newBody, existing: existing, loadedBody: loadedBody, created: created, updated: updated)
+    }
+
+    /// The reviewer's harness: Properties tags and a custom title on a
+    /// desktop note must survive the first MemoChat edit.
+    func testDesktopPropertiesTagsAndTitleSurviveEdit() {
+        let file = "---\ntitle: My Project\ntags:\n  - project\n  - work\n---\n# Kickoff notes\nSome text\n"
+        let text = renderEdit(file: file, newBody: "# Kickoff notes\nSome text, edited\n")
+        XCTAssertTrue(text.hasPrefix("---\ntitle: My Project\ntags:\n  - project\n  - work\ncreated: "), text)
+        XCTAssertFalse(text.contains("Kickoff notes\ncreated"))
+        XCTAssertTrue(text.hasSuffix("---\n# Kickoff notes\nSome text, edited\n"))
+    }
+
+    func testAddingInlineTagAppendsToFrontmatterTags() {
+        let file = "---\ntags: [project, work]\n---\nNotes\n"
+        let text = renderEdit(file: file, newBody: "Notes #new\n")
+        XCTAssertTrue(text.contains("tags: [project, work, new]\n"), text)
+    }
+
+    func testRemovingInlineTagAlsoInFrontmatterRemovesIt() {
+        let file = "---\ntags: [project, work]\n---\nNotes #work\n"
+        let text = renderEdit(file: file, newBody: "Notes\n")
+        XCTAssertTrue(text.contains("tags: [project]\n"), text)
+    }
+
+    /// A bare scalar (quoted, with `#`) parses as one tag; an unmirrored body
+    /// tag is appended to it.
+    func testScalarUserTagsMergeWithBodyTags() {
+        let file = "---\ntags: \"#Project\"\n---\nNotes #work\n"
+        let text = renderEdit(file: file, newBody: "Notes #work edited\n")
+        XCTAssertTrue(text.contains("tags: [Project, work]\n"), text)
+    }
+
+    func testCommaSeparatedUserTagsParse() {
+        XCTAssertEqual(VaultNoteSerializer.parseTags(rawEntry: "tags: a, 'b', #c\n"), ["a", "b", "c"])
+        XCTAssertEqual(VaultNoteSerializer.parseTags(rawEntry: "tags: [a, \"b\"]\n"), ["a", "b"])
+        XCTAssertEqual(VaultNoteSerializer.parseTags(rawEntry: "tags:\n  - a\n  - \"#b\"\n"), ["a", "b"])
+    }
+
+    /// Unchanged merge result leaves the user's raw text byte-identical.
+    func testUserBlockTagsByteIdenticalWhenNothingChanged() {
+        let file = "---\ntags:\n  - project\n  - work\n---\nNotes #work\n"
+        let text = renderEdit(file: file, newBody: "Notes #work, more\n")
+        XCTAssertTrue(text.contains("tags:\n  - project\n  - work\n"), text)
+    }
+
+    /// App-authored note: tags equal the loaded body's tags, so the drift rule
+    /// applies exactly as before — including removing the key when empty.
+    func testAppAuthoredTagsFollowDriftRule() {
+        let file = "---\ntags: [inbox, ideas]\n---\nHello #inbox #ideas\n"
+        XCTAssertTrue(renderEdit(file: file, newBody: "Hello #ideas #later\n").contains("tags: [ideas, later]\n"))
+        XCTAssertFalse(renderEdit(file: file, newBody: "Hello\n").contains("tags:"))
+    }
+
+    func testCustomTitleSurvivesEdit() {
+        let file = "---\ntitle: \"Custom: name\"\n---\nFirst line\n"
+        let text = renderEdit(file: file, newBody: "Changed first line\n")
+        XCTAssertTrue(text.contains("title: \"Custom: name\"\n"), text)
+    }
+
+    func testAppDerivedTitleFollowsFirstLine() {
+        let file = "---\ntitle: First line\n---\nFirst line\n"
+        let text = renderEdit(file: file, newBody: "Changed first line\n")
+        XCTAssertTrue(text.contains("title: Changed first line\n"), text)
+        XCTAssertFalse(renderEdit(file: file, newBody: "").contains("title:"))
+    }
+
+    /// An app-derived title that was quoted on write still counts as app-owned.
+    func testQuotedAppDerivedTitleFollowsFirstLine() {
+        let file = "---\ntitle: 'Buy milk #groceries'\n---\nBuy milk #groceries\n"
+        let text = renderEdit(file: file, newBody: "Buy bread #groceries\n")
+        XCTAssertTrue(text.contains("title: 'Buy bread #groceries'\n"), text)
+    }
+
+    // MARK: - I2: vault tag extraction
+
+    func testVaultTagsIgnoreLinkFragments() {
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "See [[Project#Goals]] and https://x.com/a#frag"), [])
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "[text](https://x.com/b#frag) ![img](a.png#x)"), [])
+    }
+
+    func testVaultTagsFindProseAndLeadingTags() {
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "#Real start\nand #real again, #other\n"), ["real", "other"])
+    }
+
+    func testVaultTagsIgnoreCode() {
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "use `#notatag` here #yes"), ["yes"])
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "```\n#fenced\n```\n#after"), ["after"])
+    }
+
+    func testVaultTagsRequireWhitespaceBeforeHash() {
+        XCTAssertEqual(VaultNoteSerializer.vaultTags(in: "issue#12 and C#"), [])
+    }
+
+    func testNoteTagsUseVaultExtractor() {
+        let note = VaultNote(relativePath: "a.md", frontmatter: nil, body: "[[A#B]] #tag", modifiedAt: created, fileSize: 1)
+        XCTAssertEqual(note.tags, ["tag"])
+    }
+
+    func testRenderDoesNotMirrorWikilinkFragments() {
+        let text = VaultNoteSerializer.render(
+            body: "See [[Project#Goals]]\n", existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertFalse(text.contains("tags:"))
+    }
+
+    // MARK: - Minor 9: CRLF titles
+
+    func testTitleTrimsCarriageReturn() {
+        XCTAssertEqual(VaultNoteSerializer.title(forBody: "Hello\r\nWorld\r\n"), "Hello")
+        let text = VaultNoteSerializer.render(
+            body: "Hello\r\nWorld\r\n", existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: Hello\n"))
+    }
+
     func testBodyWithNoTagsOmitsTagsKey() {
-        let text = VaultNoteSerializer.render(body: "no tags here\n", existing: nil, created: created, updated: updated)
+        let text = VaultNoteSerializer.render(body: "no tags here\n", existing: nil, loadedBody: nil, created: created, updated: updated)
         XCTAssertFalse(text.contains("tags:"))
     }
 
     func testEmptyBodyOmitsTitleKey() {
-        let text = VaultNoteSerializer.render(body: "", existing: nil, created: created, updated: updated)
+        let text = VaultNoteSerializer.render(body: "", existing: nil, loadedBody: nil, created: created, updated: updated)
         XCTAssertFalse(text.contains("title:"))
         XCTAssertTrue(text.contains("created:"))
     }
@@ -104,7 +227,7 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// through the same path the app would (Frontmatter.parse + VaultNote.title),
     /// so these are true round-trip tests, not just string-contains checks.
     private func roundTrippedTitle(forBody body: String) -> String {
-        let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
+        let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
         let (frontmatter, parsedBody) = Frontmatter.parse(text)
         let note = VaultNote(relativePath: "note.md", frontmatter: frontmatter, body: parsedBody, modifiedAt: updated, fileSize: text.utf8.count)
         return note.title
@@ -116,8 +239,8 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// and inline #tags are the app's defining feature.
     func testTitleWithInlineHashIsQuotedAndRoundTrips() {
         let body = "Buy milk #groceries\n"
-        let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
-        XCTAssertTrue(text.contains("title: \"Buy milk #groceries\"\n"))
+        let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: 'Buy milk #groceries'\n"))
         XCTAssertEqual(roundTrippedTitle(forBody: body), "Buy milk #groceries")
     }
 
@@ -126,8 +249,8 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// frontmatter block when opened in Obsidian.
     func testTitleStartingWithDashIsQuotedAndRoundTrips() {
         let body = "- Shopping list\n"
-        let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
-        XCTAssertTrue(text.contains("title: \"- Shopping list\"\n"))
+        let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: '- Shopping list'\n"))
         XCTAssertEqual(roundTrippedTitle(forBody: body), "- Shopping list")
     }
 
@@ -135,16 +258,16 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// bool/nil rather than the literal string.
     func testTitleThatIsReservedWordIsQuotedAndRoundTrips() {
         let body = "yes\n"
-        let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
-        XCTAssertTrue(text.contains("title: \"yes\"\n"))
+        let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: 'yes'\n"))
         XCTAssertEqual(roundTrippedTitle(forBody: body), "yes")
     }
 
     /// A bare numeric-looking title parses as a number, not a string.
     func testTitleThatIsNumericIsQuotedAndRoundTrips() {
         let body = "123\n"
-        let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
-        XCTAssertTrue(text.contains("title: \"123\"\n"))
+        let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: '123'\n"))
         XCTAssertEqual(roundTrippedTitle(forBody: body), "123")
     }
 
@@ -152,9 +275,9 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// YAML and must be quoted the same way as the other leading-character cases.
     func testTitlesWithLeadingReservedCharactersAreQuoted() {
         for body in ["@mention line\n", "`code` line\n", "%directive line\n"] {
-            let text = VaultNoteSerializer.render(body: body, existing: nil, created: created, updated: updated)
+            let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: created, updated: updated)
             let expectedTitle = String(body.dropLast())
-            XCTAssertTrue(text.contains("title: \"\(expectedTitle)\"\n"), "expected quoting for: \(body)")
+            XCTAssertTrue(text.contains("title: '\(expectedTitle)'\n"), "expected quoting for: \(body)")
             XCTAssertEqual(roundTrippedTitle(forBody: body), expectedTitle)
         }
     }
@@ -165,5 +288,59 @@ final class VaultNoteSerializerTests: XCTestCase {
     func testTitleWithDoubleQuoteRoundTrips() {
         let body = "He said \"hi\": bye\n"
         XCTAssertEqual(roundTrippedTitle(forBody: body), "He said \"hi\": bye")
+    }
+
+    // MARK: - D2: unsafe YAML scalars (single-quoted style)
+
+    /// render → Frontmatter.parse → value(for:) → unquote must return the
+    /// original title for every harness input that used to corrupt YAML.
+    func testUnsafeTitlesRoundTrip() {
+        let titles = [
+            "\"Hello,\" she said",
+            "'Tis the season",
+            "- see C:\\Users\\hugo",
+            ", and then",
+            "\"Quoted whole\"",
+            "2026-09-16",
+            "path C:\\Users\\hugo",
+            "ends with colon:",
+            "it's fine",
+        ]
+        for title in titles {
+            let text = VaultNoteSerializer.render(
+                body: "\(title)\n", existing: nil, loadedBody: nil, created: created, updated: updated)
+            let (frontmatter, _) = Frontmatter.parse(text)
+            let raw = frontmatter?.value(for: "title")
+            XCTAssertEqual(raw?.trimmingQuotes(), title, "round trip failed for \(title); wrote \(raw ?? "nil")")
+        }
+    }
+
+    func testUnsafeTitlesUseSingleQuotedStyle() {
+        let expectations: [(String, String)] = [
+            ("\"Hello,\" she said", "'\"Hello,\" she said'"),
+            ("'Tis the season", "'''Tis the season'"),
+            ("- see C:\\Users\\hugo", "'- see C:\\Users\\hugo'"),
+            (", and then", "', and then'"),
+            ("\"Quoted whole\"", "'\"Quoted whole\"'"),
+            ("2026-09-16", "'2026-09-16'"),
+        ]
+        for (title, expected) in expectations {
+            let text = VaultNoteSerializer.render(
+                body: "\(title)\n", existing: nil, loadedBody: nil, created: created, updated: updated)
+            XCTAssertTrue(text.contains("title: \(expected)\n"), "for \(title): \(text)")
+        }
+    }
+
+    func testPlainTitleStaysUnquoted() {
+        let text = VaultNoteSerializer.render(
+            body: "Plain title, with comma\n", existing: nil, loadedBody: nil, created: created, updated: updated)
+        XCTAssertTrue(text.contains("title: Plain title, with comma\n"))
+    }
+
+    /// Existing files (and older app output) use double quotes.
+    func testDoubleQuotedTitleStillReads() {
+        let (fm, body) = Frontmatter.parse("---\ntitle: \"a \\\"b\\\" c\\\\d\"\n---\nx\n")
+        let note = VaultNote(relativePath: "n.md", frontmatter: fm, body: body, modifiedAt: created, fileSize: 1)
+        XCTAssertEqual(note.title, "a \"b\" c\\d")
     }
 }

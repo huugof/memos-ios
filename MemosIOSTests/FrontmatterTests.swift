@@ -121,6 +121,65 @@ final class FrontmatterTests: XCTestCase {
         XCTAssertEqual(fm!.render(), "---\ntags: [one, two]\ntitle: Hello\n---\n")
     }
 
+    // MARK: - D1: blank lines / comments inside a multi-line entry
+
+    func testBlankLineInsideSequenceStaysWithEntry() {
+        let text = "---\ntags:\n  - inbox\n\n  - ideas\ncreated: 2026-01-01T00:00:00Z\n---\nHello #inbox\n"
+        var (fm, _) = Frontmatter.parse(text)
+        XCTAssertEqual(fm!.rawText(for: "tags"), "tags:\n  - inbox\n\n  - ideas\n")
+        fm!.set("tags", rawValue: "[inbox]")
+        XCTAssertEqual(fm!.render(), "---\ntags: [inbox]\ncreated: 2026-01-01T00:00:00Z\n---\n")
+    }
+
+    func testBlankLineInsideLastSequenceIsRemovedWithIt() {
+        let text = "---\ncreated: 2026-01-01T00:00:00Z\ntags:\n  - inbox\n\n  - ideas\n---\nHello\n"
+        var (fm, _) = Frontmatter.parse(text)
+        fm!.remove("tags")
+        fm!.set("updated", rawValue: "2026-09-16T00:00:00Z")
+        XCTAssertEqual(fm!.render(), "---\ncreated: 2026-01-01T00:00:00Z\nupdated: 2026-09-16T00:00:00Z\n---\n")
+    }
+
+    func testColumnZeroCommentInsideSequenceStaysWithEntry() {
+        let text = "---\ntags:\n  - inbox\n# work stuff\n  - ideas\ntitle: Hi\n---\nBody\n"
+        var (fm, _) = Frontmatter.parse(text)
+        fm!.set("tags", rawValue: "[inbox, ideas]")
+        XCTAssertEqual(fm!.render(), "---\ntags: [inbox, ideas]\ntitle: Hi\n---\n")
+    }
+
+    /// Blank lines and comments between two entries are still passthrough and
+    /// survive a rewrite of the entry above them.
+    func testTrailingBlankAndCommentAfterEntryArePassthrough() {
+        let text = "---\ntags:\n  - inbox\n\n# section\ntitle: Hi\n---\nBody\n"
+        var (fm, _) = Frontmatter.parse(text)
+        XCTAssertEqual(fm!.rawText(for: "tags"), "tags:\n  - inbox\n")
+        fm!.set("tags", rawValue: "[a]")
+        XCTAssertEqual(fm!.render(), "---\ntags: [a]\n\n# section\ntitle: Hi\n---\n")
+    }
+
+    func testTrailingBlankAtEndOfBlockIsKept() {
+        let text = "---\ntags:\n  - inbox\n\n---\nBody\n"
+        let (fm, _) = Frontmatter.parse(text)
+        XCTAssertEqual(fm!.render(), "---\ntags:\n  - inbox\n\n---\n")
+    }
+
+    // MARK: - Minor 8: byte-order mark
+
+    func testLeadingBOMIsStrippedAndReEmitted() {
+        let text = "\u{FEFF}---\ntitle: Hello\n---\nBody\n"
+        let (fm, body) = Frontmatter.parse(text)
+        XCTAssertEqual(fm?.value(for: "title"), "Hello")
+        XCTAssertEqual(body, "Body\n")
+        XCTAssertEqual(fm!.render() + body, text)
+    }
+
+    func testBOMSurvivesSerializerSave() {
+        let text = "\u{FEFF}---\ntitle: Hello\n---\nHello\n"
+        let (fm, body) = Frontmatter.parse(text)
+        let saved = VaultNoteSerializer.render(
+            body: "Hello again\n", existing: fm, loadedBody: body, created: Date(), updated: Date())
+        XCTAssertTrue(saved.hasPrefix("\u{FEFF}---\ntitle: Hello again\n"))
+    }
+
     func testEmptyFrontmatterRendersEmptyString() {
         let fm = Frontmatter(blocks: [])
         XCTAssertEqual(fm.render(), "")

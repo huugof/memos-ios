@@ -154,7 +154,7 @@ final class VaultStore: ObservableObject {
             let filename = VaultNoteSerializer.filename(for: now, existing: existing)
             let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
 
-            let text = VaultNoteSerializer.render(body: body, existing: nil, created: now, updated: now)
+            let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: now, updated: now)
             let metadata = try fileStore.write(text, to: relativePath)
 
             let entry = self.entry(from: text, path: metadata.relativePath, metadata: metadata)
@@ -177,6 +177,7 @@ final class VaultStore: ObservableObject {
             let text = VaultNoteSerializer.render(
                 body: body,
                 existing: note.frontmatter,
+                loadedBody: note.body,
                 created: note.frontmatter.flatMap { fm in
                     fm.value(for: "created").flatMap(VaultNoteSerializer.iso8601.date(from:))
                 } ?? now,
