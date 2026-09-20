@@ -302,4 +302,42 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertTrue(store.entries.isEmpty)
         XCTAssertTrue(VaultIndex.load().isEmpty)
     }
+
+    /// The discard rule behind the switch-vaults race: a refresh pass captures
+    /// the generation when it starts, and must not publish its result if the
+    /// app has been pointed at a different vault in the meantime. Without this,
+    /// a pass already in flight against the old vault finishes afterwards and
+    /// writes that vault's rows into `entries` and the persisted index, where
+    /// they read as the newly picked vault's notes.
+    func testRefreshStartedBeforeVaultSwitchMustNotPublish() throws {
+        let generation = store.currentGeneration
+        XCTAssertTrue(store.shouldPublishRefresh(startedAtGeneration: generation))
+
+        store.resetForNewVault()
+
+        XCTAssertFalse(store.shouldPublishRefresh(startedAtGeneration: generation))
+        XCTAssertTrue(store.shouldPublishRefresh(startedAtGeneration: store.currentGeneration))
+    }
+
+    func testResetForNewVaultClearsAPreviousVaultsError() throws {
+        store.recordError(VaultAccessError.stale)
+        XCTAssertNotNil(store.errorMessage)
+        XCTAssertTrue(store.needsReconnect)
+
+        store.resetForNewVault()
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertFalse(store.needsReconnect)
+    }
+
+    func testSuccessfulDeleteClearsAStaleReconnectPrompt() throws {
+        let entry = try store.create(body: "Delete me\n", now: Date())
+        store.recordError(VaultAccessError.stale)
+        XCTAssertTrue(store.needsReconnect)
+
+        try store.delete(relativePath: entry.relativePath)
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertFalse(store.needsReconnect)
+    }
 }

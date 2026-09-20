@@ -29,6 +29,18 @@ final class VaultStore: ObservableObject {
     private let storeProvider: () throws -> VaultFileStore
     private var lastRefreshAt: Date?
 
+    /// Bumped every time the app is pointed at a different vault. A refresh
+    /// captures this when it starts and discards its result if it no longer
+    /// matches, so a pass that was already in flight against the previous
+    /// vault can't publish that vault's notes as the new one's.
+    private var vaultGeneration = 0
+
+    /// Set when `refresh()` is called while one is already running. The
+    /// in-flight pass runs another when it finishes, so a refresh asked for
+    /// mid-pass — notably the one right after picking a new vault — isn't
+    /// silently dropped until the next poll.
+    private var refreshRequestedDuringRefresh = false
+
     /// create/update/delete calls that land on the main actor while a
     /// refresh() is in flight (i.e. while suspended at the detached-work
     /// `await`). refresh()'s background pass computes its result from a
@@ -84,9 +96,23 @@ final class VaultStore: ObservableObject {
     /// replayed onto the detached result below, so a concurrent write can't
     /// be reverted (or a concurrent delete resurrected) by this refresh.
     func refresh() async {
-        guard !isLoading else { return }
+        guard !isLoading else {
+            refreshRequestedDuringRefresh = true
+            return
+        }
+        await runRefreshPass()
+        while refreshRequestedDuringRefresh {
+            refreshRequestedDuringRefresh = false
+            await runRefreshPass()
+        }
+    }
+
+    /// One reconcile pass. Split out of `refresh()` so a request that arrives
+    /// mid-pass can be honored by running this again rather than being dropped.
+    private func runRefreshPass() async {
         isLoading = true
         localChangesDuringRefresh = [:]
+        let generation = vaultGeneration
         defer { isLoading = false }
 
         let root: URL
@@ -101,6 +127,15 @@ final class VaultStore: ObservableObject {
         let result = await Task.detached(priority: .utility) {
             Self.performRefresh(root: root)
         }.value
+
+        guard shouldPublishRefresh(startedAtGeneration: generation) else {
+            // The user picked a different vault while this pass was in flight.
+            // The result describes a vault the app is no longer connected to,
+            // so publishing it would show the old vault's notes as the new
+            // one's — and persist them under the new vault's index.
+            localChangesDuringRefresh = [:]
+            return
+        }
 
         switch result {
         case .success(var refreshed):
@@ -272,6 +307,7 @@ final class VaultStore: ObservableObject {
         }
         entries.removeAll { $0.relativePath == relativePath }
         VaultIndex.save(entries)
+        clearError()
         if isLoading {
             // A refresh is in flight; make sure its result doesn't
             // resurrect this path when it's merged back in refresh().
@@ -284,8 +320,22 @@ final class VaultStore: ObservableObject {
     /// against a newly picked vault so its rows don't linger mixed in with
     /// the old vault's (Minor 7).
     func resetForNewVault() {
+        vaultGeneration &+= 1
         entries = []
         VaultIndex.save([])
+        clearError()
+    }
+
+    /// The generation a refresh pass should compare against before publishing.
+    /// Exposed so the discard rule can be tested directly — the genuine race
+    /// (a slow pass against the old vault finishing after the switch) can't be
+    /// driven deterministically from a unit test.
+    var currentGeneration: Int { vaultGeneration }
+
+    /// False once the app has been pointed at a different vault since the pass
+    /// identified by `generation` began.
+    func shouldPublishRefresh(startedAtGeneration generation: Int) -> Bool {
+        generation == vaultGeneration
     }
 
     // MARK: - Errors
