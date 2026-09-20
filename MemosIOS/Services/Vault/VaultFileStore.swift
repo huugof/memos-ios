@@ -355,7 +355,15 @@ struct VaultFileStore {
         )
 
         let tempURL = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try data.write(to: tempURL)
+        do {
+            try data.write(to: tempURL)
+        } catch {
+            // The write itself can fail partway (e.g. disk full) and still
+            // leave a partial file at tempURL; clean it up here too, not
+            // just on the coordination/move failure paths below.
+            try? fileManager.removeItem(at: tempURL)
+            throw error
+        }
 
         var coordinationError: NSError?
         var moveError: Error?

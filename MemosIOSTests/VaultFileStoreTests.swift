@@ -224,6 +224,37 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertNoThrow(try store.delete(relativePath: "never-existed.md"))
     }
 
+    /// Follow-up A (batch-3 review): `.trash` flattens subfolders by design —
+    /// Obsidian's own "move to Obsidian trash" always drops items at the
+    /// trash root regardless of parent folder, so that part is intentionally
+    /// left as-is. What must hold is that two same-named notes from
+    /// DIFFERENT subfolders never clobber each other once flattened: they
+    /// disambiguate to distinct trash names, each with its original,
+    /// untouched contents.
+    func testDeleteFromDifferentSubfoldersDisambiguatesWithoutClobbering() throws {
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Projects/2020", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Notes/2021", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try writeFile("Projects/2020/meeting.md", "from 2020 projects\n")
+        try writeFile("Notes/2021/meeting.md", "from 2021 notes\n")
+
+        try store.delete(relativePath: "Projects/2020/meeting.md")
+        try store.delete(relativePath: "Notes/2021/meeting.md")
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Projects/2020/meeting.md").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Notes/2021/meeting.md").path))
+
+        let firstTrashed = try String(contentsOf: root.appendingPathComponent(".trash/meeting.md"), encoding: .utf8)
+        let secondTrashed = try String(contentsOf: root.appendingPathComponent(".trash/meeting 2.md"), encoding: .utf8)
+        XCTAssertEqual(firstTrashed, "from 2020 projects\n")
+        XCTAssertEqual(secondTrashed, "from 2021 notes\n")
+    }
+
     /// I3: trashed files must never resurface in the note listing.
     func testListSkipsTrashFolder() throws {
         try writeFile("keep.md", "# Keep\n")
@@ -277,6 +308,24 @@ final class VaultFileStoreTests: XCTestCase {
         let after = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
         XCTAssertEqual(Set(after).subtracting(before), [], "the temp file created for the failed move must be cleaned up")
     }
+
+    // Follow-up B (batch-3 review): `writeNewFile` now also cleans up the
+    // temp file if the INITIAL `data.write(to: tempURL)` itself throws (e.g.
+    // disk full), not just on the coordination/move failure paths above —
+    // see VaultFileStore.swift. No test is added for this one specifically:
+    // the only locally-reproducible way to make that initial write fail
+    // (chmod'ing the temp directory to deny entry creation, the same
+    // technique `testWriteNewFileCleansUpTempFileOnFailure` above uses for
+    // the move step) blocks the file from being created at all, so "no temp
+    // file is left behind" holds trivially whether or not the new cleanup
+    // code runs — it doesn't discriminate the fix from its absence. I
+    // confirmed this by running that technique against the pre-fix code and
+    // watching the assertion pass anyway. A genuine repro needs either an
+    // actual disk-full condition or making `FileManager` injectable into
+    // `VaultFileStore` so a test double can simulate a write that creates a
+    // partial file and then throws — both out of scope for this low-severity
+    // fix, so per the brief's 2-attempt cap this falls back to review of the
+    // 3-line change instead of a test.
 
     func testExistingFilenamesInSubfolder() throws {
         let inbox = root.appendingPathComponent("inbox", isDirectory: true)
