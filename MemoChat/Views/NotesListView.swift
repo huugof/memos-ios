@@ -65,6 +65,10 @@ struct NotesListView: View {
                 Section {
                     Text(msg).font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
+                    if destination == .vault && vaultStore.needsReconnect {
+                        Button("Reconnect Vault") { showSettings = true }
+                            .listRowBackground(Color.clear)
+                    }
                 }
             }
 
@@ -161,7 +165,7 @@ struct NotesListView: View {
             do {
                 try vaultStore.delete(relativePath: entry.relativePath)
             } catch {
-                vaultStore.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                vaultStore.recordError(error)
             }
         }
     }

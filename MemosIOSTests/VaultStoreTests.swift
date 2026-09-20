@@ -261,4 +261,33 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertFalse(store.entries.contains { $0.relativePath == entry.relativePath })
         XCTAssertFalse(VaultIndex.load().contains { $0.relativePath == entry.relativePath })
     }
+
+    // MARK: - Minor 4: needsReconnect
+
+    private struct DummyError: Error {}
+
+    func testRefreshWithMissingVaultSetsNeedsReconnect() async {
+        let failing = VaultStore(storeProvider: { throw VaultAccessError.notConfigured })
+        await failing.refresh()
+        XCTAssertTrue(failing.needsReconnect)
+    }
+
+    func testNonVaultAccessErrorDoesNotSetNeedsReconnect() async {
+        let failing = VaultStore(storeProvider: { throw DummyError() })
+        await failing.refresh()
+        XCTAssertNotNil(failing.errorMessage)
+        XCTAssertFalse(failing.needsReconnect)
+    }
+
+    func testSuccessfulOperationClearsNeedsReconnect() throws {
+        // Simulate a prior reconnect-worthy failure, then prove a
+        // subsequent successful write clears it.
+        store.recordError(VaultAccessError.stale)
+        XCTAssertTrue(store.needsReconnect)
+
+        _ = try store.create(body: "Hi\n", now: Date())
+        XCTAssertFalse(store.needsReconnect)
+        XCTAssertNil(store.errorMessage)
+    }
+
 }

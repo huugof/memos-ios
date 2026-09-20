@@ -18,6 +18,11 @@ final class VaultStore: ObservableObject {
     @Published private(set) var entries: [VaultIndexEntry] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
+    /// Set when `errorMessage` came from a `VaultAccessError` (a missing or
+    /// stale bookmark) rather than some other failure, so the UI can offer a
+    /// "Reconnect Vault" affordance without string-matching the message
+    /// (Minor 4).
+    @Published private(set) var needsReconnect = false
     /// Set when a save had to go to a conflict copy, so the UI can say so.
     @Published private(set) var lastConflictPath: String?
 
@@ -88,7 +93,7 @@ final class VaultStore: ObservableObject {
         do {
             root = try storeProvider().root
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            recordError(error)
             localChangesDuringRefresh = [:]
             return
         }
@@ -112,9 +117,9 @@ final class VaultStore: ObservableObject {
             entries = refreshed
             VaultIndex.save(refreshed)
             lastRefreshAt = Date()
-            errorMessage = nil
+            clearError()
         case .failure(let error):
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            recordError(error)
         }
         localChangesDuringRefresh = [:]
     }
@@ -203,7 +208,7 @@ final class VaultStore: ObservableObject {
 
             let entry = VaultIndexEntry.make(from: Self.note(from: text, path: metadata.relativePath, metadata: metadata))
             self.upsert(entry)
-            self.errorMessage = nil
+            self.clearError()
             return entry
         }
     }
@@ -256,7 +261,7 @@ final class VaultStore: ObservableObject {
                 written = Self.note(from: text, path: path, metadata: metadata)
             }
             self.upsert(VaultIndexEntry.make(from: written))
-            self.errorMessage = nil
+            self.clearError()
             return VaultSaveOutcome(result: result, note: written)
         }
     }
@@ -272,6 +277,24 @@ final class VaultStore: ObservableObject {
             // resurrect this path when it's merged back in refresh().
             localChangesDuringRefresh.updateValue(nil, forKey: relativePath)
         }
+    }
+
+    // MARK: - Errors
+
+    /// Records a failure surfaced to the UI. `needsReconnect` is derived
+    /// from the error's actual type — a `VaultAccessError` (missing or
+    /// stale bookmark) — rather than matching its message text, per Minor 4.
+    /// Not private: `NotesListView`'s delete-failure handler also routes
+    /// through here so a failed delete offers the same "Reconnect Vault"
+    /// affordance as a failed refresh.
+    func recordError(_ error: Error) {
+        errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        needsReconnect = error is VaultAccessError
+    }
+
+    private func clearError() {
+        errorMessage = nil
+        needsReconnect = false
     }
 
     // MARK: - Helpers
