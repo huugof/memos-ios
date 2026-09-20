@@ -8,8 +8,35 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
     let tags: [String]
     let modifiedAt: Date
     let fileSize: Int
+    /// True for a placeholder entry standing in for an iCloud file that
+    /// hasn't been downloaded (or was evicted): `title`/`preview`/`tags`
+    /// weren't derived from real content. `VaultIndex.diff` always sends
+    /// such an entry to `needsRead`, ignoring mtime/size, so it keeps being
+    /// re-checked until a refresh can finally read the real file. Optional
+    /// (rather than defaulted) so an index persisted before this field
+    /// existed still decodes — absent means "no", correct for every
+    /// pre-existing entry, all of which were read from real content.
+    let needsContent: Bool?
 
     var id: String { relativePath }
+
+    init(
+        relativePath: String,
+        title: String,
+        preview: String,
+        tags: [String],
+        modifiedAt: Date,
+        fileSize: Int,
+        needsContent: Bool? = nil
+    ) {
+        self.relativePath = relativePath
+        self.title = title
+        self.preview = preview
+        self.tags = tags
+        self.modifiedAt = modifiedAt
+        self.fileSize = fileSize
+        self.needsContent = needsContent
+    }
 
     static func make(from note: VaultNote) -> VaultIndexEntry {
         VaultIndexEntry(
@@ -92,6 +119,13 @@ enum VaultIndex {
 
         for file in disk {
             guard let existing = indexByPath[file.relativePath] else {
+                needsRead.append(file.relativePath)
+                continue
+            }
+            // A placeholder entry (I4) is always re-checked, regardless of
+            // mtime/size — those may not have changed at all while the file
+            // was still downloading, but the content still needs a read.
+            if existing.needsContent == true {
                 needsRead.append(file.relativePath)
                 continue
             }

@@ -107,4 +107,31 @@ final class VaultIndexTests: XCTestCase {
         XCTAssertEqual(diff.needsRead, ["a.md"])
         XCTAssertTrue(diff.unchanged.isEmpty)
     }
+
+    /// I4: a placeholder entry (`needsContent == true`) is always re-checked
+    /// on the next refresh, even when mtime/size on disk haven't budged —
+    /// they may genuinely not change at all while a file is mid-download.
+    func testNeedsContentEntrySentToNeedsReadRegardlessOfMatchingMetadata() {
+        let placeholder = VaultIndexEntry(
+            relativePath: "a.md", title: "A", preview: "", tags: [],
+            modifiedAt: Date(timeIntervalSince1970: 100), fileSize: 10, needsContent: true
+        )
+        let disk = [metadata("a.md", modified: 100, size: 10)]
+        let diff = VaultIndex.diff(index: [placeholder], disk: disk)
+
+        XCTAssertEqual(diff.needsRead, ["a.md"])
+        XCTAssertTrue(diff.unchanged.isEmpty)
+    }
+
+    /// Old on-disk `VaultIndexEntry` JSON, persisted before `needsContent`
+    /// existed, must still decode — with the field defaulting to `nil`.
+    func testVaultIndexEntryDecodesOldJSONWithoutNeedsContentKey() throws {
+        let oldJSON = """
+        {"relativePath":"a.md","title":"A","preview":"P","tags":[],"modifiedAt":719000000,"fileSize":10}
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(VaultIndexEntry.self, from: oldJSON)
+        XCTAssertEqual(decoded.relativePath, "a.md")
+        XCTAssertNil(decoded.needsContent)
+    }
 }

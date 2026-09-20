@@ -4,6 +4,33 @@ struct VaultFileMetadata: Codable, Equatable {
     let relativePath: String
     let modifiedAt: Date
     let fileSize: Int
+    /// True when this file is an iCloud placeholder that hasn't finished
+    /// downloading, or was downloaded once and has since been evicted.
+    /// False for every non-ubiquitous file. Defaults to false so call sites
+    /// that predate this field (including `VaultIndexEntry`'s persisted
+    /// sibling, decoded elsewhere) don't need to pass it, and — the point of
+    /// the custom `init(from:)` below — so an on-disk index JSON persisted
+    /// before this key existed still decodes instead of failing to load.
+    let needsDownload: Bool
+
+    init(relativePath: String, modifiedAt: Date, fileSize: Int, needsDownload: Bool = false) {
+        self.relativePath = relativePath
+        self.modifiedAt = modifiedAt
+        self.fileSize = fileSize
+        self.needsDownload = needsDownload
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case relativePath, modifiedAt, fileSize, needsDownload
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        relativePath = try container.decode(String.self, forKey: .relativePath)
+        modifiedAt = try container.decode(Date.self, forKey: .modifiedAt)
+        fileSize = try container.decode(Int.self, forKey: .fileSize)
+        needsDownload = try container.decodeIfPresent(Bool.self, forKey: .needsDownload) ?? false
+    }
 }
 
 enum VaultWriteResult: Equatable {
@@ -33,26 +60,71 @@ struct VaultFileStore {
     /// vault most files may be `.notDownloaded`, and materializing all of them
     /// just to draw a list is unacceptable. VaultIndex decides what to read.
     func listMarkdownFiles() throws -> [VaultFileMetadata] {
-        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey, .isDirectoryKey]
+        let keys: [URLResourceKey] = [
+            .contentModificationDateKey, .fileSizeKey, .isDirectoryKey,
+            .ubiquitousItemDownloadingStatusKey
+        ]
+        // `.skipsHiddenFiles` is deliberately not used: a not-yet-downloaded
+        // (or evicted) iCloud file is represented on disk as a dot-prefixed
+        // `.Name.md.icloud` placeholder, which that option would hide
+        // entirely — exactly the file this needs to see, so it can report it
+        // as `Name.md` with `needsDownload == true` instead of silently
+        // dropping it from the vault. Hidden files are filtered by hand
+        // below instead.
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: [.skipsPackageDescendants]
         ) else {
             return []
         }
 
         var results: [VaultFileMetadata] = []
         for case let url as URL in enumerator {
+            guard let relativePath = relativePath(for: url) else { continue }
+            let components = relativePath.split(separator: "/").map(String.init)
+            guard let leaf = components.last else { continue }
+
             // .obsidian holds vault config, not notes; .trash holds files
             // deleted from within the app (see `delete(relativePath:)`).
-            // Neither belongs in the note list.
-            if url.pathComponents.contains(".obsidian") || url.pathComponents.contains(".trash") {
+            // Neither belongs in the note list, at any depth.
+            if components.contains(".obsidian") || components.contains(".trash") {
                 enumerator.skipDescendants()
                 continue
             }
+
+            let mappedLeaf = Self.mappedFilename(leaf)
+            let isPlaceholder = mappedLeaf != leaf
+
+            // Manual hidden-file filtering, replacing `.skipsHiddenFiles`
+            // (see above): any dot-prefixed ancestor directory is skipped
+            // outright (and not descended into), and a dot-prefixed leaf is
+            // skipped too — unless it's an `.icloud` placeholder, which is
+            // the one hidden name this needs to see.
+            let hiddenAncestor = components.dropLast().contains { $0.hasPrefix(".") }
+            let hiddenLeaf = !isPlaceholder && leaf.hasPrefix(".")
+            if hiddenAncestor || hiddenLeaf {
+                if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+
+            if isPlaceholder {
+                guard mappedLeaf.lowercased().hasSuffix(".md") else { continue }
+                var mappedComponents = components
+                mappedComponents[mappedComponents.count - 1] = mappedLeaf
+                let mappedRelativePath = mappedComponents.joined(separator: "/")
+                // A single file whose metadata can't be read must not fail
+                // the whole listing — just skip that one file (see below).
+                guard let fileMetadata = try? metadata(
+                    for: url, relativePath: mappedRelativePath, forcedNeedsDownload: true
+                ) else { continue }
+                results.append(fileMetadata)
+                continue
+            }
+
             guard url.pathExtension.lowercased() == "md" else { continue }
-            guard let relativePath = relativePath(for: url) else { continue }
             // A single file whose metadata can't be read (a transient
             // iCloud/file-provider failure, a race with an external delete,
             // …) must not fail the whole listing — just skip that one file.
@@ -66,7 +138,21 @@ struct VaultFileStore {
         let folder = subfolder.isEmpty ? root : root.appendingPathComponent(subfolder, isDirectory: true)
         guard fileManager.fileExists(atPath: folder.path) else { return [] }
         let names = try fileManager.contentsOfDirectory(atPath: folder.path)
-        return Set(names)
+        // Map any not-yet-downloaded placeholder to the real name it stands
+        // in for, so a same-minute note created on another device — still
+        // just a placeholder locally — is still recognized here and isn't
+        // overwritten by `create`'s disambiguation.
+        return Set(names.map(Self.mappedFilename))
+    }
+
+    /// Maps a not-yet-downloaded iCloud placeholder's on-disk name
+    /// (`.Name.ext.icloud`) to the real filename (`Name.ext`) it stands in
+    /// for. Any other name passes through unchanged. Shared by
+    /// `listMarkdownFiles` and `existingFilenames` so both agree on what a
+    /// placeholder "really" is.
+    static func mappedFilename(_ name: String) -> String {
+        guard name.hasPrefix("."), name.hasSuffix(".icloud") else { return name }
+        return String(name.dropFirst().dropLast(".icloud".count))
     }
 
     // MARK: - Reading
@@ -358,12 +444,31 @@ struct VaultFileStore {
         return text
     }
 
-    private func metadata(for url: URL, relativePath: String) throws -> VaultFileMetadata {
-        let values = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+    /// - Parameter forcedNeedsDownload: set by the `.icloud`-placeholder path
+    ///   in `listMarkdownFiles`, where `needsDownload` is known outright
+    ///   rather than derived from the resource key (the placeholder file
+    ///   itself doesn't carry a meaningful ubiquitous status).
+    private func metadata(
+        for url: URL,
+        relativePath: String,
+        forcedNeedsDownload: Bool? = nil
+    ) throws -> VaultFileMetadata {
+        let values = try url.resourceValues(forKeys: [
+            .contentModificationDateKey, .fileSizeKey, .ubiquitousItemDownloadingStatusKey
+        ])
+        let needsDownload: Bool
+        if let forcedNeedsDownload {
+            needsDownload = forcedNeedsDownload
+        } else if let status = values.ubiquitousItemDownloadingStatus {
+            needsDownload = status != .current
+        } else {
+            needsDownload = false
+        }
         return VaultFileMetadata(
             relativePath: relativePath,
             modifiedAt: values.contentModificationDate ?? .distantPast,
-            fileSize: values.fileSize ?? 0
+            fileSize: values.fileSize ?? 0,
+            needsDownload: needsDownload
         )
     }
 }

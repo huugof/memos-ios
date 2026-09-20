@@ -130,9 +130,47 @@ final class VaultStore: ObservableObject {
                 let onDisk = try fileStore.listMarkdownFiles()
                 let diff = VaultIndex.diff(index: index, disk: onDisk)
                 let priorByPath = Dictionary(index.map { ($0.relativePath, $0) }, uniquingKeysWith: { first, _ in first })
+                let diskByPath = Dictionary(onDisk.map { ($0.relativePath, $0) }, uniquingKeysWith: { first, _ in first })
 
                 var refreshed = diff.unchanged
                 for path in diff.needsRead {
+                    if let diskMeta = diskByPath[path], diskMeta.needsDownload {
+                        // I4: never force a download just to draw the list.
+                        // Kick one off in the background (best-effort; a
+                        // plain temp-directory path, and any transient
+                        // failure, is fine to ignore here) and show what's
+                        // already known instead of blocking on it.
+                        try? FileManager.default.startDownloadingUbiquitousItem(
+                            at: root.appendingPathComponent(path)
+                        )
+                        if let prior = priorByPath[path] {
+                            // Keep showing the last known content, but mark
+                            // it for another look next refresh — mtime/size
+                            // may not change at all while still downloading.
+                            refreshed.append(VaultIndexEntry(
+                                relativePath: prior.relativePath,
+                                title: prior.title,
+                                preview: prior.preview,
+                                tags: prior.tags,
+                                modifiedAt: prior.modifiedAt,
+                                fileSize: prior.fileSize,
+                                needsContent: true
+                            ))
+                        } else {
+                            let filename = (path as NSString).lastPathComponent
+                            let title = (filename as NSString).deletingPathExtension
+                            refreshed.append(VaultIndexEntry(
+                                relativePath: path,
+                                title: title,
+                                preview: "",
+                                tags: [],
+                                modifiedAt: diskMeta.modifiedAt,
+                                fileSize: diskMeta.fileSize,
+                                needsContent: true
+                            ))
+                        }
+                        continue
+                    }
                     if let note = try? fileStore.read(relativePath: path) {
                         refreshed.append(VaultIndexEntry.make(from: note))
                     } else if let prior = priorByPath[path] {

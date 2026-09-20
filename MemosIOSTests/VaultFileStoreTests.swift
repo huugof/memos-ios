@@ -286,4 +286,64 @@ final class VaultFileStoreTests: XCTestCase {
         XCTAssertEqual(try store.existingFilenames(inSubfolder: "inbox"), ["one.md"])
         XCTAssertEqual(try store.existingFilenames(inSubfolder: "missing"), [])
     }
+
+    // MARK: - I4: iCloud placeholders
+
+    /// A not-yet-downloaded (or evicted) iCloud file is represented on disk
+    /// as a dot-prefixed `.Name.md.icloud` placeholder. `listMarkdownFiles`
+    /// must surface it as `Name.md` with `needsDownload == true` — not hide
+    /// it (as `.skipsHiddenFiles` used to) and not list it under its raw
+    /// on-disk name.
+    func testListMapsICloudPlaceholderToRealNameWithNeedsDownload() throws {
+        try writeFile(".Foo.md.icloud", "placeholder contents")
+
+        let files = try store.listMarkdownFiles()
+        XCTAssertEqual(files.map(\.relativePath), ["Foo.md"])
+        XCTAssertEqual(files.first?.needsDownload, true)
+    }
+
+    /// Same mapping applies to `existingFilenames`, so `create`'s
+    /// same-minute-filename disambiguation sees the placeholder as the real
+    /// name and doesn't overwrite a note that already exists (just not yet
+    /// downloaded) on another device.
+    func testExistingFilenamesMapsICloudPlaceholderToRealName() throws {
+        try writeFile(".Foo.md.icloud", "placeholder contents")
+
+        XCTAssertTrue(try store.existingFilenames(inSubfolder: "").contains("Foo.md"))
+    }
+
+    /// A regular (non-placeholder) hidden file must still be skipped, same
+    /// as `.skipsHiddenFiles` used to do.
+    func testListSkipsOrdinaryHiddenFiles() throws {
+        try writeFile(".hidden.md", "# Hidden\n")
+        try writeFile("visible.md", "# Visible\n")
+
+        let files = try store.listMarkdownFiles()
+        XCTAssertEqual(files.map(\.relativePath), ["visible.md"])
+    }
+
+    /// A placeholder whose mapped name isn't a `.md` file (e.g. an
+    /// attachment) must not be reported by `listMarkdownFiles` — only the
+    /// markdown-file listing maps placeholders; other file types aren't
+    /// notes.
+    func testListIgnoresNonMarkdownICloudPlaceholder() throws {
+        try writeFile(".photo.png.icloud", "placeholder")
+        try writeFile("real.md", "# Real\n")
+
+        let files = try store.listMarkdownFiles()
+        XCTAssertEqual(files.map(\.relativePath), ["real.md"])
+    }
+
+    /// Old on-disk `VaultFileMetadata` JSON, persisted before `needsDownload`
+    /// existed, must still decode — with the field defaulting to `false`.
+    func testVaultFileMetadataDecodesOldJSONWithoutNeedsDownloadKey() throws {
+        let oldJSON = """
+        {"relativePath":"note.md","modifiedAt":719000000,"fileSize":42}
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(VaultFileMetadata.self, from: oldJSON)
+        XCTAssertEqual(decoded.relativePath, "note.md")
+        XCTAssertEqual(decoded.fileSize, 42)
+        XCTAssertEqual(decoded.needsDownload, false)
+    }
 }

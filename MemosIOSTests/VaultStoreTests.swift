@@ -168,6 +168,26 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertTrue(store.entries.isEmpty)
     }
 
+    /// I4: a not-yet-downloaded iCloud file (`.Foo.md.icloud` on disk) must
+    /// produce a placeholder entry — title from the filename, no preview, no
+    /// tags — without ever reading it as markdown content. There's no way to
+    /// fake the ubiquitous-item status key on a real file in a plain temp
+    /// dir, so this goes through the `.icloud` placeholder path instead, per
+    /// the brief.
+    func testRefreshProducesPlaceholderEntryForICloudPlaceholderWithoutReading() async throws {
+        try "this is placeholder-file content and must never be parsed as a note body"
+            .write(to: root.appendingPathComponent(".Foo.md.icloud"), atomically: true, encoding: .utf8)
+
+        await store.refresh()
+
+        XCTAssertEqual(store.entries.map(\.relativePath), ["Foo.md"])
+        let placeholder = store.entries.first
+        XCTAssertEqual(placeholder?.title, "Foo")
+        XCTAssertEqual(placeholder?.preview, "")
+        XCTAssertEqual(placeholder?.tags, [])
+        XCTAssertEqual(placeholder?.needsContent, true)
+    }
+
     func testRefreshSurfacesMissingVaultAsErrorMessage() async {
         let failing = VaultStore(storeProvider: { throw VaultAccessError.notConfigured })
         await failing.refresh()
