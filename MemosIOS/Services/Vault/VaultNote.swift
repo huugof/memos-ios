@@ -183,6 +183,13 @@ enum VaultNoteSerializer {
     /// still equal what the app would have derived from `loadedBody`; values
     /// the user set elsewhere (e.g. Obsidian Properties) are preserved, and
     /// body tag changes since load are merged into a user-maintained list.
+    ///
+    /// On a brand-new note `existing` may be a template's frontmatter (see
+    /// `VaultTemplate`). Its keys are copied verbatim, but `title` and
+    /// `created` are written by the app rather than defended, since a
+    /// template's copies of them are placeholders. `tags` needs no special
+    /// case: a template's list is already treated as user-maintained, so a
+    /// fixed `tags: [inbox]` survives and the body's tags merge in.
     static func render(
         body: String,
         existing: Frontmatter?,
@@ -200,8 +207,10 @@ enum VaultNoteSerializer {
 
         applyTitle(to: &frontmatter, body: body, loadedBody: loadedBody)
 
-        // created is stamped once; a note only gets born one time.
-        if frontmatter.value(for: "created") == nil {
+        // created is stamped once; a note only gets born one time. A new note
+        // (no loadedBody) stamps regardless: any value there came from a
+        // template, and a template's `created:` is a placeholder, not a birth.
+        if loadedBody == nil || frontmatter.value(for: "created") == nil {
             frontmatter.set("created", rawValue: iso8601.string(from: created))
         }
         frontmatter.set("updated", rawValue: iso8601.string(from: updated))
@@ -212,9 +221,15 @@ enum VaultNoteSerializer {
     }
 
     private static func applyTitle(to frontmatter: inout Frontmatter, body: String, loadedBody: String?) {
-        if frontmatter.contains("title") {
+        if frontmatter.contains("title"), loadedBody != nil {
             // Present: app-owned only if it still equals the title derived
             // from the body as loaded. Anything else is the user's.
+            //
+            // A new note has no loaded body to compare against, so the check is
+            // skipped entirely: its frontmatter came from a template, whose
+            // `title:` is a slot to fill, not a value to defend. Without this
+            // the guard would find nothing to derive, bail, and freeze an
+            // empty title onto every note ever captured.
             guard let current = frontmatter.value(for: "title")?.trimmingQuotes(),
                   let derived = loadedBody.flatMap(title(forBody:)),
                   current == derived
@@ -285,7 +300,9 @@ extension String {
     fileprivate static let yamlReservedScalars: Set<String> = ["~", "null", "true", "false", "yes", "no", "on", "off"]
 
     /// Characters that YAML treats as indicators when they start a plain scalar.
-    fileprivate static let yamlLeadingIndicators: Set<Character> = [
+    /// Internal rather than fileprivate: `VaultTemplate` checks the same set
+    /// when a `{{title}}` expansion lands in a template value.
+    static let yamlLeadingIndicators: Set<Character> = [
         "-", "?", ":", ",", "[", "]", "{", "}", "#", "&", "*", "!", "|", ">", "'", "\"", "%", "@", "`",
     ]
 

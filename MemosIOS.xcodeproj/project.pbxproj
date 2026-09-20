@@ -35,6 +35,7 @@
 		65D14EF9DDFD38B98FA17C9E /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C99B6D6B8B8C6D10D9D4CC4 /* NoteEditorView.swift */; };
 		73977F06AEBB33D0A9B537A0 /* MemosClientParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC53AE10C9EF85373784E333 /* MemosClientParsingTests.swift */; };
 		7ABD1D9840EE89429A5A504B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C88216F2F2264C0100556A3 /* Theme.swift */; };
+		81DB5A775AEBE4FE9D83A7D3 /* VaultTemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E77B16294F135EF6A0A7A84 /* VaultTemplateTests.swift */; };
 		84E86780B28551FCC3B05047 /* VaultBookmarkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78D8B7E7868EAFD042C29FF6 /* VaultBookmarkStoreTests.swift */; };
 		85CEB425464E4C87B790B87E /* VaultFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E382C3BD9C48BDF87C580742 /* VaultFileStoreTests.swift */; };
 		860EA76FD9C7DADE8818D0AB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7B1F6B54399A8275E32B41 /* AppSettings.swift */; };
@@ -48,6 +49,7 @@
 		BC6C7823C2A221CF997BA83C /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = B986071B582B8AEE9BFBE67E /* ServerMemoEditDraft.swift */; };
 		BF880C8BAC872A0D9994FB6D /* VaultAttachmentWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C395C47B8599D8C8CEC4E1 /* VaultAttachmentWriterTests.swift */; };
 		C7AB537885F09A10010FDECD /* VaultIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5272D22C70CDA914A8069 /* VaultIndex.swift */; };
+		CE49919F5031F160DCFEC1EC /* VaultTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A10B306A55D946BDE27885 /* VaultTemplate.swift */; };
 		D871FE8D7C9715659CAC623C /* NoteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68E753E5640FC44ADB0AB7C /* NoteRowView.swift */; };
 		D94C83889EA3A08921380B60 /* NoteTextViewListEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D1BC6FB62BE2579DAE6DB6 /* NoteTextViewListEditingTests.swift */; };
 		D9D2FC60FF42932E8E6936B4 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 893CFD5BCB8923BACCC72663 /* MemosClient.swift */; };
@@ -82,12 +84,14 @@
 		17FE193B4659A1EA1C29822B /* VaultNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNote.swift; sourceTree = "<group>"; };
 		18C395C47B8599D8C8CEC4E1 /* VaultAttachmentWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultAttachmentWriterTests.swift; sourceTree = "<group>"; };
 		1AEAF0DFB16D85E341A64626 /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		1E77B16294F135EF6A0A7A84 /* VaultTemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultTemplateTests.swift; sourceTree = "<group>"; };
 		26034333BC345BD75CD1D3E3 /* MemoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoCache.swift; sourceTree = "<group>"; };
 		267BC0553695E330DE17C773 /* MemoChatApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoChatApp.swift; sourceTree = "<group>"; };
 		2719E381769F708F274D5503 /* UnifiedNoteVaultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNoteVaultTests.swift; sourceTree = "<group>"; };
 		2EFDDCFF4E0614156B4DED06 /* TagExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagExtractor.swift; sourceTree = "<group>"; };
 		3A901D4990FC43277550BE6A /* VaultNoteSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNoteSerializerTests.swift; sourceTree = "<group>"; };
 		3F3229B12ED0F0DE3D36FD9E /* ServerMemoDeleteQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteQueueTests.swift; sourceTree = "<group>"; };
+		44A10B306A55D946BDE27885 /* VaultTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultTemplate.swift; sourceTree = "<group>"; };
 		47E7E7B5F96B2E3E6CB4A4FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4B7EBD7C9D11E556A4C1ACC5 /* MemoChat.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MemoChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C88216F2F2264C0100556A3 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -153,6 +157,7 @@
 				9297158AFBF42A6F09FBE012 /* VaultIndexTests.swift */,
 				3A901D4990FC43277550BE6A /* VaultNoteSerializerTests.swift */,
 				79172BAAF487A4687DE86A02 /* VaultStoreTests.swift */,
+				1E77B16294F135EF6A0A7A84 /* VaultTemplateTests.swift */,
 			);
 			path = MemosIOSTests;
 			sourceTree = "<group>";
@@ -194,6 +199,7 @@
 				CAF5272D22C70CDA914A8069 /* VaultIndex.swift */,
 				17FE193B4659A1EA1C29822B /* VaultNote.swift */,
 				7DA5B3F12BC01ED4ACAB7204 /* VaultStore.swift */,
+				44A10B306A55D946BDE27885 /* VaultTemplate.swift */,
 			);
 			path = Vault;
 			sourceTree = "<group>";
@@ -429,6 +435,7 @@
 				2A2B0A212BD9D4432D4F1498 /* VaultIndexTests.swift in Sources */,
 				DD6173A0FD656402A6899305 /* VaultNoteSerializerTests.swift in Sources */,
 				9206B904D685033533240A6E /* VaultStoreTests.swift in Sources */,
+				81DB5A775AEBE4FE9D83A7D3 /* VaultTemplateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -475,6 +482,7 @@
 				2FE0C2371702E4C396B15C92 /* VaultNote.swift in Sources */,
 				E031961CF16F3AB7461AE731 /* VaultSettingsSection.swift in Sources */,
 				4E4EE9405640FD0B714F8D4A /* VaultStore.swift in Sources */,
+				CE49919F5031F160DCFEC1EC /* VaultTemplate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

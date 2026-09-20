@@ -157,6 +157,15 @@ struct VaultFileStore {
 
     // MARK: - Reading
 
+    /// Best-effort nudge for a file iCloud has evicted, so a later read finds
+    /// real content. Silent by design: the callers that use it already have a
+    /// working fallback for the file being unavailable.
+    func requestDownload(relativePath: String) {
+        try? fileManager.startDownloadingUbiquitousItem(
+            at: root.appendingPathComponent(relativePath)
+        )
+    }
+
     func read(relativePath: String) throws -> VaultNote {
         let url = root.appendingPathComponent(relativePath)
         let text = try readText(at: url)

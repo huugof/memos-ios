@@ -18,6 +18,7 @@ enum AppSettings {
         static let destinationKind = "destinationKind"
         static let vaultNotesFolder = "vaultNotesFolder"
         static let vaultAttachmentsFolder = "vaultAttachmentsFolder"
+        static let vaultTemplatePath = "vaultTemplatePath"
     }
 
     private static let defaults = UserDefaults.standard
@@ -207,6 +208,13 @@ enum AppSettings {
     static var vaultAttachmentsFolder: String {
         get { defaults.string(forKey: Keys.vaultAttachmentsFolder) ?? "attachments" }
         set { defaults.set(Self.normalizedFolder(newValue), forKey: Keys.vaultAttachmentsFolder) }
+    }
+
+    /// Vault-relative path of the Markdown file whose frontmatter seeds every
+    /// new note (e.g. `Templates/Capture.md`). Empty means no template.
+    static var vaultTemplatePath: String {
+        get { defaults.string(forKey: Keys.vaultTemplatePath) ?? "" }
+        set { defaults.set(Self.normalizedFolder(newValue), forKey: Keys.vaultTemplatePath) }
     }
 
     /// Splits on "/", trims whitespace/newlines from each component, and drops

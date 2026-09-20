@@ -238,7 +238,9 @@ final class VaultStore: ObservableObject {
             let filename = VaultNoteSerializer.filename(for: now, existing: existing)
             let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
 
-            let text = VaultNoteSerializer.render(body: body, existing: nil, loadedBody: nil, created: now, updated: now)
+            let template = Self.templateFrontmatter(from: fileStore, body: body, now: now)
+            let text = VaultNoteSerializer.render(
+                body: body, existing: template, loadedBody: nil, created: now, updated: now)
             let metadata = try fileStore.write(text, to: relativePath)
 
             let entry = VaultIndexEntry.make(from: Self.note(from: text, path: metadata.relativePath, metadata: metadata))
@@ -252,6 +254,34 @@ final class VaultStore: ObservableObject {
         try withFileStore { fileStore in
             try fileStore.read(relativePath: relativePath)
         }
+    }
+
+    /// The configured template's frontmatter, or nil when there is no usable
+    /// one. Every failure is silent and non-fatal — no template set, the file
+    /// renamed or deleted on the desktop, an evicted iCloud placeholder, a
+    /// file with no frontmatter block at all. A capture must never fail
+    /// because a template didn't read; the note is what matters, and a note
+    /// without the template's keys is still the note.
+    private static func templateFrontmatter(
+        from fileStore: VaultFileStore,
+        body: String,
+        now: Date
+    ) -> Frontmatter? {
+        let path = AppSettings.vaultTemplatePath
+        guard !path.isEmpty else { return nil }
+
+        guard let template = try? fileStore.read(relativePath: path) else {
+            // Most likely evicted by iCloud: ask for it, so the next capture
+            // finds it downloaded.
+            fileStore.requestDownload(relativePath: path)
+            return nil
+        }
+
+        return VaultTemplate.frontmatter(
+            fromFileText: template.originalText,
+            title: VaultNoteSerializer.title(forBody: body),
+            now: now
+        )
     }
 
     /// Saves an edit, preserving unknown frontmatter and writing a conflict

@@ -7,7 +7,9 @@ struct VaultSettingsSection: View {
     @State private var destination = AppSettings.destinationKind
     @State private var notesFolder = AppSettings.vaultNotesFolder
     @State private var attachmentsFolder = AppSettings.vaultAttachmentsFolder
+    @State private var templatePath = AppSettings.vaultTemplatePath
     @State private var isPickingFolder = false
+    @State private var isPickingTemplate = false
     @State private var vaultPath: String?
     @State private var errorMessage: String?
 
@@ -58,6 +60,20 @@ struct VaultSettingsSection: View {
                             AppSettings.vaultAttachmentsFolder = newValue
                         }
 
+                    Button {
+                        isPickingTemplate = true
+                    } label: {
+                        HStack {
+                            Text("Frontmatter template")
+                            Spacer()
+                            Text(templatePath.isEmpty ? "None" : templatePath)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+                        }
+                    }
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.caption)
@@ -85,9 +101,16 @@ struct VaultSettingsSection: View {
                 errorMessage = error.localizedDescription
             }
         }
+        .sheet(isPresented: $isPickingTemplate) {
+            VaultTemplatePicker(selection: $templatePath)
+        }
+        .onChange(of: templatePath) { _, newValue in
+            AppSettings.vaultTemplatePath = newValue
+        }
         .onAppear {
             notesFolder = AppSettings.vaultNotesFolder
             attachmentsFolder = AppSettings.vaultAttachmentsFolder
+            templatePath = AppSettings.vaultTemplatePath
             refreshVaultPath()
         }
     }
@@ -103,5 +126,89 @@ struct VaultSettingsSection: View {
             vaultPath = nil
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+}
+
+/// Picks the Markdown file whose frontmatter seeds new notes.
+///
+/// The list comes from the persisted vault index rather than a file picker:
+/// the index already holds every `.md` path in the vault, so this needs no
+/// second bookmark and no security scope, and a path can't be mistyped.
+private struct VaultTemplatePicker: View {
+    @Binding var selection: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var paths: [String] = []
+    @State private var isLoaded = false
+    @State private var query = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                row(path: "", label: "None")
+                ForEach(filtered, id: \.self) { path in
+                    row(path: path, label: path)
+                }
+            }
+            .searchable(text: $query, prompt: "Filter by path")
+            .navigationTitle("Frontmatter Template")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .overlay {
+                if isLoaded && paths.isEmpty {
+                    ContentUnavailableView(
+                        "No Notes Indexed",
+                        systemImage: "folder",
+                        description: Text("Choose a vault and let it refresh, then pick a template.")
+                    )
+                }
+            }
+        }
+        .task {
+            paths = await Task.detached {
+                VaultIndex.load().map(\.relativePath).sorted(by: Self.templatesFirst)
+            }.value
+            isLoaded = true
+        }
+    }
+
+    @ViewBuilder
+    private func row(path: String, label: String) -> some View {
+        Button {
+            selection = path
+            dismiss()
+        } label: {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                Spacer()
+                if selection == path {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(appAccent)
+                }
+            }
+        }
+    }
+
+    private var filtered: [String] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return paths }
+        return paths.filter { $0.localizedCaseInsensitiveContains(trimmed) }
+    }
+
+    /// A vault's templates almost always live in a folder saying so, and that
+    /// is the only thing anyone opens this list to find.
+    private nonisolated static func templatesFirst(_ lhs: String, _ rhs: String) -> Bool {
+        let left = lhs.localizedCaseInsensitiveContains("template")
+        let right = rhs.localizedCaseInsensitiveContains("template")
+        if left != right { return left }
+        return lhs.localizedStandardCompare(rhs) == .orderedAscending
     }
 }

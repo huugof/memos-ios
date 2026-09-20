@@ -7,6 +7,7 @@ final class VaultStoreTests: XCTestCase {
     private var root: URL!
     private var store: VaultStore!
     private var originalNotesFolderValue: Any?
+    private var originalTemplatePathValue: Any?
     private var originalIndex: [VaultIndexEntry] = []
 
     override func setUpWithError() throws {
@@ -18,11 +19,13 @@ final class VaultStoreTests: XCTestCase {
         // (key absent) is restored to "absent", not to "" — see
         // DestinationSettingsTests for the same pattern.
         originalNotesFolderValue = UserDefaults.standard.object(forKey: "vaultNotesFolder")
+        originalTemplatePathValue = UserDefaults.standard.object(forKey: "vaultTemplatePath")
         // Capture the real on-disk index rather than wiping it permanently —
         // VaultIndex.save([]) below is for test isolation only.
         originalIndex = VaultIndex.load()
 
         AppSettings.vaultNotesFolder = ""
+        AppSettings.vaultTemplatePath = ""
         let fileStore = VaultFileStore(root: root)
         store = VaultStore(storeProvider: { fileStore })
         VaultIndex.save([])
@@ -33,6 +36,11 @@ final class VaultStoreTests: XCTestCase {
             UserDefaults.standard.set(originalNotesFolderValue, forKey: "vaultNotesFolder")
         } else {
             UserDefaults.standard.removeObject(forKey: "vaultNotesFolder")
+        }
+        if let originalTemplatePathValue {
+            UserDefaults.standard.set(originalTemplatePathValue, forKey: "vaultTemplatePath")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "vaultTemplatePath")
         }
         VaultIndex.save(originalIndex)
         try? FileManager.default.removeItem(at: root)
@@ -47,6 +55,36 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertTrue(onDisk.contains("tags: [inbox]\n"))
         XCTAssertTrue(onDisk.hasSuffix("Hello #inbox\n"))
         XCTAssertEqual(store.entries.first?.relativePath, entry.relativePath)
+    }
+
+    func testCreateSeedsFrontmatterFromTheConfiguredTemplate() throws {
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Templates"), withIntermediateDirectories: true)
+        try "---\ntitle:\nsource: phone\ntags: [inbox]\n---\nIgnore this body.\n"
+            .write(to: root.appendingPathComponent("Templates/Capture.md"), atomically: true, encoding: .utf8)
+        AppSettings.vaultTemplatePath = "Templates/Capture.md"
+
+        let entry = try store.create(body: "Hello there\nwith #ideas\n", now: Date())
+        let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
+
+        XCTAssertTrue(onDisk.contains("source: phone\n"))
+        XCTAssertTrue(onDisk.contains("title: Hello there\n"))
+        XCTAssertTrue(onDisk.contains("tags: [inbox, ideas]\n"))
+        XCTAssertTrue(onDisk.hasSuffix("Hello there\nwith #ideas\n"))
+        XCTAssertFalse(onDisk.contains("Ignore this body."))
+    }
+
+    /// A template that has been renamed or deleted on the desktop, or that
+    /// iCloud has evicted, must cost the user a template — never the capture.
+    func testCreateStillWritesWhenTheTemplateIsMissing() throws {
+        AppSettings.vaultTemplatePath = "Templates/Gone.md"
+
+        let entry = try store.create(body: "Hello #inbox\n", now: Date())
+        let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
+
+        XCTAssertTrue(onDisk.contains("tags: [inbox]\n"))
+        XCTAssertTrue(onDisk.hasSuffix("Hello #inbox\n"))
+        XCTAssertNil(store.errorMessage)
     }
 
     func testCreateHonoursNotesSubfolder() throws {
