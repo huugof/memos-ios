@@ -188,6 +188,21 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(placeholder?.needsContent, true)
     }
 
+    /// Minor 5: a genuine permission failure while writing must surface as
+    /// `VaultAccessError.stale` — the "Reconnect Vault" message — not a raw
+    /// Cocoa error. This must NOT be triggered merely by
+    /// `startAccessingSecurityScopedResource()` returning `false`: every
+    /// other test in this file uses a plain temp-directory root, where that
+    /// always returns `false`, and none of them should fail because of it.
+    func testPermissionErrorDuringWriteMapsToVaultAccessErrorStale() throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: root.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.path) }
+
+        XCTAssertThrowsError(try store.create(body: "Hi\n", now: Date())) { error in
+            XCTAssertEqual(error as? VaultAccessError, .stale)
+        }
+    }
+
     func testRefreshSurfacesMissingVaultAsErrorMessage() async {
         let failing = VaultStore(storeProvider: { throw VaultAccessError.notConfigured })
         await failing.refresh()

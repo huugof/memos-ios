@@ -289,13 +289,32 @@ final class VaultStore: ObservableObject {
 
     /// Shared by `withFileStore` (main actor) and `performRefresh` (detached)
     /// so both open/close the same balanced security scope around file work.
+    ///
+    /// Minor 5: `startAccessingSecurityScopedResource()` returning `false` is
+    /// deliberately NOT treated as failure on its own — a plain local temp
+    /// directory (every test's root) isn't security-scoped at all and always
+    /// returns `false` here, so throwing on that alone would make every
+    /// vault operation fail under test. The real signal that the bookmark
+    /// has gone stale is the file operation itself failing with a Cocoa
+    /// permission error, so that's what gets mapped to `VaultAccessError
+    /// .stale` — a message the user can act on ("Reconnect Vault in
+    /// Settings") instead of a raw Cocoa error.
     private nonisolated static func withSecurityScope<T>(
         of store: VaultFileStore,
         _ body: (VaultFileStore) throws -> T
     ) throws -> T {
         let needsScope = store.root.startAccessingSecurityScopedResource()
         defer { if needsScope { store.root.stopAccessingSecurityScopedResource() } }
-        return try body(store)
+        do {
+            return try body(store)
+        } catch let error as CocoaError where error.code == .fileReadNoPermission || error.code == .fileWriteNoPermission {
+            // Any NSError in NSCocoaErrorDomain — which is how Foundation's
+            // file APIs report a permission-denied failure — bridges to
+            // CocoaError automatically, so this single catch covers both a
+            // genuinely-thrown CocoaError and a plain NSError with a
+            // matching domain/code.
+            throw VaultAccessError.stale
+        }
     }
 
     /// The note exactly as `text` was written to `path`.
