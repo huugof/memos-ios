@@ -279,6 +279,15 @@ final class VaultStore: ObservableObject {
         }
     }
 
+    /// Clears everything carried over from a previously connected vault:
+    /// in-memory entries and the persisted index. Called before refreshing
+    /// against a newly picked vault so its rows don't linger mixed in with
+    /// the old vault's (Minor 7).
+    func resetForNewVault() {
+        entries = []
+        VaultIndex.save([])
+    }
+
     // MARK: - Errors
 
     /// Records a failure surfaced to the UI. `needsReconnect` is derived

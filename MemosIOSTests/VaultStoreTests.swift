@@ -290,4 +290,16 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
     }
 
+    // MARK: - Minor 7: resetForNewVault
+
+    func testResetForNewVaultClearsEntriesAndIndex() throws {
+        _ = try store.create(body: "Stays until reset\n", now: Date())
+        XCTAssertFalse(store.entries.isEmpty)
+        XCTAssertFalse(VaultIndex.load().isEmpty)
+
+        store.resetForNewVault()
+
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertTrue(VaultIndex.load().isEmpty)
+    }
 }

@@ -90,7 +90,10 @@ struct ComposeRootView: View {
         }
         .onChange(of: vaultBookmark) { _, _ in
             // A different vault was picked: the index describes the old one.
+            // Clear it before refreshing so the previous vault's rows don't
+            // linger mixed in with the new vault's (Minor 7).
             guard AppSettings.destinationKind == .vault else { return }
+            vaultStore.resetForNewVault()
             Task { await vaultStore.refresh() }
         }
         .onAppear {
