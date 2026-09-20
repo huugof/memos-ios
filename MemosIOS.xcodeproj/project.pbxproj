@@ -11,6 +11,7 @@
 		0716B1894F5CCCC66A1696DC /* NoteDateGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78045225F7A285619686489E /* NoteDateGrouping.swift */; };
 		0F13466FEADD1C9D1B66C258 /* PendingAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A550D943535D939AE662EA /* PendingAttachments.swift */; };
 		13B9576F40E43694AB097519 /* VaultAttachmentWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2AF535B334277CFA59B314 /* VaultAttachmentWriter.swift */; };
+		1C4B773FD09FFF62D15FB03B /* AttachmentMarkdownBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BBEC72ACD7749FDA83FCB80 /* AttachmentMarkdownBuilderTests.swift */; };
 		1D83F20E864DA8FE1BD4D800 /* ServerMemoDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16260DC10C4930EFDC07B643 /* ServerMemoDeleteService.swift */; };
 		22044053F3050BE24E6EF0BA /* DraftResumeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F38B4C8C57F80E1A619404E /* DraftResumeCoordinator.swift */; };
 		25091CFF82AC31CE9C54D89C /* ServerMemoDeleteTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51DFF135F91000CC84D5E9F /* ServerMemoDeleteTask.swift */; };
@@ -74,6 +75,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0BBEC72ACD7749FDA83FCB80 /* AttachmentMarkdownBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentMarkdownBuilderTests.swift; sourceTree = "<group>"; };
 		0E6313222B0FB09E77351324 /* VaultFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFileStore.swift; sourceTree = "<group>"; };
 		103F9223B5D42C4332965FED /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
 		16260DC10C4930EFDC07B643 /* ServerMemoDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteService.swift; sourceTree = "<group>"; };
@@ -136,6 +138,7 @@
 		15756E40DDDDB75361A37819 /* MemosIOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				0BBEC72ACD7749FDA83FCB80 /* AttachmentMarkdownBuilderTests.swift */,
 				AD97E5AEE07507A8DDBE9DE8 /* DestinationSettingsTests.swift */,
 				DB4FB9C4B8D66B0728DA6C7C /* DraftBehaviorTests.swift */,
 				C1D46C9156C91B0BF3A36348 /* FrontmatterTests.swift */,
@@ -412,6 +415,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1C4B773FD09FFF62D15FB03B /* AttachmentMarkdownBuilderTests.swift in Sources */,
 				BC018628E784704F91CE39A2 /* DestinationSettingsTests.swift in Sources */,
 				8DC1E04EB40C41ABB59781E0 /* DraftBehaviorTests.swift in Sources */,
 				359D4116493B62A5CF468D96 /* FrontmatterTests.swift in Sources */,

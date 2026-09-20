@@ -766,18 +766,11 @@ struct NoteEditorView: View {
     }
 
     private func attachmentMarkdown(existingText: String) -> [String] {
-        var parts: [String] = []
-        for p in pendingImages where p.uploadedURL != nil {
-            if AppSettings.destinationKind == .vault {
-                parts.append(VaultAttachmentWriter.wikilink(for: (p.uploadedURL! as NSString).lastPathComponent))
-            } else {
-                parts.append("![](\(p.uploadedURL!))")
-            }
-        }
-        for f in pendingFiles where f.uploadedURL != nil {
-            parts.append("[\(f.filename)](\(f.uploadedURL!))")
-        }
-        return parts
+        AttachmentMarkdownBuilder.build(
+            images: pendingImages,
+            files: pendingFiles,
+            currentDestination: AppSettings.destinationKind
+        )
     }
 
     private func handleImageSelected(_ image: UIImage) {
@@ -802,6 +795,7 @@ struct NoteEditorView: View {
                 }
                 if let idx = pendingImages.firstIndex(where: { $0.id == pendingID }) {
                     pendingImages[idx].uploadedURL = written
+                    pendingImages[idx].vaultPath = written
                     pendingImages[idx].isUploading = false
                 }
             } catch {
