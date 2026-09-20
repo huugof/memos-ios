@@ -26,12 +26,7 @@ targets:
       - path: MemosIOS/Models
       - path: MemosIOS/Services
       - path: MemosIOS/Storage
-      - path: MemosIOS/Views/Components
-        includes:
-          - NoteListEditing.swift
       - path: MemosIOS/Views
-        includes:
-          - SettingsView.swift
     settings:
       base:
         PRODUCT_NAME: MemoChat
