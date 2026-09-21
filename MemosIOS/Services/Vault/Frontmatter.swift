@@ -136,10 +136,16 @@ struct Frontmatter: Equatable {
 
     // MARK: - Mutation
 
-    /// Replaces the raw text of an existing entry, or appends a new one.
+    /// Replaces the value of an existing entry, or appends a new one.
     /// Neighbouring blocks are never touched.
     mutating func set(_ key: String, rawValue: String) {
-        let replacement = Block.entry(key: key, rawText: "\(key): \(rawValue)\n")
+        setRawText(key, rawText: "\(key): \(rawValue)\n")
+    }
+
+    /// The same, given the entry's complete raw text. A block sequence spans
+    /// lines and so has no `key: value` form to pass to `set`.
+    mutating func setRawText(_ key: String, rawText: String) {
+        let replacement = Block.entry(key: key, rawText: rawText)
         if let index = blocks.firstIndex(where: { if case .entry(let k, _) = $0 { return k == key }; return false }) {
             blocks[index] = replacement
         } else {

@@ -52,7 +52,7 @@ final class VaultStoreTests: XCTestCase {
 
         let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
         XCTAssertTrue(onDisk.hasPrefix("---\n"))
-        XCTAssertTrue(onDisk.contains("tags: [inbox]\n"))
+        XCTAssertTrue(onDisk.contains("tags:\n  - inbox\n"))
         XCTAssertTrue(onDisk.hasSuffix("Hello #inbox\n"))
         XCTAssertEqual(store.entries.first?.relativePath, entry.relativePath)
     }
@@ -69,7 +69,7 @@ final class VaultStoreTests: XCTestCase {
 
         XCTAssertTrue(onDisk.contains("source: phone\n"))
         XCTAssertTrue(onDisk.contains("title: Hello there\n"))
-        XCTAssertTrue(onDisk.contains("tags: [inbox, ideas]\n"))
+        XCTAssertTrue(onDisk.contains("tags:\n  - inbox\n  - ideas\n"))
         XCTAssertTrue(onDisk.hasSuffix("Hello there\nwith #ideas\n"))
         XCTAssertFalse(onDisk.contains("Ignore this body."))
     }
@@ -82,7 +82,7 @@ final class VaultStoreTests: XCTestCase {
         let entry = try store.create(body: "Hello #inbox\n", now: Date())
         let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
 
-        XCTAssertTrue(onDisk.contains("tags: [inbox]\n"))
+        XCTAssertTrue(onDisk.contains("tags:\n  - inbox\n"))
         XCTAssertTrue(onDisk.hasSuffix("Hello #inbox\n"))
         XCTAssertNil(store.errorMessage)
     }

@@ -327,7 +327,7 @@ enum VaultNoteSerializer {
 
         guard let rawEntry = frontmatter.rawText(for: "tags") else {
             if !newTags.isEmpty {
-                frontmatter.set("tags", rawValue: inlineTags(newTags))
+                frontmatter.setRawText("tags", rawText: tagsEntry(newTags))
             }
             return
         }
@@ -343,7 +343,7 @@ enum VaultNoteSerializer {
             if newTags.isEmpty {
                 frontmatter.remove("tags")
             } else if existing != newTags {
-                frontmatter.set("tags", rawValue: inlineTags(newTags))
+                frontmatter.setRawText("tags", rawText: tagsEntry(newTags))
             }
             return
         }
@@ -356,21 +356,24 @@ enum VaultNoteSerializer {
         }
         let added = newTags.filter { !existingKeys.contains($0) }
         if kept.count != existing.count || !added.isEmpty {
-            frontmatter.set("tags", rawValue: inlineTags(kept + added))
+            frontmatter.setRawText("tags", rawText: tagsEntry(kept + added))
         }
     }
 
-    /// `[a, b]` flow sequence. Items that would break a flow sequence are
-    /// single-quoted.
-    private static func inlineTags(_ tags: [String]) -> String {
-        let items = tags.map { tag -> String in
-            let flowUnsafe = tag.contains(where: { ",[]{}".contains($0) })
-            if flowUnsafe && tag.yamlScalar() == tag {
-                return "'\(tag.replacingOccurrences(of: "'", with: "''"))'"
-            }
-            return tag.yamlScalar()
-        }
-        return "[\(items.joined(separator: ", "))]"
+    /// A `tags` entry as a block sequence:
+    ///
+    ///     tags:
+    ///       - one
+    ///       - two
+    ///
+    /// The shape Obsidian itself writes. A flow sequence (`[a, b]`) is equally
+    /// valid YAML, but a vault should read as one hand wrote it.
+    ///
+    /// Only the items need quoting, and only where a plain scalar would
+    /// misparse: unlike a flow sequence, a block item can hold a comma or a
+    /// bracket unharmed, so `yamlScalar()`'s rules are the whole story.
+    private static func tagsEntry(_ tags: [String]) -> String {
+        "tags:\n" + tags.map { "  - \($0.yamlScalar())\n" }.joined()
     }
 }
 

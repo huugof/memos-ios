@@ -79,7 +79,7 @@ final class VaultTemplateTests: XCTestCase {
         let text = VaultNoteSerializer.render(
             body: "My note with #ideas\n", existing: seeded, loadedBody: nil, created: now, updated: now)
 
-        XCTAssertTrue(text.contains("tags: [inbox, ideas]\n"))
+        XCTAssertTrue(text.contains("tags:\n  - inbox\n  - ideas\n"))
     }
 
     // MARK: - Placeholders

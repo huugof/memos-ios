@@ -68,7 +68,7 @@ final class VaultNoteSerializerTests: XCTestCase {
         XCTAssertTrue(text.hasPrefix("---\n"))
         XCTAssertTrue(text.contains("date: 2026-09-16T21:30:03Z\n"))
         XCTAssertTrue(text.contains("modified: 2026-09-16T21:34:11Z\n"))
-        XCTAssertTrue(text.contains("tags: [inbox, ideas]\n"))
+        XCTAssertTrue(text.contains("tags:\n  - inbox\n  - ideas\n"))
         XCTAssertTrue(text.hasSuffix("My note\nwith #inbox and #ideas\n"))
     }
 
@@ -147,7 +147,26 @@ final class VaultNoteSerializerTests: XCTestCase {
     func testRemovingInlineTagRemovesItFromFrontmatter() {
         let (existing, loadedBody) = Frontmatter.parse("---\ntags: [inbox, ideas]\n---\nold #inbox #ideas\n")
         let text = VaultNoteSerializer.render(body: "now only #inbox\n", existing: existing, loadedBody: loadedBody, created: created, updated: updated)
-        XCTAssertTrue(text.contains("tags: [inbox]\n"))
+        XCTAssertTrue(text.contains("tags:\n  - inbox\n"))
+    }
+
+    /// The shape Obsidian writes, and so the shape the rest of the vault is
+    /// already in. Flow style would be valid YAML and still look foreign.
+    func testTagsAreWrittenAsABlockSequence() {
+        let text = VaultNoteSerializer.render(
+            body: "Hello #one #two #three-tags\n", existing: nil, loadedBody: nil,
+            created: created, updated: updated, style: utc)
+        XCTAssertTrue(text.contains("tags:\n  - one\n  - two\n  - three-tags\n"), text)
+    }
+
+    /// A block item still needs quoting where a plain scalar would misparse —
+    /// bare `yes` reads back as a boolean.
+    func testBlockSequenceItemsAreQuotedWhereYAMLNeedsIt() {
+        let (existing, _) = Frontmatter.parse("---\ntags: [yes]\n---\n")
+        let text = VaultNoteSerializer.render(
+            body: "Hello #ideas\n", existing: existing, loadedBody: nil,
+            created: created, updated: updated, style: utc)
+        XCTAssertTrue(text.contains("tags:\n  - 'yes'\n  - ideas\n"), text)
     }
 
     // MARK: - C1: user-owned title and tags survive a save
@@ -171,13 +190,13 @@ final class VaultNoteSerializerTests: XCTestCase {
     func testAddingInlineTagAppendsToFrontmatterTags() {
         let file = "---\ntags: [project, work]\n---\nNotes\n"
         let text = renderEdit(file: file, newBody: "Notes #new\n")
-        XCTAssertTrue(text.contains("tags: [project, work, new]\n"), text)
+        XCTAssertTrue(text.contains("tags:\n  - project\n  - work\n  - new\n"), text)
     }
 
     func testRemovingInlineTagAlsoInFrontmatterRemovesIt() {
         let file = "---\ntags: [project, work]\n---\nNotes #work\n"
         let text = renderEdit(file: file, newBody: "Notes\n")
-        XCTAssertTrue(text.contains("tags: [project]\n"), text)
+        XCTAssertTrue(text.contains("tags:\n  - project\n"), text)
     }
 
     /// A bare scalar (quoted, with `#`) parses as one tag; an unmirrored body
@@ -185,7 +204,7 @@ final class VaultNoteSerializerTests: XCTestCase {
     func testScalarUserTagsMergeWithBodyTags() {
         let file = "---\ntags: \"#Project\"\n---\nNotes #work\n"
         let text = renderEdit(file: file, newBody: "Notes #work edited\n")
-        XCTAssertTrue(text.contains("tags: [Project, work]\n"), text)
+        XCTAssertTrue(text.contains("tags:\n  - Project\n  - work\n"), text)
     }
 
     func testCommaSeparatedUserTagsParse() {
@@ -205,7 +224,7 @@ final class VaultNoteSerializerTests: XCTestCase {
     /// applies exactly as before — including removing the key when empty.
     func testAppAuthoredTagsFollowDriftRule() {
         let file = "---\ntags: [inbox, ideas]\n---\nHello #inbox #ideas\n"
-        XCTAssertTrue(renderEdit(file: file, newBody: "Hello #ideas #later\n").contains("tags: [ideas, later]\n"))
+        XCTAssertTrue(renderEdit(file: file, newBody: "Hello #ideas #later\n").contains("tags:\n  - ideas\n  - later\n"))
         XCTAssertFalse(renderEdit(file: file, newBody: "Hello\n").contains("tags:"))
     }
 
