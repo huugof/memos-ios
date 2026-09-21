@@ -50,6 +50,54 @@ enum VaultTemplate {
         let timeZone: TimeZone
     }
 
+    // MARK: - Timestamp patterns
+
+    /// The raw, *unexpanded* values of entries carrying a `{{date}}` or
+    /// `{{time}}` placeholder, keyed by frontmatter key.
+    ///
+    /// Unexpanded is the point: the app re-expands them at write time, which
+    /// is what lets a managed key keep the shape its template asked for on
+    /// every later save — not only on the capture that created the note.
+    /// A stamp has to be re-written each save, so its format has to outlive
+    /// the moment the template was read.
+    static func timestampPatterns(fromFileText fileText: String) -> [String: String] {
+        guard let parsed = Frontmatter.parse(fileText).frontmatter else { return [:] }
+        var patterns: [String: String] = [:]
+        for case .entry(let key, let rawText) in parsed.blocks {
+            guard let value = singleLineValue(of: rawText),
+                  containsDateOrTimePlaceholder(value)
+            else { continue }
+            patterns[key] = value
+        }
+        return patterns
+    }
+
+    /// Expands a pattern from `timestampPatterns` for one moment.
+    static func expandedValue(_ pattern: String, now: Date, timeZone: TimeZone = .current) -> String {
+        let context = Context(title: nil, now: now, timeZone: timeZone)
+        return substitute(pattern, context: context, escape: { $0 }).text
+    }
+
+    /// The value of a single-line `key: value` entry, or nil for a block
+    /// sequence or folded scalar — neither of which is a timestamp.
+    private static func singleLineValue(of rawText: String) -> String? {
+        let lines = rawText.components(separatedBy: "\n")
+        guard lines.dropFirst().allSatisfy(\.isEmpty),
+              let first = lines.first,
+              let colon = first.firstIndex(of: ":")
+        else { return nil }
+        return String(first[first.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func containsDateOrTimePlaceholder(_ value: String) -> Bool {
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        return placeholder.matches(in: value, range: range).contains { match in
+            guard let nameRange = Range(match.range(at: 1), in: value) else { return false }
+            let name = value[nameRange].lowercased()
+            return name == "date" || name == "time"
+        }
+    }
+
     // MARK: - Entry expansion
 
     /// Expands one `key: value` entry, keeping the value valid YAML.

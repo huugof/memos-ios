@@ -124,7 +124,13 @@ final class VaultStoreTests: XCTestCase {
 
         let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
         XCTAssertTrue(onDisk.contains("Revised\n"))
-        XCTAssertTrue(onDisk.contains("modified: 1970-01-24T"))
+        // Written in the device's zone, so the expectation is computed the
+        // same way rather than pinned to a UTC string.
+        let stamp = ISO8601DateFormatter()
+        stamp.formatOptions = [.withInternetDateTime]
+        stamp.timeZone = .current
+        let expected = stamp.string(from: Date(timeIntervalSince1970: 2_000_000))
+        XCTAssertTrue(onDisk.contains("modified: \(expected)\n"), onDisk)
     }
 
     func testUpdateAfterExternalChangeMakesConflictCopy() throws {

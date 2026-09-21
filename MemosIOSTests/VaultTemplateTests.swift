@@ -6,6 +6,8 @@ final class VaultTemplateTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_789_594_203)  // 2026-09-16T21:30:03Z
     private let utc = TimeZone(identifier: "UTC")!
 
+    private let utcStyle = VaultNoteSerializer.TimestampStyle(timeZone: TimeZone(identifier: "UTC")!)
+
     private func frontmatter(_ fileText: String, title: String? = "Note title") -> Frontmatter? {
         VaultTemplate.frontmatter(fromFileText: fileText, title: title, now: now, timeZone: utc)
     }
@@ -49,7 +51,8 @@ final class VaultTemplateTests: XCTestCase {
         """
         let seeded = try XCTUnwrap(frontmatter(template))
         let text = VaultNoteSerializer.render(
-            body: "My note\n", existing: seeded, loadedBody: nil, created: now, updated: now)
+            body: "My note\n", existing: seeded, loadedBody: nil,
+            created: now, updated: now, style: utcStyle)
 
         XCTAssertTrue(text.contains("title: My note\n"))
         XCTAssertTrue(text.contains("created: 2026-09-16T21:30:03Z\n"))
@@ -62,7 +65,8 @@ final class VaultTemplateTests: XCTestCase {
     func testOverwritesATemplatesLiteralCreatedValue() throws {
         let seeded = try XCTUnwrap(frontmatter("---\ncreated: 2001-01-01\n---\n"))
         let text = VaultNoteSerializer.render(
-            body: "My note\n", existing: seeded, loadedBody: nil, created: now, updated: now)
+            body: "My note\n", existing: seeded, loadedBody: nil,
+            created: now, updated: now, style: utcStyle)
 
         XCTAssertTrue(text.contains("created: 2026-09-16T21:30:03Z\n"))
         XCTAssertFalse(text.contains("2001-01-01"))
@@ -147,6 +151,51 @@ final class VaultTemplateTests: XCTestCase {
         XCTAssertEqual(seeded.value(for: "alias"), "{{title}}")
     }
 
+    // MARK: - Timestamp shapes
+
+    /// The whole point of the feature for a managed key: the template's format
+    /// must survive, instead of the app stamping ISO 8601 over the top of it.
+    func testTemplateFormatWinsForAManagedTimestampKey() throws {
+        let file = "---\ndate: {{date:YYYY-MM-DD HH:mm}}\n---\n"
+        let seeded = try XCTUnwrap(frontmatter(file))
+        let text = VaultNoteSerializer.render(
+            body: "My note\n", existing: seeded, loadedBody: nil, created: now, updated: now,
+            style: .init(patterns: VaultTemplate.timestampPatterns(fromFileText: file), timeZone: utc))
+
+        XCTAssertTrue(text.contains("date: 2026-09-16 21:30\n"), text)
+    }
+
+    /// A stamp is rewritten on every save, so the shape has to outlive the
+    /// capture: an edit re-expands the pattern rather than reverting to ISO.
+    func testLaterSaveKeepsTheTemplateShape() {
+        let file = "---\nmodified: {{date:YYYY-MM-DD HH:mm}}\n---\n"
+        let (existing, loadedBody) = Frontmatter.parse("---\nmodified: 2026-01-01 08:00\n---\nold\n")
+        let text = VaultNoteSerializer.render(
+            body: "edited\n", existing: existing, loadedBody: loadedBody, created: now, updated: now,
+            style: .init(patterns: VaultTemplate.timestampPatterns(fromFileText: file), timeZone: utc))
+
+        XCTAssertTrue(text.contains("modified: 2026-09-16 21:30\n"), text)
+    }
+
+    /// Only date and time placeholders are timestamp shapes. A literal value
+    /// or a `{{title}}` is an ordinary key the app must not stamp over.
+    func testTimestampPatternsCoverOnlyDateAndTimeValues() {
+        let patterns = VaultTemplate.timestampPatterns(
+            fromFileText: "---\ndate: {{date}}\nat: {{time:HH:mm}}\nsource: phone\nalias: {{title}}\n---\n")
+        XCTAssertEqual(patterns, ["date": "{{date}}", "at": "{{time:HH:mm}}"])
+    }
+
+    /// With no pattern the stamp is still the device's wall clock, carrying
+    /// its offset rather than `Z`.
+    func testDefaultStampCarriesTheDeviceOffset() {
+        let text = VaultNoteSerializer.render(
+            body: "My note\n", existing: nil, loadedBody: nil, created: now, updated: now,
+            style: .init(timeZone: TimeZone(secondsFromGMT: -4 * 3600)!))
+
+        XCTAssertTrue(text.contains("date: 2026-09-16T17:30:03-04:00\n"), text)
+        XCTAssertFalse(text.contains("Z\n"), text)
+    }
+
     // MARK: - No usable template
 
     func testFileWithoutAFrontmatterBlockYieldsNil() {
@@ -159,7 +208,8 @@ final class VaultTemplateTests: XCTestCase {
     func testEmptyBlockYieldsAnEmptyFrontmatter() throws {
         let seeded = try XCTUnwrap(frontmatter("---\n---\n"))
         let text = VaultNoteSerializer.render(
-            body: "My note\n", existing: seeded, loadedBody: nil, created: now, updated: now)
+            body: "My note\n", existing: seeded, loadedBody: nil,
+            created: now, updated: now, style: utcStyle)
         XCTAssertTrue(text.contains("date: 2026-09-16T21:30:03Z\n"), text)
         XCTAssertTrue(text.contains("modified: 2026-09-16T21:30:03Z\n"), text)
         XCTAssertFalse(text.contains("title:"), text)

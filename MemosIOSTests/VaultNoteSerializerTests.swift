@@ -3,6 +3,10 @@ import XCTest
 
 final class VaultNoteSerializerTests: XCTestCase {
 
+    /// Stamps are written in the device's zone, so the tests pin UTC rather
+    /// than expecting strings that move with the machine.
+    private let utc = VaultNoteSerializer.TimestampStyle(timeZone: TimeZone(identifier: "UTC")!)
+
     private let created = Date(timeIntervalSince1970: 1_789_594_203)  // 2026-09-16T21:30:03Z
     private let updated = Date(timeIntervalSince1970: 1_789_594_451)  // 2026-09-16T21:34:11Z
 
@@ -48,7 +52,8 @@ final class VaultNoteSerializerTests: XCTestCase {
     private func renderNew(body: String, templateKeys: String = "title:\n") -> String {
         let (existing, _) = Frontmatter.parse("---\n\(templateKeys)---\n")
         return VaultNoteSerializer.render(
-            body: body, existing: existing, loadedBody: nil, created: created, updated: updated)
+            body: body, existing: existing, loadedBody: nil,
+            created: created, updated: updated, style: utc)
     }
 
     func testRenderWritesManagedKeys() {
@@ -57,7 +62,8 @@ final class VaultNoteSerializerTests: XCTestCase {
             existing: nil,
             loadedBody: nil,
             created: created,
-            updated: updated
+            updated: updated,
+            style: utc
         )
         XCTAssertTrue(text.hasPrefix("---\n"))
         XCTAssertTrue(text.contains("date: 2026-09-16T21:30:03Z\n"))
@@ -95,7 +101,8 @@ final class VaultNoteSerializerTests: XCTestCase {
         let (existing, loadedBody) = Frontmatter.parse(
             "---\ncreated: 2020-01-01T00:00:00Z\nupdated: 2020-01-01T00:00:00Z\n---\nbody\n")
         let text = VaultNoteSerializer.render(
-            body: "body\n", existing: existing, loadedBody: loadedBody, created: created, updated: updated)
+            body: "body\n", existing: existing, loadedBody: loadedBody,
+            created: created, updated: updated, style: utc)
         XCTAssertTrue(text.contains("created: 2020-01-01T00:00:00Z\n"), text)
         XCTAssertTrue(text.contains("updated: 2026-09-16T21:34:11Z\n"), text)
         XCTAssertFalse(text.contains("date:"), text)

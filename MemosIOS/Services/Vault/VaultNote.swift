@@ -67,7 +67,36 @@ enum VaultNoteSerializer {
         return aliases.first(where: frontmatter.contains) ?? preferred
     }
 
+    /// How the managed timestamps are written.
+    struct TimestampStyle {
+        /// Per-key patterns the template declared, e.g.
+        /// `["date": "{{date:YYYY-MM-DD HH:mm}}"]`. Held unexpanded and
+        /// re-expanded on every write, so a save keeps the template's shape
+        /// instead of reverting to the default stamp.
+        var patterns: [String: String] = [:]
+
+        /// The zone the default stamp is written in: the device's, so the
+        /// time in a note is the time on the clock it was written at.
+        var timeZone: TimeZone = .current
+    }
+
+    /// One managed timestamp — the template's shape where it declared one,
+    /// otherwise ISO 8601 carrying the device's offset rather than `Z`.
+    private static func stamp(_ date: Date, key: String, style: TimestampStyle) -> String {
+        if let pattern = style.patterns[key] {
+            return VaultTemplate.expandedValue(pattern, now: date, timeZone: style.timeZone)
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = style.timeZone
+        return formatter.string(from: date)
+    }
+
     /// The note's creation stamp, read from whichever key holds it.
+    ///
+    /// Nil when the stamp is in a template's own format rather than ISO 8601.
+    /// That costs nothing: the only caller feeds `render`, which never
+    /// rewrites a creation stamp that is already there.
     static func createdDate(in frontmatter: Frontmatter) -> Date? {
         for key in [createdKey] + createdKeyAliases {
             if let value = frontmatter.value(for: key)?.trimmingQuotes(),
@@ -223,7 +252,8 @@ enum VaultNoteSerializer {
     ///
     /// Only the timestamps are inserted into a note that lacks them. `title`
     /// is filled where the key exists and otherwise left out — the template
-    /// decides which keys a note carries.
+    /// decides which keys a note carries, and `style` lets it decide how the
+    /// timestamps are formatted.
     ///
     /// On a brand-new note `existing` may be a template's frontmatter (see
     /// `VaultTemplate`). Its keys are copied verbatim, but `title` and the
@@ -236,7 +266,8 @@ enum VaultNoteSerializer {
         existing: Frontmatter?,
         loadedBody: String?,
         created: Date,
-        updated: Date
+        updated: Date,
+        style: TimestampStyle = TimestampStyle()
     ) -> String {
         var frontmatter = existing ?? Frontmatter(blocks: [])
         var body = body
@@ -253,12 +284,10 @@ enum VaultNoteSerializer {
         // and a template's date is a placeholder, not a birth.
         let bornKey = timestampKey(in: frontmatter, preferred: createdKey, aliases: createdKeyAliases)
         if loadedBody == nil || frontmatter.value(for: bornKey) == nil {
-            frontmatter.set(bornKey, rawValue: iso8601.string(from: created))
+            frontmatter.set(bornKey, rawValue: stamp(created, key: bornKey, style: style))
         }
-        frontmatter.set(
-            timestampKey(in: frontmatter, preferred: updatedKey, aliases: updatedKeyAliases),
-            rawValue: iso8601.string(from: updated)
-        )
+        let touchedKey = timestampKey(in: frontmatter, preferred: updatedKey, aliases: updatedKeyAliases)
+        frontmatter.set(touchedKey, rawValue: stamp(updated, key: touchedKey, style: style))
 
         applyTags(to: &frontmatter, body: body, loadedBody: loadedBody)
 

@@ -238,9 +238,10 @@ final class VaultStore: ObservableObject {
             let filename = VaultNoteSerializer.filename(for: now, existing: existing)
             let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
 
-            let template = Self.templateFrontmatter(from: fileStore, body: body, now: now)
+            let seed = Self.templateSeed(from: fileStore, body: body, now: now)
             let text = VaultNoteSerializer.render(
-                body: body, existing: template, loadedBody: nil, created: now, updated: now)
+                body: body, existing: seed.frontmatter, loadedBody: nil,
+                created: now, updated: now, style: seed.style)
             let metadata = try fileStore.write(text, to: relativePath)
 
             let entry = VaultIndexEntry.make(from: Self.note(from: text, path: metadata.relativePath, metadata: metadata))
@@ -256,17 +257,17 @@ final class VaultStore: ObservableObject {
         }
     }
 
-    /// The configured template's frontmatter, or nil when there is no usable
-    /// one. Every failure is silent and non-fatal — no template set, the file
-    /// renamed or deleted on the desktop, an evicted iCloud placeholder, a
-    /// file with no frontmatter block at all. A capture must never fail
-    /// because a template didn't read; the note is what matters, and a note
-    /// without the template's keys is still the note.
-    private static func templateFrontmatter(
-        from fileStore: VaultFileStore,
-        body: String,
-        now: Date
-    ) -> Frontmatter? {
+    private struct TemplateSeed {
+        var frontmatter: Frontmatter?
+        var style = VaultNoteSerializer.TimestampStyle()
+    }
+
+    /// The configured template's text, or nil when there is no usable one.
+    /// Every failure is silent and non-fatal — no template set, the file
+    /// renamed or deleted on the desktop, an evicted iCloud placeholder. A
+    /// capture must never fail because a template didn't read; the note is
+    /// what matters, and a note without the template's keys is still the note.
+    private static func templateText(from fileStore: VaultFileStore) -> String? {
         let path = AppSettings.vaultTemplatePath
         guard !path.isEmpty else { return nil }
 
@@ -276,12 +277,33 @@ final class VaultStore: ObservableObject {
             fileStore.requestDownload(relativePath: path)
             return nil
         }
+        return template.originalText
+    }
 
-        return VaultTemplate.frontmatter(
-            fromFileText: template.originalText,
-            title: VaultNoteSerializer.title(forBody: body),
-            now: now
+    /// The frontmatter a new note starts from, plus the timestamp shapes the
+    /// template asked for.
+    private static func templateSeed(
+        from fileStore: VaultFileStore,
+        body: String,
+        now: Date
+    ) -> TemplateSeed {
+        guard let text = templateText(from: fileStore) else { return TemplateSeed() }
+        return TemplateSeed(
+            frontmatter: VaultTemplate.frontmatter(
+                fromFileText: text,
+                title: VaultNoteSerializer.title(forBody: body),
+                now: now
+            ),
+            style: .init(patterns: VaultTemplate.timestampPatterns(fromFileText: text))
         )
+    }
+
+    /// The timestamp shapes alone — what a save needs to re-stamp the note the
+    /// way its template asked. Read fresh each time so editing the template
+    /// takes effect; with no usable template the save writes the default stamp.
+    private static func templateStyle(from fileStore: VaultFileStore) -> VaultNoteSerializer.TimestampStyle {
+        guard let text = templateText(from: fileStore) else { return .init() }
+        return .init(patterns: VaultTemplate.timestampPatterns(fromFileText: text))
     }
 
     /// Saves an edit, preserving unknown frontmatter and writing a conflict
@@ -300,7 +322,8 @@ final class VaultStore: ObservableObject {
                 existing: note.frontmatter,
                 loadedBody: note.body,
                 created: note.frontmatter.flatMap(VaultNoteSerializer.createdDate(in:)) ?? now,
-                updated: now
+                updated: now,
+                style: Self.templateStyle(from: fileStore)
             )
 
             // Conflict detection compares the file's actual current content against the
