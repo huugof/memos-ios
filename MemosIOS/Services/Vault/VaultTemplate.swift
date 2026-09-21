@@ -6,8 +6,8 @@ import Foundation
 /// `VaultNoteSerializer.render` as the note's `existing` frontmatter, so every
 /// key, its order, its quoting style and any comments survive verbatim —
 /// exactly the guarantee that already protects a desktop-edited note. Only the
-/// four managed keys (`title`, `created`, `updated`, `tags`) are then written
-/// over the top.
+/// managed keys (`date`, `modified`, `tags`, and `title` where the template
+/// has one) are then written over the top.
 ///
 /// The template's *body* is ignored: in a compose-first app the note's text is
 /// what the user typed.

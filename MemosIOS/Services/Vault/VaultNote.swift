@@ -41,6 +41,43 @@ enum VaultNoteSerializer {
         return formatter
     }()
 
+    // MARK: - Managed keys
+
+    /// The key stamped once, when the note is captured.
+    static let createdKey = "date"
+
+    /// The key stamped on every save.
+    static let updatedKey = "modified"
+
+    /// Names earlier versions wrote. A note already carrying one keeps it
+    /// rather than gaining a second timestamp under the current name: two
+    /// stamps for the same moment is worse than an old spelling.
+    private static let createdKeyAliases = ["created"]
+    private static let updatedKeyAliases = ["updated"]
+
+    /// The key this note uses for a managed timestamp: whichever name it
+    /// already carries — from a template or from an earlier version — falling
+    /// back to the current one.
+    private static func timestampKey(
+        in frontmatter: Frontmatter,
+        preferred: String,
+        aliases: [String]
+    ) -> String {
+        if frontmatter.contains(preferred) { return preferred }
+        return aliases.first(where: frontmatter.contains) ?? preferred
+    }
+
+    /// The note's creation stamp, read from whichever key holds it.
+    static func createdDate(in frontmatter: Frontmatter) -> Date? {
+        for key in [createdKey] + createdKeyAliases {
+            if let value = frontmatter.value(for: key)?.trimmingQuotes(),
+               let date = iso8601.date(from: value) {
+                return date
+            }
+        }
+        return nil
+    }
+
     /// `YYYY-MM-DD HHmm.md`, with ` 2`, ` 3`, … appended on collision.
     /// Timestamp names never collide with an edited first line, so a note's
     /// filename is stable for its whole life and inbound [[wikilinks]] survive.
@@ -184,9 +221,13 @@ enum VaultNoteSerializer {
     /// the user set elsewhere (e.g. Obsidian Properties) are preserved, and
     /// body tag changes since load are merged into a user-maintained list.
     ///
+    /// Only the timestamps are inserted into a note that lacks them. `title`
+    /// is filled where the key exists and otherwise left out — the template
+    /// decides which keys a note carries.
+    ///
     /// On a brand-new note `existing` may be a template's frontmatter (see
-    /// `VaultTemplate`). Its keys are copied verbatim, but `title` and
-    /// `created` are written by the app rather than defended, since a
+    /// `VaultTemplate`). Its keys are copied verbatim, but `title` and the
+    /// creation stamp are written by the app rather than defended, since a
     /// template's copies of them are placeholders. `tags` needs no special
     /// case: a template's list is already treated as user-maintained, so a
     /// fixed `tags: [inbox]` survives and the body's tags merge in.
@@ -207,23 +248,33 @@ enum VaultNoteSerializer {
 
         applyTitle(to: &frontmatter, body: body, loadedBody: loadedBody)
 
-        // created is stamped once; a note only gets born one time. A new note
-        // (no loadedBody) stamps regardless: any value there came from a
-        // template, and a template's `created:` is a placeholder, not a birth.
-        if loadedBody == nil || frontmatter.value(for: "created") == nil {
-            frontmatter.set("created", rawValue: iso8601.string(from: created))
+        // Stamped once; a note only gets born one time. A new note (no
+        // loadedBody) stamps regardless: any value there came from a template,
+        // and a template's date is a placeholder, not a birth.
+        let bornKey = timestampKey(in: frontmatter, preferred: createdKey, aliases: createdKeyAliases)
+        if loadedBody == nil || frontmatter.value(for: bornKey) == nil {
+            frontmatter.set(bornKey, rawValue: iso8601.string(from: created))
         }
-        frontmatter.set("updated", rawValue: iso8601.string(from: updated))
+        frontmatter.set(
+            timestampKey(in: frontmatter, preferred: updatedKey, aliases: updatedKeyAliases),
+            rawValue: iso8601.string(from: updated)
+        )
 
         applyTags(to: &frontmatter, body: body, loadedBody: loadedBody)
 
         return frontmatter.render() + body
     }
 
+    /// Fills `title` only when the note already has the key — put there by a
+    /// template, or by a version that still inserted it. It is never added:
+    /// which keys a note carries is the template's call, and a title is
+    /// already the note's first line.
     private static func applyTitle(to frontmatter: inout Frontmatter, body: String, loadedBody: String?) {
-        if frontmatter.contains("title"), loadedBody != nil {
-            // Present: app-owned only if it still equals the title derived
-            // from the body as loaded. Anything else is the user's.
+        guard frontmatter.contains("title") else { return }
+        if loadedBody != nil {
+            // On a note read from disk: app-owned only if it still equals the
+            // title derived from the body as loaded. Anything else is the
+            // user's.
             //
             // A new note has no loaded body to compare against, so the check is
             // skipped entirely: its frontmatter came from a template, whose

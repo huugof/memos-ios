@@ -154,10 +154,14 @@ final class VaultTemplateTests: XCTestCase {
         XCTAssertNil(frontmatter("---\nunterminated: true\n"))
     }
 
+    /// An empty block is a usable template: it declares no keys, so the note
+    /// gets the timestamps and nothing else — not even a title.
     func testEmptyBlockYieldsAnEmptyFrontmatter() throws {
         let seeded = try XCTUnwrap(frontmatter("---\n---\n"))
         let text = VaultNoteSerializer.render(
             body: "My note\n", existing: seeded, loadedBody: nil, created: now, updated: now)
-        XCTAssertTrue(text.contains("title: My note\n"))
+        XCTAssertTrue(text.contains("date: 2026-09-16T21:30:03Z\n"), text)
+        XCTAssertTrue(text.contains("modified: 2026-09-16T21:30:03Z\n"), text)
+        XCTAssertFalse(text.contains("title:"), text)
     }
 }

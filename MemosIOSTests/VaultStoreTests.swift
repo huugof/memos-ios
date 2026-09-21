@@ -124,7 +124,7 @@ final class VaultStoreTests: XCTestCase {
 
         let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
         XCTAssertTrue(onDisk.contains("Revised\n"))
-        XCTAssertTrue(onDisk.contains("updated: 1970-01-24T"))
+        XCTAssertTrue(onDisk.contains("modified: 1970-01-24T"))
     }
 
     func testUpdateAfterExternalChangeMakesConflictCopy() throws {

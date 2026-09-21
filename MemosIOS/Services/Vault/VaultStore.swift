@@ -299,9 +299,7 @@ final class VaultStore: ObservableObject {
                 body: body,
                 existing: note.frontmatter,
                 loadedBody: note.body,
-                created: note.frontmatter.flatMap { fm in
-                    fm.value(for: "created").flatMap(VaultNoteSerializer.iso8601.date(from:))
-                } ?? now,
+                created: note.frontmatter.flatMap(VaultNoteSerializer.createdDate(in:)) ?? now,
                 updated: now
             )
 
