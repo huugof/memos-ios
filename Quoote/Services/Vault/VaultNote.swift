@@ -78,11 +78,19 @@ enum VaultNoteSerializer {
         /// The zone the default stamp is written in: the device's, so the
         /// time in a note is the time on the clock it was written at.
         var timeZone: TimeZone = .current
+
+        /// A moment format set in Settings. It wins over the template's
+        /// patterns for the managed keys, so the shape can be changed on the
+        /// phone without editing a file in the vault.
+        var format: String?
     }
 
     /// One managed timestamp — the template's shape where it declared one,
     /// otherwise ISO 8601 carrying the device's offset rather than `Z`.
     private static func stamp(_ date: Date, key: String, style: TimestampStyle) -> String {
+        if let format = style.format, !format.isEmpty {
+            return VaultTemplate.formatted(date, momentFormat: format, in: style.timeZone)
+        }
         if let pattern = style.patterns[key] {
             return VaultTemplate.expandedValue(pattern, now: date, timeZone: style.timeZone)
         }
@@ -292,6 +300,21 @@ enum VaultNoteSerializer {
         applyTags(to: &frontmatter, body: body, loadedBody: loadedBody)
 
         return frontmatter.render() + body
+    }
+
+    /// Just the frontmatter block `render` would write — what the editor
+    /// shows when asked what a save will send.
+    static func renderedFrontmatter(
+        body: String,
+        existing: Frontmatter?,
+        loadedBody: String?,
+        created: Date,
+        updated: Date,
+        style: TimestampStyle = TimestampStyle()
+    ) -> String {
+        let text = render(body: body, existing: existing, loadedBody: loadedBody,
+                          created: created, updated: updated, style: style)
+        return Frontmatter.parse(text).frontmatter?.render() ?? ""
     }
 
     /// Fills `title` only when the note already has the key — put there by a

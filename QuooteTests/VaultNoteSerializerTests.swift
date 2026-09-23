@@ -416,4 +416,30 @@ final class VaultNoteSerializerTests: XCTestCase {
         let note = VaultNote(relativePath: "n.md", frontmatter: fm, body: body, modifiedAt: created, fileSize: 1)
         XCTAssertEqual(note.title, "a \"b\" c\\d")
     }
+
+    // MARK: - Settings date format
+
+    func testSettingsFormatOverridesTemplatePatternsForBothStamps() {
+        var style = utc
+        style.patterns = ["date": "{{date:YYYY}}"]
+        style.format = "YYYY-MM-DD HH:mm"
+        let created = Date(timeIntervalSince1970: 0)
+        let updated = Date(timeIntervalSince1970: 3_600)
+
+        let text = VaultNoteSerializer.render(
+            body: "Hi\n", existing: nil, loadedBody: nil,
+            created: created, updated: updated, style: style)
+
+        XCTAssertTrue(text.contains("date: 1970-01-01 00:00\n"), text)
+        XCTAssertTrue(text.contains("modified: 1970-01-01 01:00\n"), text)
+    }
+
+    func testRenderedFrontmatterIsRenderMinusBody() {
+        let date = Date(timeIntervalSince1970: 0)
+        let full = VaultNoteSerializer.render(
+            body: "Hi #a\n", existing: nil, loadedBody: nil, created: date, updated: date, style: utc)
+        let block = VaultNoteSerializer.renderedFrontmatter(
+            body: "Hi #a\n", existing: nil, loadedBody: nil, created: date, updated: date, style: utc)
+        XCTAssertEqual(full, block + "Hi #a\n")
+    }
 }

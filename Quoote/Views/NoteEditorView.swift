@@ -65,6 +65,7 @@ struct NoteEditorView: View {
     @State private var vaultSaveTask: Task<Void, Never>?
 
     @State private var showAttachMenu = false
+    @State private var frontmatterPreview: Result<String, Error>?
     @State private var didTapDone = false
     /// Last text sent via the home Send button — gates the button and double-sends.
     @State private var lastSentText = ""
@@ -155,6 +156,14 @@ struct NoteEditorView: View {
             Button("OK") { uploadError = nil }
         } message: {
             if let err = uploadError { Text(err) }
+        }
+        .sheet(isPresented: .init(
+            get: { frontmatterPreview != nil },
+            set: { if !$0 { frontmatterPreview = nil } }
+        )) {
+            if let frontmatterPreview {
+                FrontmatterPreviewSheet(result: frontmatterPreview)
+            }
         }
         .task { await setup() }
         .onChange(of: draftText) { _, _ in
@@ -368,6 +377,10 @@ struct NoteEditorView: View {
                     Button("Cancel", role: .cancel) {}
                 }
 
+                if showsFrontmatterButton {
+                    frontmatterButton
+                }
+
                 Divider().frame(height: 16)
 
                 Button { resetToNewNote() } label: {
@@ -382,6 +395,39 @@ struct NoteEditorView: View {
             .glassToolbarCapsule()
         }
         sendToolbarItem { sendHome() }
+    }
+
+    /// Vault notes only: a Memos memo has no frontmatter to show.
+    private var showsFrontmatterButton: Bool {
+        switch target {
+        case .vaultFile: return true
+        case .serverMemo: return false
+        case .newNote, .localDraft: return AppSettings.destinationKind == .vault
+        }
+    }
+
+    private var frontmatterButton: some View {
+        Button { showFrontmatterPreview() } label: {
+            Image(systemName: "curlybraces")
+                .font(.system(size: 15))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+        .tint(.primary)
+    }
+
+    /// Renders what the next save would write, from the same inputs it would use.
+    private func showFrontmatterPreview() {
+        let isExisting: Bool
+        if case .vaultFile = target { isExisting = true } else { isExisting = false }
+        guard !isExisting || loadedVaultNote != nil else { return }
+        frontmatterPreview = Result {
+            try vaultStore.previewFrontmatter(
+                body: isExisting ? vaultNoteBody : draftText,
+                note: isExisting ? loadedVaultNote : nil
+            )
+        }
     }
 
     /// The ↑ send button — identical on both screens so it stays in the same spot.
@@ -416,6 +462,11 @@ struct NoteEditorView: View {
                         .padding(.vertical, 6)
                 }
                 .disabled(noteID == nil)
+
+                if showsFrontmatterButton {
+                    Divider().frame(height: 16)
+                    frontmatterButton
+                }
 
                 Divider()
                     .frame(height: 16)

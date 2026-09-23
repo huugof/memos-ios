@@ -8,6 +8,7 @@ struct VaultSettingsSection: View {
     @State private var notesFolder = AppSettings.vaultNotesFolder
     @State private var attachmentsFolder = AppSettings.vaultAttachmentsFolder
     @State private var templatePath = AppSettings.vaultTemplatePath
+    @State private var dateFormat = AppSettings.vaultDateFormat
     @State private var isPickingFolder = false
     @State private var isPickingTemplate = false
     @State private var vaultPath: String?
@@ -27,7 +28,7 @@ struct VaultSettingsSection: View {
             }
 
             if destination == .vault {
-                Section("Obsidian Vault") {
+                Section {
                     Button {
                         isPickingFolder = true
                     } label: {
@@ -74,11 +75,28 @@ struct VaultSettingsSection: View {
                         }
                     }
 
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Date format (blank = template's)", text: $dateFormat)
+                            .font(.body.monospaced())
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .onChange(of: dateFormat) { _, newValue in
+                                AppSettings.vaultDateFormat = newValue
+                            }
+                        Text(dateFormatExample)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.caption)
                             .foregroundStyle(.red)
                     }
+                } header: {
+                    Text("Obsidian Vault")
+                } footer: {
+                    Text("The date format sets `date` and `modified` in Obsidian's tokens (YYYY MM DD HH mm), overriding the template's.")
                 }
             }
         }
@@ -111,8 +129,17 @@ struct VaultSettingsSection: View {
             notesFolder = AppSettings.vaultNotesFolder
             attachmentsFolder = AppSettings.vaultAttachmentsFolder
             templatePath = AppSettings.vaultTemplatePath
+            dateFormat = AppSettings.vaultDateFormat
             refreshVaultPath()
         }
+    }
+
+    /// What `date:` will look like with the current field, stamped now.
+    private var dateFormatExample: String {
+        let trimmed = dateFormat.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Template's format, else ISO 8601" }
+        let now = VaultTemplate.formatted(Date(), momentFormat: trimmed, in: .current)
+        return "\(VaultNoteSerializer.createdKey): \(now)"
     }
 
     private func refreshVaultPath() {

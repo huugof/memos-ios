@@ -287,14 +287,16 @@ final class VaultStore: ObservableObject {
         body: String,
         now: Date
     ) -> TemplateSeed {
-        guard let text = templateText(from: fileStore) else { return TemplateSeed() }
+        guard let text = templateText(from: fileStore) else {
+            return TemplateSeed(style: timestampStyle(templateText: nil))
+        }
         return TemplateSeed(
             frontmatter: VaultTemplate.frontmatter(
                 fromFileText: text,
                 title: VaultNoteSerializer.title(forBody: body),
                 now: now
             ),
-            style: .init(patterns: VaultTemplate.timestampPatterns(fromFileText: text))
+            style: timestampStyle(templateText: text)
         )
     }
 
@@ -302,8 +304,38 @@ final class VaultStore: ObservableObject {
     /// way its template asked. Read fresh each time so editing the template
     /// takes effect; with no usable template the save writes the default stamp.
     private static func templateStyle(from fileStore: VaultFileStore) -> VaultNoteSerializer.TimestampStyle {
-        guard let text = templateText(from: fileStore) else { return .init() }
-        return .init(patterns: VaultTemplate.timestampPatterns(fromFileText: text))
+        timestampStyle(templateText: templateText(from: fileStore))
+    }
+
+    /// The Settings format, when set, beats the template's patterns.
+    private static func timestampStyle(templateText: String?) -> VaultNoteSerializer.TimestampStyle {
+        let format = AppSettings.vaultDateFormat
+        return .init(
+            patterns: templateText.map(VaultTemplate.timestampPatterns(fromFileText:)) ?? [:],
+            format: format.isEmpty ? nil : format
+        )
+    }
+
+    /// The frontmatter block a save would write right now: `create`'s when
+    /// `note` is nil, `update`'s otherwise. Same inputs, same template read,
+    /// so what the preview shows is what the file gets.
+    func previewFrontmatter(body: String, note: VaultNote?, now: Date = Date()) throws -> String {
+        try withFileStore { fileStore in
+            guard let note else {
+                let seed = Self.templateSeed(from: fileStore, body: body, now: now)
+                return VaultNoteSerializer.renderedFrontmatter(
+                    body: body, existing: seed.frontmatter, loadedBody: nil,
+                    created: now, updated: now, style: seed.style)
+            }
+            return VaultNoteSerializer.renderedFrontmatter(
+                body: body,
+                existing: note.frontmatter,
+                loadedBody: note.body,
+                created: note.frontmatter.flatMap(VaultNoteSerializer.createdDate(in:)) ?? now,
+                updated: now,
+                style: Self.templateStyle(from: fileStore)
+            )
+        }
     }
 
     /// Saves an edit, preserving unknown frontmatter and writing a conflict

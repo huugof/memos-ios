@@ -8,6 +8,7 @@ final class VaultStoreTests: XCTestCase {
     private var store: VaultStore!
     private var originalNotesFolderValue: Any?
     private var originalTemplatePathValue: Any?
+    private var originalDateFormatValue: Any?
     private var originalIndex: [VaultIndexEntry] = []
 
     override func setUpWithError() throws {
@@ -20,12 +21,14 @@ final class VaultStoreTests: XCTestCase {
         // DestinationSettingsTests for the same pattern.
         originalNotesFolderValue = UserDefaults.standard.object(forKey: "vaultNotesFolder")
         originalTemplatePathValue = UserDefaults.standard.object(forKey: "vaultTemplatePath")
+        originalDateFormatValue = UserDefaults.standard.object(forKey: "vaultDateFormat")
         // Capture the real on-disk index rather than wiping it permanently —
         // VaultIndex.save([]) below is for test isolation only.
         originalIndex = VaultIndex.load()
 
         AppSettings.vaultNotesFolder = ""
         AppSettings.vaultTemplatePath = ""
+        AppSettings.vaultDateFormat = ""
         let fileStore = VaultFileStore(root: root)
         store = VaultStore(storeProvider: { fileStore })
         VaultIndex.save([])
@@ -41,6 +44,11 @@ final class VaultStoreTests: XCTestCase {
             UserDefaults.standard.set(originalTemplatePathValue, forKey: "vaultTemplatePath")
         } else {
             UserDefaults.standard.removeObject(forKey: "vaultTemplatePath")
+        }
+        if let originalDateFormatValue {
+            UserDefaults.standard.set(originalDateFormatValue, forKey: "vaultDateFormat")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "vaultDateFormat")
         }
         VaultIndex.save(originalIndex)
         try? FileManager.default.removeItem(at: root)
@@ -72,6 +80,51 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertTrue(onDisk.contains("tags:\n  - inbox\n  - ideas\n"))
         XCTAssertTrue(onDisk.hasSuffix("Hello there\nwith #ideas\n"))
         XCTAssertFalse(onDisk.contains("Ignore this body."))
+    }
+
+    func testSettingsDateFormatBeatsTheTemplates() throws {
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Templates"), withIntermediateDirectories: true)
+        try "---\ndate: {{date:YYYY}}\n---\n"
+            .write(to: root.appendingPathComponent("Templates/Capture.md"), atomically: true, encoding: .utf8)
+        AppSettings.vaultTemplatePath = "Templates/Capture.md"
+        AppSettings.vaultDateFormat = "[day] DD.MM.YYYY"
+
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let entry = try store.create(body: "Hi\n", now: now)
+        let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
+
+        let expected = VaultTemplate.formatted(now, momentFormat: "[day] DD.MM.YYYY", in: .current)
+        XCTAssertTrue(onDisk.contains("date: \(expected)\n"), onDisk)
+        XCTAssertTrue(onDisk.contains("modified: \(expected)\n"), onDisk)
+    }
+
+    func testPreviewMatchesWhatCreateWrites() throws {
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("Templates"), withIntermediateDirectories: true)
+        try "---\nsource: phone\ndate: {{date:YYYY-MM-DD HH:mm}}\n---\n"
+            .write(to: root.appendingPathComponent("Templates/Capture.md"), atomically: true, encoding: .utf8)
+        AppSettings.vaultTemplatePath = "Templates/Capture.md"
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+        let preview = try store.previewFrontmatter(body: "Hi #idea\n", note: nil, now: now)
+        let entry = try store.create(body: "Hi #idea\n", now: now)
+        let onDisk = try String(contentsOf: root.appendingPathComponent(entry.relativePath), encoding: .utf8)
+
+        XCTAssertFalse(preview.isEmpty)
+        XCTAssertEqual(onDisk, preview + "Hi #idea\n")
+    }
+
+    func testPreviewMatchesWhatUpdateWrites() throws {
+        let created = try store.create(body: "First\n", now: Date(timeIntervalSince1970: 1_790_000_000))
+        let note = try store.read(relativePath: created.relativePath)
+        let later = Date(timeIntervalSince1970: 1_790_003_600)
+
+        let preview = try store.previewFrontmatter(body: "Second #x\n", note: note, now: later)
+        try store.update(note: note, body: "Second #x\n", now: later)
+        let onDisk = try String(contentsOf: root.appendingPathComponent(created.relativePath), encoding: .utf8)
+
+        XCTAssertEqual(onDisk, preview + "Second #x\n")
     }
 
     /// A template that has been renamed or deleted on the desktop, or that

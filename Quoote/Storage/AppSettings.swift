@@ -19,6 +19,7 @@ enum AppSettings {
         static let vaultNotesFolder = "vaultNotesFolder"
         static let vaultAttachmentsFolder = "vaultAttachmentsFolder"
         static let vaultTemplatePath = "vaultTemplatePath"
+        static let vaultDateFormat = "vaultDateFormat"
     }
 
     private static let defaults = UserDefaults.standard
@@ -215,6 +216,13 @@ enum AppSettings {
     static var vaultTemplatePath: String {
         get { defaults.string(forKey: Keys.vaultTemplatePath) ?? "" }
         set { defaults.set(Self.normalizedFolder(newValue), forKey: Keys.vaultTemplatePath) }
+    }
+
+    /// Moment format for the managed `date`/`modified` stamps (e.g.
+    /// `YYYY-MM-DD HH:mm`). Empty defers to the template, then ISO 8601.
+    static var vaultDateFormat: String {
+        get { defaults.string(forKey: Keys.vaultDateFormat) ?? "" }
+        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.vaultDateFormat) }
     }
 
     /// Splits on "/", trims whitespace/newlines from each component, and drops

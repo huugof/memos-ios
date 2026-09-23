@@ -186,9 +186,9 @@ enum VaultTemplate {
             let replacement: String
             switch name {
             case "date":
-                replacement = formatted(context.now, format: format ?? "YYYY-MM-DD", in: context.timeZone)
+                replacement = formatted(context.now, momentFormat: format ?? "YYYY-MM-DD", in: context.timeZone)
             case "time":
-                replacement = formatted(context.now, format: format ?? "HH:mm", in: context.timeZone)
+                replacement = formatted(context.now, momentFormat: format ?? "HH:mm", in: context.timeZone)
             default:
                 guard let title = context.title else { continue }
                 replacement = title
@@ -202,7 +202,7 @@ enum VaultTemplate {
     /// `en_US_POSIX` deliberately: the placeholder's output goes into a YAML
     /// scalar, and a locale with non-Latin digits would make `{{date}}`
     /// unparseable as a date. The cost is English month and weekday names.
-    private static func formatted(_ date: Date, format: String, in timeZone: TimeZone) -> String {
+    static func formatted(_ date: Date, momentFormat format: String, in timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
