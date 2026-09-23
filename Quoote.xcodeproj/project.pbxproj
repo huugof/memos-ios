@@ -1,0 +1,728 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00E33C579AE348BBB2E3A8F8 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFBD7414B72573F3646117B /* KeychainTokenStore.swift */; };
+		0A1FF20B34D7E5957F342884 /* DraftResumeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B5843C412992177E3B848D /* DraftResumeCoordinator.swift */; };
+		151BF0CE2B1DB6A97787E422 /* VaultTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C436A0FBD7111C09185E02C /* VaultTemplate.swift */; };
+		1D7BCB26205E023C7DCF75F7 /* VaultAttachmentWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 702F84A67872865E046A35EC /* VaultAttachmentWriterTests.swift */; };
+		1FE7311FC28E72F2560F102E /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA8AA90676036B41F333EF70 /* SpeechTranscriptionService.swift */; };
+		21EEB13DE66946DDE66AB411 /* PinnedNotesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A975412D77652ED447A2BB /* PinnedNotesStore.swift */; };
+		22B500AF9C9CCF6657B98733 /* VaultStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F508C831CD24843EA58DB7C2 /* VaultStoreTests.swift */; };
+		2AC9B3906FC42D7A11272E63 /* VaultTemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886B9224011235CC303763FC /* VaultTemplateTests.swift */; };
+		36704DB93D428BC44BB9984A /* DraftSendService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC211902CF2869F41F6EBE3 /* DraftSendService.swift */; };
+		3704ED5799DC09710CD2E61F /* UnifiedNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9402EFB7E5837FF74E182198 /* UnifiedNote.swift */; };
+		38DBCCC776F6B0FCEB6313F2 /* QuooteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DC416904B915D0990DF67C /* QuooteApp.swift */; };
+		39A85349CFC937528246A297 /* PendingAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FA731558EC472CD764F789 /* PendingAttachments.swift */; };
+		3B60732A3EB2E327D1D90601 /* NotesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86254E9BC7FE9C1D643892F9 /* NotesListView.swift */; };
+		40C918ACE4B32B3B578FC849 /* Draft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314274C9F9FC7211ED610923 /* Draft.swift */; };
+		416E954917580FA7BCED42FD /* VaultNoteSerializerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4678F2263DE73528DB77B8 /* VaultNoteSerializerTests.swift */; };
+		41A0B135B65A914DAE90FC37 /* VaultFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD6CE86243820E9EE99D159 /* VaultFileStoreTests.swift */; };
+		4FB318F2A2D0B51D2DA0329F /* VaultSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF3C10A880D48FFAC4ADB0 /* VaultSettingsSection.swift */; };
+		54AFDCAA2653474A286689F6 /* PlainNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314F0A31877B0266D4365219 /* PlainNoteEditor.swift */; };
+		5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */; };
+		5D2E4CA21535F70984A8145C /* DraftBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */; };
+		75B502BCCCE1E36630C798D2 /* TagExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B500C334B926323FB0A1BF9D /* TagExtractor.swift */; };
+		78394F3BE191208471A727AA /* MemoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF648FBB039B64367F21768 /* MemoCache.swift */; };
+		7C132C7A9A76CABDEA9EFA8C /* ServerMemosStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85D95C3452988D0F5A538A2F /* ServerMemosStore.swift */; };
+		7E68D3DA79EA41AD128EA2E8 /* VaultBookmarkStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6FAA2AA16E6FEA853D8D146 /* VaultBookmarkStoreTests.swift */; };
+		81D598B3E1020FFA8F67311D /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E9472C0B2E322C14E8BAD7 /* NoteEditorView.swift */; };
+		87E707456FE0E7214C2EB354 /* VaultFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F74071D00A3A7693EF1F179 /* VaultFileStore.swift */; };
+		8966DE2FCEE1FD44C1F155D9 /* ServerMemoDeleteTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4DB5839A1ED3672B00F7A62 /* ServerMemoDeleteTask.swift */; };
+		9381D37D0FC10BB1BBE4B33E /* FrontmatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB22F14C563C717107686A52 /* FrontmatterTests.swift */; };
+		98B8CCA62EB94884CFF3713C /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796F216391772A2680E9082F /* AppSettings.swift */; };
+		9D2FEF1E13793CDB882CE08E /* NoteRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F1F8FD1F6549D7D9AF4428 /* NoteRowView.swift */; };
+		9E1A85D61011236DED24C200 /* MemosClientParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */; };
+		A38AF354651356634DDD4A3B /* ServerMemoDeleteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F12E3EA6F82D154435FEF2 /* ServerMemoDeleteService.swift */; };
+		A5279A0E21FCCCBEBE149898 /* ServerMemoSaveQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D71F419E70B9079F12570F /* ServerMemoSaveQueueTests.swift */; };
+		A54F61303467CE8F94E96A05 /* ServerMemoDeleteQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */; };
+		A5AC6F4ACACD2685130D9AD9 /* AttachmentMarkdownBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB6B4F805F6E27869F1578C /* AttachmentMarkdownBuilderTests.swift */; };
+		AC5A09537C4183121427C8B4 /* UnifiedNoteVaultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232FF5DC1B1442AB3E9A70D7 /* UnifiedNoteVaultTests.swift */; };
+		AD25D65AC5824C44E10E028D /* VaultNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4BD92E5D98538A7CE582BE5 /* VaultNote.swift */; };
+		AE3028BA5E9CFECF0E7057A7 /* VaultBookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAAB97ADC079C72954ECE801 /* VaultBookmarkStore.swift */; };
+		AF32F6D80D4F9D0E80E4F5C9 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259CEB7B4BD1575F84D9D5AC /* ModelContext+Persist.swift */; };
+		B79C03D8A4FF405BD23A1BBE /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20D79192ED714D12E5DDD2C /* VaultStore.swift */; };
+		B8652CF81B83FAF0B22DDF21 /* VaultIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5C1D8108B4B288493A5A0D /* VaultIndex.swift */; };
+		B9DCF248ECBEC4260E00AF27 /* ServerMemoSaveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29B336B607DE5530B679D2 /* ServerMemoSaveService.swift */; };
+		BF9380D24C0383032B6B0080 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BE6887F3B952B329719F6B8 /* Theme.swift */; };
+		C3B47D9CEF210DE6B7B41EBB /* VaultAttachmentWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE0282C897B37462878CD27 /* VaultAttachmentWriter.swift */; };
+		C6BDA696B44AE642A3799A83 /* NoteDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3060E6C9EEB8D3D24C6E6EF0 /* NoteDestination.swift */; };
+		C8BB1B187A9DF063E76A1180 /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB98FD9D9F1F9AB00BD2D868 /* ServerMemoEditDraft.swift */; };
+		CA5F5EDA5398E9C0DBF6A417 /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94101A71EB26ADE3EAB50F73 /* DraftStore.swift */; };
+		D41C5EF73ABA8384BF0579EA /* ComposeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57B045ABA11EE0C51E8902B /* ComposeRootView.swift */; };
+		D657D03D51660CA54BD642AD /* NoteDateGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94FE3A3FFAA20FF0C3CADF8B /* NoteDateGrouping.swift */; };
+		E8BBD2F4C298D21A1D7ACC6E /* ChatAppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9777ED7EECB2921282B60C0 /* ChatAppContainer.swift */; };
+		E8E703ADB697269B0AD5E792 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE281162F51E0A8A4815423E /* SettingsView.swift */; };
+		EC592E04605233E96A505642 /* DestinationSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C1E7160F80BC102A8F99C7 /* DestinationSettingsTests.swift */; };
+		EFF60B5D84803147AE3512C7 /* NoteListEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B507BE5931ECCED514A2B9D7 /* NoteListEditing.swift */; };
+		F4CB3524B62A399A2C1EFB00 /* MemosClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1083AC872C36EE0F032ED26D /* MemosClient.swift */; };
+		FDF46FA026FD67C20DF2B8E8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C321CE3D11766E63E91042FA /* Assets.xcassets */; };
+		FEA5932912F0A8E24EE782DB /* VaultIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7959E1B71004BB40B039DEE /* VaultIndexTests.swift */; };
+		FEBA9D8EAEFEF69051A82380 /* Frontmatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C36AC7C56C22B666C13A48C /* Frontmatter.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		ED8E75016D8FF66B15EDC1CA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F742FA2D543E3D3E733F356 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54020804BDE6D6F84685BD6C;
+			remoteInfo = Quoote;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteQueueTests.swift; sourceTree = "<group>"; };
+		06D71F419E70B9079F12570F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
+		0C436A0FBD7111C09185E02C /* VaultTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultTemplate.swift; sourceTree = "<group>"; };
+		0EFBD7414B72573F3646117B /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
+		1083AC872C36EE0F032ED26D /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
+		13A975412D77652ED447A2BB /* PinnedNotesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedNotesStore.swift; sourceTree = "<group>"; };
+		18C1E7160F80BC102A8F99C7 /* DestinationSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DestinationSettingsTests.swift; sourceTree = "<group>"; };
+		1CBF3C10A880D48FFAC4ADB0 /* VaultSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultSettingsSection.swift; sourceTree = "<group>"; };
+		1FF648FBB039B64367F21768 /* MemoCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoCache.swift; sourceTree = "<group>"; };
+		20F1F8FD1F6549D7D9AF4428 /* NoteRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRowView.swift; sourceTree = "<group>"; };
+		232FF5DC1B1442AB3E9A70D7 /* UnifiedNoteVaultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNoteVaultTests.swift; sourceTree = "<group>"; };
+		259CEB7B4BD1575F84D9D5AC /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
+		3060E6C9EEB8D3D24C6E6EF0 /* NoteDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDestination.swift; sourceTree = "<group>"; };
+		314274C9F9FC7211ED610923 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
+		314F0A31877B0266D4365219 /* PlainNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlainNoteEditor.swift; sourceTree = "<group>"; };
+		350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftBehaviorTests.swift; sourceTree = "<group>"; };
+		4C36AC7C56C22B666C13A48C /* Frontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frontmatter.swift; sourceTree = "<group>"; };
+		53DC416904B915D0990DF67C /* QuooteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuooteApp.swift; sourceTree = "<group>"; };
+		5E4678F2263DE73528DB77B8 /* VaultNoteSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNoteSerializerTests.swift; sourceTree = "<group>"; };
+		64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
+		67854A6CB41706651238437B /* Quoote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Quoote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6BE6887F3B952B329719F6B8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		6F74071D00A3A7693EF1F179 /* VaultFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFileStore.swift; sourceTree = "<group>"; };
+		702F84A67872865E046A35EC /* VaultAttachmentWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultAttachmentWriterTests.swift; sourceTree = "<group>"; };
+		73B5843C412992177E3B848D /* DraftResumeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftResumeCoordinator.swift; sourceTree = "<group>"; };
+		75F12E3EA6F82D154435FEF2 /* ServerMemoDeleteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteService.swift; sourceTree = "<group>"; };
+		796F216391772A2680E9082F /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		85D95C3452988D0F5A538A2F /* ServerMemosStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemosStore.swift; sourceTree = "<group>"; };
+		86254E9BC7FE9C1D643892F9 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
+		886B9224011235CC303763FC /* VaultTemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultTemplateTests.swift; sourceTree = "<group>"; };
+		9402EFB7E5837FF74E182198 /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
+		94101A71EB26ADE3EAB50F73 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
+		94FE3A3FFAA20FF0C3CADF8B /* NoteDateGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDateGrouping.swift; sourceTree = "<group>"; };
+		AA8AA90676036B41F333EF70 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
+		AF5C1D8108B4B288493A5A0D /* VaultIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndex.swift; sourceTree = "<group>"; };
+		AFD6CE86243820E9EE99D159 /* VaultFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultFileStoreTests.swift; sourceTree = "<group>"; };
+		B500C334B926323FB0A1BF9D /* TagExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagExtractor.swift; sourceTree = "<group>"; };
+		B507BE5931ECCED514A2B9D7 /* NoteListEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteListEditing.swift; sourceTree = "<group>"; };
+		B629F3EF3F9262106074FC72 /* QuooteTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QuooteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB29B336B607DE5530B679D2 /* ServerMemoSaveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveService.swift; sourceTree = "<group>"; };
+		BCE0282C897B37462878CD27 /* VaultAttachmentWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultAttachmentWriter.swift; sourceTree = "<group>"; };
+		C321CE3D11766E63E91042FA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C3FA731558EC472CD764F789 /* PendingAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingAttachments.swift; sourceTree = "<group>"; };
+		C4BD92E5D98538A7CE582BE5 /* VaultNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNote.swift; sourceTree = "<group>"; };
+		C4E9472C0B2E322C14E8BAD7 /* NoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorView.swift; sourceTree = "<group>"; };
+		C57B045ABA11EE0C51E8902B /* ComposeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeRootView.swift; sourceTree = "<group>"; };
+		D20D79192ED714D12E5DDD2C /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStore.swift; sourceTree = "<group>"; };
+		D9777ED7EECB2921282B60C0 /* ChatAppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAppContainer.swift; sourceTree = "<group>"; };
+		DEB6B4F805F6E27869F1578C /* AttachmentMarkdownBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentMarkdownBuilderTests.swift; sourceTree = "<group>"; };
+		E4DB5839A1ED3672B00F7A62 /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
+		E6FAA2AA16E6FEA853D8D146 /* VaultBookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStoreTests.swift; sourceTree = "<group>"; };
+		EAAB97ADC079C72954ECE801 /* VaultBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStore.swift; sourceTree = "<group>"; };
+		EB22F14C563C717107686A52 /* FrontmatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterTests.swift; sourceTree = "<group>"; };
+		EB98FD9D9F1F9AB00BD2D868 /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
+		F508C831CD24843EA58DB7C2 /* VaultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStoreTests.swift; sourceTree = "<group>"; };
+		F7959E1B71004BB40B039DEE /* VaultIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndexTests.swift; sourceTree = "<group>"; };
+		FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextViewListEditingTests.swift; sourceTree = "<group>"; };
+		FBC211902CF2869F41F6EBE3 /* DraftSendService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftSendService.swift; sourceTree = "<group>"; };
+		FE281162F51E0A8A4815423E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0A32682051636749997A2681 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C321CE3D11766E63E91042FA /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		2AC7D04658B3140B3EF56970 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				73B5843C412992177E3B848D /* DraftResumeCoordinator.swift */,
+				FBC211902CF2869F41F6EBE3 /* DraftSendService.swift */,
+				94101A71EB26ADE3EAB50F73 /* DraftStore.swift */,
+				1083AC872C36EE0F032ED26D /* MemosClient.swift */,
+				3060E6C9EEB8D3D24C6E6EF0 /* NoteDestination.swift */,
+				75F12E3EA6F82D154435FEF2 /* ServerMemoDeleteService.swift */,
+				BB29B336B607DE5530B679D2 /* ServerMemoSaveService.swift */,
+				85D95C3452988D0F5A538A2F /* ServerMemosStore.swift */,
+				AA8AA90676036B41F333EF70 /* SpeechTranscriptionService.swift */,
+				7BA52FD0432AFAD4B85EED33 /* Vault */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		3E113163DD63FF1E4DAE9130 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				94FE3A3FFAA20FF0C3CADF8B /* NoteDateGrouping.swift */,
+				B507BE5931ECCED514A2B9D7 /* NoteListEditing.swift */,
+				20F1F8FD1F6549D7D9AF4428 /* NoteRowView.swift */,
+				C3FA731558EC472CD764F789 /* PendingAttachments.swift */,
+				314F0A31877B0266D4365219 /* PlainNoteEditor.swift */,
+				1CBF3C10A880D48FFAC4ADB0 /* VaultSettingsSection.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		4D7F9B3FD8E012DC2F2F3834 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				67854A6CB41706651238437B /* Quoote.app */,
+				B629F3EF3F9262106074FC72 /* QuooteTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4F9B5A7E2ECC5E7BAFB33796 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C57B045ABA11EE0C51E8902B /* ComposeRootView.swift */,
+				C4E9472C0B2E322C14E8BAD7 /* NoteEditorView.swift */,
+				86254E9BC7FE9C1D643892F9 /* NotesListView.swift */,
+				FE281162F51E0A8A4815423E /* SettingsView.swift */,
+				6BE6887F3B952B329719F6B8 /* Theme.swift */,
+				3E113163DD63FF1E4DAE9130 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		77DD0BEC8DAEAC5F54536C94 /* QuooteTests */ = {
+			isa = PBXGroup;
+			children = (
+				DEB6B4F805F6E27869F1578C /* AttachmentMarkdownBuilderTests.swift */,
+				18C1E7160F80BC102A8F99C7 /* DestinationSettingsTests.swift */,
+				350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */,
+				EB22F14C563C717107686A52 /* FrontmatterTests.swift */,
+				64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */,
+				FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */,
+				0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */,
+				06D71F419E70B9079F12570F /* ServerMemoSaveQueueTests.swift */,
+				232FF5DC1B1442AB3E9A70D7 /* UnifiedNoteVaultTests.swift */,
+				702F84A67872865E046A35EC /* VaultAttachmentWriterTests.swift */,
+				E6FAA2AA16E6FEA853D8D146 /* VaultBookmarkStoreTests.swift */,
+				AFD6CE86243820E9EE99D159 /* VaultFileStoreTests.swift */,
+				F7959E1B71004BB40B039DEE /* VaultIndexTests.swift */,
+				5E4678F2263DE73528DB77B8 /* VaultNoteSerializerTests.swift */,
+				F508C831CD24843EA58DB7C2 /* VaultStoreTests.swift */,
+				886B9224011235CC303763FC /* VaultTemplateTests.swift */,
+			);
+			path = QuooteTests;
+			sourceTree = "<group>";
+		};
+		7BA52FD0432AFAD4B85EED33 /* Vault */ = {
+			isa = PBXGroup;
+			children = (
+				4C36AC7C56C22B666C13A48C /* Frontmatter.swift */,
+				BCE0282C897B37462878CD27 /* VaultAttachmentWriter.swift */,
+				EAAB97ADC079C72954ECE801 /* VaultBookmarkStore.swift */,
+				6F74071D00A3A7693EF1F179 /* VaultFileStore.swift */,
+				AF5C1D8108B4B288493A5A0D /* VaultIndex.swift */,
+				C4BD92E5D98538A7CE582BE5 /* VaultNote.swift */,
+				D20D79192ED714D12E5DDD2C /* VaultStore.swift */,
+				0C436A0FBD7111C09185E02C /* VaultTemplate.swift */,
+			);
+			path = Vault;
+			sourceTree = "<group>";
+		};
+		99E4F4C2E57AEF787E6867E7 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				13A975412D77652ED447A2BB /* PinnedNotesStore.swift */,
+				B500C334B926323FB0A1BF9D /* TagExtractor.swift */,
+				9402EFB7E5837FF74E182198 /* UnifiedNote.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		9BE0E902AA65D47FFCB5C3A3 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				314274C9F9FC7211ED610923 /* Draft.swift */,
+				E4DB5839A1ED3672B00F7A62 /* ServerMemoDeleteTask.swift */,
+				EB98FD9D9F1F9AB00BD2D868 /* ServerMemoEditDraft.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B8DE1597C740056E882F4B7A = {
+			isa = PBXGroup;
+			children = (
+				E22C4897EA5764593E845DD3 /* Quoote */,
+				77DD0BEC8DAEAC5F54536C94 /* QuooteTests */,
+				4D7F9B3FD8E012DC2F2F3834 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CA9D4AA36769C1E11D0594D5 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D9777ED7EECB2921282B60C0 /* ChatAppContainer.swift */,
+				53DC416904B915D0990DF67C /* QuooteApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E22C4897EA5764593E845DD3 /* Quoote */ = {
+			isa = PBXGroup;
+			children = (
+				CA9D4AA36769C1E11D0594D5 /* App */,
+				9BE0E902AA65D47FFCB5C3A3 /* Models */,
+				0A32682051636749997A2681 /* Resources */,
+				2AC7D04658B3140B3EF56970 /* Services */,
+				E4F153C6553E76FE566611F6 /* Storage */,
+				99E4F4C2E57AEF787E6867E7 /* ViewModels */,
+				4F9B5A7E2ECC5E7BAFB33796 /* Views */,
+			);
+			path = Quoote;
+			sourceTree = "<group>";
+		};
+		E4F153C6553E76FE566611F6 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				796F216391772A2680E9082F /* AppSettings.swift */,
+				0EFBD7414B72573F3646117B /* KeychainTokenStore.swift */,
+				1FF648FBB039B64367F21768 /* MemoCache.swift */,
+				259CEB7B4BD1575F84D9D5AC /* ModelContext+Persist.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		54020804BDE6D6F84685BD6C /* Quoote */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4AA7F2E18A21A7F92A1B3271 /* Build configuration list for PBXNativeTarget "Quoote" */;
+			buildPhases = (
+				7F899A947FE57007A99B5C84 /* Sources */,
+				A8A421D1D59943E4C9B9560F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Quoote;
+			packageProductDependencies = (
+			);
+			productName = Quoote;
+			productReference = 67854A6CB41706651238437B /* Quoote.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9E20B27B169F895C7A28CE64 /* QuooteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6CC7C6B3A469410D3F8016B6 /* Build configuration list for PBXNativeTarget "QuooteTests" */;
+			buildPhases = (
+				9B7D8A2BFE5EE2C819229156 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DA561145B77D8F180F273F2B /* PBXTargetDependency */,
+			);
+			name = QuooteTests;
+			packageProductDependencies = (
+			);
+			productName = QuooteTests;
+			productReference = B629F3EF3F9262106074FC72 /* QuooteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1F742FA2D543E3D3E733F356 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					54020804BDE6D6F84685BD6C = {
+						DevelopmentTeam = 58RDU34A2M;
+					};
+					9E20B27B169F895C7A28CE64 = {
+						DevelopmentTeam = 58RDU34A2M;
+					};
+				};
+			};
+			buildConfigurationList = 3B6C94119F5ECCF20379BE9E /* Build configuration list for PBXProject "Quoote" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B8DE1597C740056E882F4B7A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				54020804BDE6D6F84685BD6C /* Quoote */,
+				9E20B27B169F895C7A28CE64 /* QuooteTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A8A421D1D59943E4C9B9560F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FDF46FA026FD67C20DF2B8E8 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7F899A947FE57007A99B5C84 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				98B8CCA62EB94884CFF3713C /* AppSettings.swift in Sources */,
+				E8BBD2F4C298D21A1D7ACC6E /* ChatAppContainer.swift in Sources */,
+				D41C5EF73ABA8384BF0579EA /* ComposeRootView.swift in Sources */,
+				40C918ACE4B32B3B578FC849 /* Draft.swift in Sources */,
+				0A1FF20B34D7E5957F342884 /* DraftResumeCoordinator.swift in Sources */,
+				36704DB93D428BC44BB9984A /* DraftSendService.swift in Sources */,
+				CA5F5EDA5398E9C0DBF6A417 /* DraftStore.swift in Sources */,
+				FEBA9D8EAEFEF69051A82380 /* Frontmatter.swift in Sources */,
+				00E33C579AE348BBB2E3A8F8 /* KeychainTokenStore.swift in Sources */,
+				78394F3BE191208471A727AA /* MemoCache.swift in Sources */,
+				F4CB3524B62A399A2C1EFB00 /* MemosClient.swift in Sources */,
+				AF32F6D80D4F9D0E80E4F5C9 /* ModelContext+Persist.swift in Sources */,
+				D657D03D51660CA54BD642AD /* NoteDateGrouping.swift in Sources */,
+				C6BDA696B44AE642A3799A83 /* NoteDestination.swift in Sources */,
+				81D598B3E1020FFA8F67311D /* NoteEditorView.swift in Sources */,
+				EFF60B5D84803147AE3512C7 /* NoteListEditing.swift in Sources */,
+				9D2FEF1E13793CDB882CE08E /* NoteRowView.swift in Sources */,
+				3B60732A3EB2E327D1D90601 /* NotesListView.swift in Sources */,
+				39A85349CFC937528246A297 /* PendingAttachments.swift in Sources */,
+				21EEB13DE66946DDE66AB411 /* PinnedNotesStore.swift in Sources */,
+				54AFDCAA2653474A286689F6 /* PlainNoteEditor.swift in Sources */,
+				38DBCCC776F6B0FCEB6313F2 /* QuooteApp.swift in Sources */,
+				A38AF354651356634DDD4A3B /* ServerMemoDeleteService.swift in Sources */,
+				8966DE2FCEE1FD44C1F155D9 /* ServerMemoDeleteTask.swift in Sources */,
+				C8BB1B187A9DF063E76A1180 /* ServerMemoEditDraft.swift in Sources */,
+				B9DCF248ECBEC4260E00AF27 /* ServerMemoSaveService.swift in Sources */,
+				7C132C7A9A76CABDEA9EFA8C /* ServerMemosStore.swift in Sources */,
+				E8E703ADB697269B0AD5E792 /* SettingsView.swift in Sources */,
+				1FE7311FC28E72F2560F102E /* SpeechTranscriptionService.swift in Sources */,
+				75B502BCCCE1E36630C798D2 /* TagExtractor.swift in Sources */,
+				BF9380D24C0383032B6B0080 /* Theme.swift in Sources */,
+				3704ED5799DC09710CD2E61F /* UnifiedNote.swift in Sources */,
+				C3B47D9CEF210DE6B7B41EBB /* VaultAttachmentWriter.swift in Sources */,
+				AE3028BA5E9CFECF0E7057A7 /* VaultBookmarkStore.swift in Sources */,
+				87E707456FE0E7214C2EB354 /* VaultFileStore.swift in Sources */,
+				B8652CF81B83FAF0B22DDF21 /* VaultIndex.swift in Sources */,
+				AD25D65AC5824C44E10E028D /* VaultNote.swift in Sources */,
+				4FB318F2A2D0B51D2DA0329F /* VaultSettingsSection.swift in Sources */,
+				B79C03D8A4FF405BD23A1BBE /* VaultStore.swift in Sources */,
+				151BF0CE2B1DB6A97787E422 /* VaultTemplate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9B7D8A2BFE5EE2C819229156 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5AC6F4ACACD2685130D9AD9 /* AttachmentMarkdownBuilderTests.swift in Sources */,
+				EC592E04605233E96A505642 /* DestinationSettingsTests.swift in Sources */,
+				5D2E4CA21535F70984A8145C /* DraftBehaviorTests.swift in Sources */,
+				9381D37D0FC10BB1BBE4B33E /* FrontmatterTests.swift in Sources */,
+				9E1A85D61011236DED24C200 /* MemosClientParsingTests.swift in Sources */,
+				5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */,
+				A54F61303467CE8F94E96A05 /* ServerMemoDeleteQueueTests.swift in Sources */,
+				A5279A0E21FCCCBEBE149898 /* ServerMemoSaveQueueTests.swift in Sources */,
+				AC5A09537C4183121427C8B4 /* UnifiedNoteVaultTests.swift in Sources */,
+				1D7BCB26205E023C7DCF75F7 /* VaultAttachmentWriterTests.swift in Sources */,
+				7E68D3DA79EA41AD128EA2E8 /* VaultBookmarkStoreTests.swift in Sources */,
+				41A0B135B65A914DAE90FC37 /* VaultFileStoreTests.swift in Sources */,
+				FEA5932912F0A8E24EE782DB /* VaultIndexTests.swift in Sources */,
+				416E954917580FA7BCED42FD /* VaultNoteSerializerTests.swift in Sources */,
+				22B500AF9C9CCF6657B98733 /* VaultStoreTests.swift in Sources */,
+				2AC9B3906FC42D7A11272E63 /* VaultTemplateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DA561145B77D8F180F273F2B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54020804BDE6D6F84685BD6C /* Quoote */;
+			targetProxy = ED8E75016D8FF66B15EDC1CA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0C8951BC4D68C44B2DADF6A2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.QuooteTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Quoote.app/Quoote";
+			};
+			name = Debug;
+		};
+		40B98A2185F7DD3198D7E1D9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.QuooteTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Quoote.app/Quoote";
+			};
+			name = Release;
+		};
+		48125500A74F7A68F495995E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 58RDU34A2M;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Quoote;
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.Quoote;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A4F0C5BB95557A8B1CBBE1E4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_ASSET_PATHS = "\"Quoote/Resources\"";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Quoote;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Quoote uses the microphone for voice transcription.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Quoote uses speech recognition to transcribe your voice notes.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.Quoote;
+				PRODUCT_NAME = Quoote;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B5D6956565A9D4A1E310D9E6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_ASSET_PATHS = "\"Quoote/Resources\"";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Quoote;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Quoote uses the microphone for voice transcription.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Quoote uses speech recognition to transcribe your voice notes.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.Quoote;
+				PRODUCT_NAME = Quoote;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E7E35C8459DBDA3F77850512 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 58RDU34A2M;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Quoote;
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hugo.Quoote;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3B6C94119F5ECCF20379BE9E /* Build configuration list for PBXProject "Quoote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48125500A74F7A68F495995E /* Debug */,
+				E7E35C8459DBDA3F77850512 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4AA7F2E18A21A7F92A1B3271 /* Build configuration list for PBXNativeTarget "Quoote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A4F0C5BB95557A8B1CBBE1E4 /* Debug */,
+				B5D6956565A9D4A1E310D9E6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6CC7C6B3A469410D3F8016B6 /* Build configuration list for PBXNativeTarget "QuooteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C8951BC4D68C44B2DADF6A2 /* Debug */,
+				40B98A2185F7DD3198D7E1D9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1F742FA2D543E3D3E733F356 /* Project object */;
+}

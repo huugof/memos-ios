@@ -1,69 +1,66 @@
-name: MemosIOS
+name: Quoote
 options:
   minimumXcodeGenVersion: 2.44.0
   deploymentTarget:
     iOS: 26.0
 settings:
   base:
-    PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemoChat
+    PRODUCT_BUNDLE_IDENTIFIER: com.hugo.Quoote
     SWIFT_VERSION: 5.0
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: 58RDU34A2M
     TARGETED_DEVICE_FAMILY: "1,2"
     GENERATE_INFOPLIST_FILE: YES
     INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
     INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
-    INFOPLIST_KEY_CFBundleDisplayName: MemoChat
+    INFOPLIST_KEY_CFBundleDisplayName: Quoote
     INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
 targets:
-  MemoChat:
+  Quoote:
     type: application
     platform: iOS
     sources:
-      - path: MemoChat
-      - path: MemosIOS/Models
-      - path: MemosIOS/Services
-      - path: MemosIOS/Storage
-      - path: MemosIOS/Views
+      - path: Quoote
     settings:
       base:
-        PRODUCT_NAME: MemoChat
-        PRODUCT_BUNDLE_IDENTIFIER: com.hugo.MemoChat
+        PRODUCT_NAME: Quoote
+        PRODUCT_BUNDLE_IDENTIFIER: com.hugo.Quoote
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
-        DEVELOPMENT_ASSET_PATHS: '"MemoChat/Resources"'
+        DEVELOPMENT_ASSET_PATHS: '"Quoote/Resources"'
         SUPPORTS_MACCATALYST: NO
-        INFOPLIST_KEY_CFBundleDisplayName: MemoChat
+        INFOPLIST_KEY_CFBundleDisplayName: Quoote
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: MemoChat uses the microphone for voice transcription.
-        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: MemoChat uses speech recognition to transcribe your voice notes.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Quoote uses the microphone for voice transcription.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Quoote uses speech recognition to transcribe your voice notes.
 
-  MemosIOSTests:
+  QuooteTests:
     type: bundle.unit-test
     platform: iOS
-    hostApplication: MemoChat
+    hostApplication: Quoote
     sources:
-      - path: MemosIOSTests
+      - path: QuooteTests
     dependencies:
-      - target: MemoChat
+      - target: Quoote
     settings:
       base:
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MemoChat.app/MemoChat"
+        PRODUCT_BUNDLE_IDENTIFIER: com.hugo.QuooteTests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Quoote.app/Quoote"
         BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
-  MemoChat:
+  Quoote:
     build:
       targets:
-        MemoChat: all
-        MemosIOSTests: [test]
+        Quoote: all
+        QuooteTests: [test]
     test:
       config: Debug
       targets:
-        - MemosIOSTests
+        - QuooteTests
     run:
       config: Debug
     archive:
