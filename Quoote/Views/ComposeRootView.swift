@@ -1,14 +1,19 @@
 import SwiftUI
 import SwiftData
 
-/// App root: launch lands directly on a focused compose screen. History is one
-/// tap (or a left-edge swipe) away — it slides over the compose screen as a drawer,
-/// which keeps the in-progress note alive underneath. Local-first, invisible sync.
+/// App root: history is the screen underneath, and compose rides on a sheet over
+/// it that never closes. Launch lands with the sheet at 3/4 height and the
+/// keyboard up; dragging it down to a strip reveals the history, and tapping a
+/// note there opens it on the same sheet, pushed over the compose note so Back
+/// returns to it. Local-first, invisible sync.
 struct ComposeRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var showMenu = false
+    /// Notes opened from history, pushed over the compose note on the sheet.
+    @State private var sheetPath: [NoteEditorTarget] = []
+    @State private var detent: PresentationDetent = ComposeSheet.standard
+    @State private var showSettings = false
     /// Bumped to spin up a fresh compose draft (the "+" / quick-capture reset).
     @State private var composeResetID = UUID()
 
@@ -28,23 +33,17 @@ struct ComposeRootView: View {
     @State private var memosPrimed = false
 
     var body: some View {
-        ZStack {
-            NavigationStack {
-                NoteEditorView(
-                    target: .newNote,
-                    isHome: true,
-                    isMenuOpen: showMenu,
-                    onNewNote: newNote,
-                    onOpenMenu: openMenu
-                )
-                .id(composeResetID)
-            }
-
-            if showMenu {
-                NotesMenuRoot(onClose: closeMenu)
-                    .transition(.move(edge: .leading))
-                    .zIndex(1)  // stays on top while sliding back out, too
-            }
+        NavigationStack {
+            NotesListView(onOpen: openNote, onShowSettings: { showSettings = true })
+        }
+        .sheet(isPresented: .constant(true)) {
+            ComposeSheet(
+                path: $sheetPath,
+                detent: $detent,
+                showSettings: $showSettings,
+                composeResetID: composeResetID,
+                onNewNote: newNote
+            )
         }
         .tint(appAccent)
         .environmentObject(serverMemosStore)
@@ -142,13 +141,10 @@ struct ComposeRootView: View {
         composeResetID = UUID()
     }
 
-    private func openMenu() {
-        guard !showMenu else { return }
-        withAnimation(.easeOut(duration: 0.28)) { showMenu = true }
-    }
-
-    private func closeMenu() {
-        withAnimation(.easeIn(duration: 0.25)) { showMenu = false }
+    /// Opens a history note on the sheet, replacing any note already open there.
+    private func openNote(_ target: NoteEditorTarget) {
+        sheetPath = [target]
+        withAnimation { detent = ComposeSheet.standard }
     }
 
     /// Quick capture: after being away longer than the configured delay, come back to a
@@ -160,15 +156,16 @@ struct ComposeRootView: View {
         guard elapsed >= TimeInterval(delaySeconds) else { return }
         AppSettings.lastBackgroundAt = nil
 
-        guard showMenu else {
+        detent = ComposeSheet.standard
+        guard !sheetPath.isEmpty else {
             composeResetID = UUID()
             return
         }
 
-        // Tearing the drawer down runs the onDisappear of whatever it held, which flushes
-        // that text and enqueues the send/save; flushStagedServerEdits covers anything
-        // staged but not yet queued.
-        showMenu = false
+        // Popping the open note runs its onDisappear, which flushes that text and
+        // enqueues the send/save; flushStagedServerEdits covers anything staged but
+        // not yet queued.
+        sheetPath = []
         flushStagedServerEdits()
         // Defer the reset a runloop so the new editor doesn't grab focus mid-transition.
         Task { @MainActor in composeResetID = UUID() }
@@ -197,21 +194,52 @@ struct ComposeRootView: View {
     }
 }
 
-/// The menu layer. It carries its own navigation stack so tapping a note still pushes
-/// the editor and Back still lands on the list — the same flow as when the list lived
-/// on the compose stack, just hosted inside the drawer.
-private struct NotesMenuRoot: View {
-    let onClose: () -> Void
+/// The compose sheet. It is never dismissed — only collapsed — so the note in
+/// progress stays mounted and is never sent just because history was glanced at.
+private struct ComposeSheet: View {
+    @Binding var path: [NoteEditorTarget]
+    @Binding var detent: PresentationDetent
+    @Binding var showSettings: Bool
+    let composeResetID: UUID
+    let onNewNote: () -> Void
 
-    @State private var path: [NoteEditorTarget] = []
+    /// Tall enough to leave the editor bar showing above the home indicator.
+    static let peek = PresentationDetent.height(110)
+    static let standard = PresentationDetent.fraction(0.75)
+
+    private var isCollapsed: Bool { detent == Self.peek }
 
     var body: some View {
         NavigationStack(path: $path) {
-            NotesListView(onClose: onClose)
-                .navigationDestination(for: NoteEditorTarget.self) { target in
-                    NoteEditorView(target: target)
-                }
+            // The compose note hands the keyboard over while a history note sits
+            // on top of it, and takes it back when that note is popped.
+            NoteEditorView(
+                target: .newNote,
+                isHome: true,
+                isMenuOpen: isCollapsed || !path.isEmpty,
+                onNewNote: onNewNote,
+                onOpenMenu: toggleCollapsed
+            )
+            .id(composeResetID)
+            .navigationDestination(for: NoteEditorTarget.self) { target in
+                NoteEditorView(target: target, isMenuOpen: isCollapsed)
+            }
         }
-        .background(Color(uiColor: .systemBackground))  // opaque while sliding
+        .tint(appAccent)
+        .preferredColorScheme(.dark)
+        .presentationDetents([Self.peek, Self.standard, .large], selection: $detent)
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundInteraction(.enabled(upThrough: Self.peek))
+        .interactiveDismissDisabled()
+        // Presented from here, not from the history list: that list's screen is
+        // already presenting this sheet, so it can't present another.
+        .sheet(isPresented: $showSettings) {
+            SettingsView(onBack: { showSettings = false })
+                .preferredColorScheme(.dark)
+        }
+    }
+
+    private func toggleCollapsed() {
+        withAnimation { detent = isCollapsed ? Self.standard : Self.peek }
     }
 }
