@@ -7,13 +7,12 @@ struct NoteEditorView: View {
     let target: NoteEditorTarget
     /// When true, this is the compose-first home screen (its own chrome: history, send, new).
     var isHome: Bool = false
-    /// True while this editor is out of sight — the sheet collapsed to reveal history, or
-    /// (home) a history note pushed on top. Editors stay mounted through both, so focus has
-    /// to be handed over explicitly.
+    /// Home only: true while the notes drawer covers this screen. The compose screen stays
+    /// mounted underneath it, so focus has to be handed over explicitly.
     var isMenuOpen: Bool = false
     /// Invoked by the home "+" button to start a fresh note.
     var onNewNote: () -> Void = {}
-    /// Invoked by the ☰ button: collapses the sheet to reveal history, or raises it again.
+    /// Invoked by the ☰ button and the home left-edge swipe to open the notes drawer.
     var onOpenMenu: () -> Void = {}
 
     @Environment(\.modelContext) private var modelContext
@@ -115,19 +114,21 @@ struct NoteEditorView: View {
                 editorBody
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { editorBar }
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbarContent }
-        .toolbar(isHome ? .hidden : .automatic, for: .navigationBar)
         .overlay(alignment: .top) {
             if let message = vaultSaveMessage {
                 vaultSaveBanner(message)
             }
         }
         .background {
-            // Keeps the edge swipe popping a history note despite the hidden
-            // back button. Compose is the root, with nothing to pop.
-            if !isHome { NavigationGestures() }
+            if isHome {
+                // Root screen: the left edge opens the notes list (the system pop
+                // gesture is inert here anyway — nothing to pop back to).
+                NavigationGestures(edge: .left) { onOpenMenu() }
+            } else {
+                NavigationGestures()
+            }
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItems,
                       maxSelectionCount: nil, matching: .images)
@@ -343,77 +344,57 @@ struct NoteEditorView: View {
 
     // MARK: Toolbar
 
-    /// The nav bar holds only Back, on a note opened from history. Everything
-    /// else lives in `editorBar`, above the keyboard.
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if !isHome {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { handleBack() } label: {
-                    Image(systemName: "chevron.left")
-                        .fontWeight(.semibold)
-                }
-                .tint(.primary)
-            }
+        if isHome {
+            homeToolbarContent
+        } else {
+            editToolbarContent
         }
     }
 
-    /// Hangs above the keyboard (or the bottom edge when it's down). Send sits
-    /// in the same trailing spot on both screens.
-    private var editorBar: some View {
-        HStack(spacing: 2) {
-            if isHome {
-                barButton("line.3.horizontal") { onOpenMenu() }
+    @ToolbarContentBuilder
+    private var homeToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button { onOpenMenu() } label: {
+                Image(systemName: "line.3.horizontal")
+                    .fontWeight(.semibold)
             }
-            barButton("paperclip") { showAttachMenu = true }
+            .tint(.primary)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 0) {
+                Button { showAttachMenu = true } label: {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
                 .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
                     Button("Photo Library") { showPhotoPicker = true }
                     Button("Choose File") { showFilePicker = true }
                     Button("Cancel", role: .cancel) {}
                 }
-            if showsFrontmatterButton {
-                barButton("curlybraces") { showFrontmatterPreview() }
-            }
-            if !isHome {
-                barButton(isPinned ? "pin.fill" : "pin", tint: isPinned ? appAccent : .primary) {
-                    togglePin()
+
+                if showsFrontmatterButton {
+                    frontmatterButton
                 }
-                .disabled(noteID == nil)
-            }
 
-            Spacer(minLength: 0)
+                Divider().frame(height: 16)
 
-            if isHome {
-                barButton("square.and.pencil") { resetToNewNote() }
+                Button { resetToNewNote() } label: {
+                    Image(systemName: "square.and.pencil")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
             }
-            Button { isHome ? sendHome() : sendEdit() } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(canSend ? appAccent : Color.secondary)
-            }
-            .disabled(!canSend)
-            .padding(.leading, 4)
+            .fixedSize()
+            .glassToolbarCapsule()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .glassCapsule()
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
-    }
-
-    private func barButton(
-        _ systemImage: String,
-        tint: Color = .primary,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 17))
-                .foregroundStyle(tint)
-                .frame(width: 40, height: 36)
-                .contentShape(Rectangle())
-        }
-        .tint(.primary)
+        sendToolbarItem { sendHome() }
     }
 
     /// Vault notes only: a Memos memo has no frontmatter to show.
@@ -423,6 +404,17 @@ struct NoteEditorView: View {
         case .serverMemo: return false
         case .newNote, .localDraft: return AppSettings.destinationKind == .vault
         }
+    }
+
+    private var frontmatterButton: some View {
+        Button { showFrontmatterPreview() } label: {
+            Image(systemName: "curlybraces")
+                .font(.system(size: 15))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+        .tint(.primary)
     }
 
     /// Renders what the next save would write, from the same inputs it would use.
@@ -436,6 +428,68 @@ struct NoteEditorView: View {
                 note: isExisting ? loadedVaultNote : nil
             )
         }
+    }
+
+    /// The ↑ send button — identical on both screens so it stays in the same spot.
+    @ToolbarContentBuilder
+    private func sendToolbarItem(action: @escaping () -> Void) -> some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: action) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(canSend ? appAccent : Color.secondary)
+            }
+            .disabled(!canSend)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var editToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button { handleBack() } label: {
+                Image(systemName: "chevron.left")
+                    .fontWeight(.semibold)
+            }
+            .tint(.primary)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: 0) {
+                Button { togglePin() } label: {
+                    Image(systemName: isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 15))
+                        .foregroundStyle(isPinned ? appAccent : .primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .disabled(noteID == nil)
+
+                if showsFrontmatterButton {
+                    Divider().frame(height: 16)
+                    frontmatterButton
+                }
+
+                Divider()
+                    .frame(height: 16)
+
+                Button {
+                    showAttachMenu = true
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+                .tint(.primary)
+                .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
+                    Button("Photo Library") { showPhotoPicker = true }
+                    Button("Choose File") { showFilePicker = true }
+                    Button("Cancel", role: .cancel) {}
+                }
+            }
+            .fixedSize()
+            .glassToolbarCapsule()
+        }
+        sendToolbarItem { sendEdit() }
     }
 
     private func togglePin() {

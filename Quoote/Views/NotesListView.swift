@@ -2,10 +2,10 @@ import SwiftUI
 import SwiftData
 
 /// Plain chronological history of notes — no search, no tag cloud, no filters.
-/// The screen under the compose sheet; tapping a row opens it on that sheet.
+/// The root of the notes drawer; tapping a row opens it in the editor.
 struct NotesListView: View {
-    let onOpen: (NoteEditorTarget) -> Void
-    let onShowSettings: () -> Void
+    /// Slides the drawer back off to the left.
+    let onClose: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Draft.createdAt, order: .forward) private var allDrafts: [Draft]
@@ -16,6 +16,8 @@ struct NotesListView: View {
     @EnvironmentObject private var pinnedStore: PinnedNotesStore
     @EnvironmentObject private var vaultStore: VaultStore
     @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
+
+    @State private var showSettings = false
 
     private var destination: DestinationKind {
         DestinationKind(rawValue: destinationRaw) ?? .memos
@@ -64,7 +66,7 @@ struct NotesListView: View {
                     Text(msg).font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                     if destination == .vault && vaultStore.needsReconnect {
-                        Button("Reconnect Vault") { onShowSettings() }
+                        Button("Reconnect Vault") { showSettings = true }
                             .listRowBackground(Color.clear)
                     }
                 }
@@ -112,27 +114,34 @@ struct NotesListView: View {
         .overlay(alignment: .center) {
             if activeIsLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
         }
-        // The collapsed compose sheet covers the bottom of the list.
-        .contentMargins(.bottom, 120, for: .scrollContent)
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)
+        .background { NavigationGestures(edge: .right) { onClose() } }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { onClose() } label: {
+                    Image(systemName: "chevron.left")
+                        .fontWeight(.semibold)
+                }
+                .tint(.primary)
+            }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { onShowSettings() } label: {
+                Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                 }
                 .tint(.primary)
             }
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(onBack: { showSettings = false })
+        }
     }
 
     @ViewBuilder
     private func noteRow(for note: UnifiedNote) -> some View {
-        Button { onOpen(note.editorTarget) } label: {
+        NavigationLink(value: note.editorTarget) {
             NoteRowView(note: note)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { deleteNote(note) } label: {
                 Label("Delete", systemImage: "trash")
