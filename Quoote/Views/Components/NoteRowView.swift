@@ -4,26 +4,28 @@ struct NoteRowView: View {
     let note: UnifiedNote
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(note.title)
-                .font(.body.weight(.semibold))
+        VStack(alignment: .leading, spacing: 4) {
+            Text(note.excerpt)
+                .font(.body)
                 .foregroundStyle(.primary)
-                .lineLimit(1)
+                .lineLimit(3)
+                .truncationMode(.tail)
 
-            HStack(spacing: 6) {
-                Text(dateString)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                Text(note.preview)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+            // One Text so date and tags truncate together on a single line.
+            Text("\(Text(dateString).foregroundStyle(.secondary))\(tagsText)")
+                .font(.footnote)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
+    }
+
+    private var tagsText: Text {
+        let tags = note.tags
+        guard !tags.isEmpty else { return Text(verbatim: "") }
+        let joined = tags.map { "#\($0)" }.joined(separator: " ")
+        return Text(verbatim: "  \(joined)").foregroundStyle(appAccent)
     }
 
     private var dateString: String {

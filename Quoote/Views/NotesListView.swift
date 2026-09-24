@@ -2,10 +2,11 @@ import SwiftUI
 import SwiftData
 
 /// Plain chronological history of notes — no search, no tag cloud, no filters.
-/// The root of the notes drawer; tapping a row opens it in the editor.
+/// The screen under the note sheet; tapping a row opens that note on the sheet.
 struct NotesListView: View {
-    /// Slides the drawer back off to the left.
-    let onClose: () -> Void
+    let onOpen: (NoteEditorTarget) -> Void
+    /// Brings the sheet back up on a capture note (or the pinned one).
+    let onCompose: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Draft.createdAt, order: .forward) private var allDrafts: [Draft]
@@ -114,17 +115,21 @@ struct NotesListView: View {
         .overlay(alignment: .center) {
             if activeIsLoading && pinned.isEmpty && groups.isEmpty { ProgressView() }
         }
+        .overlay(alignment: .bottomTrailing) {
+            Button { onCompose() } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(appAccent)
+                    .frame(width: 60, height: 60)
+                    .glassCircle()
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 20)
+            .padding(.bottom, 12)
+        }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayMode(.large)
-        .background { NavigationGestures(edge: .right) { onClose() } }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { onClose() } label: {
-                    Image(systemName: "chevron.left")
-                        .fontWeight(.semibold)
-                }
-                .tint(.primary)
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
@@ -139,9 +144,10 @@ struct NotesListView: View {
 
     @ViewBuilder
     private func noteRow(for note: UnifiedNote) -> some View {
-        NavigationLink(value: note.editorTarget) {
+        Button { onOpen(note.editorTarget) } label: {
             NoteRowView(note: note)
         }
+        .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { deleteNote(note) } label: {
                 Label("Delete", systemImage: "trash")

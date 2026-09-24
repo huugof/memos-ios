@@ -23,6 +23,7 @@
 		40C918ACE4B32B3B578FC849 /* Draft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314274C9F9FC7211ED610923 /* Draft.swift */; };
 		416E954917580FA7BCED42FD /* VaultNoteSerializerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4678F2263DE73528DB77B8 /* VaultNoteSerializerTests.swift */; };
 		41A0B135B65A914DAE90FC37 /* VaultFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD6CE86243820E9EE99D159 /* VaultFileStoreTests.swift */; };
+		45E152C17AC73909B77FB275 /* PinnedNotesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E11BA6574365BE10C1FA1D7 /* PinnedNotesStoreTests.swift */; };
 		4FB318F2A2D0B51D2DA0329F /* VaultSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF3C10A880D48FFAC4ADB0 /* VaultSettingsSection.swift */; };
 		54AFDCAA2653474A286689F6 /* PlainNoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314F0A31877B0266D4365219 /* PlainNoteEditor.swift */; };
 		5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */; };
@@ -47,6 +48,7 @@
 		AD25D65AC5824C44E10E028D /* VaultNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4BD92E5D98538A7CE582BE5 /* VaultNote.swift */; };
 		AE3028BA5E9CFECF0E7057A7 /* VaultBookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAAB97ADC079C72954ECE801 /* VaultBookmarkStore.swift */; };
 		AF32F6D80D4F9D0E80E4F5C9 /* ModelContext+Persist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259CEB7B4BD1575F84D9D5AC /* ModelContext+Persist.swift */; };
+		B343767D78F4B6FD8436ACD7 /* NoteExcerpt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E5276365CC8B1E9A9D8ECAB /* NoteExcerpt.swift */; };
 		B79C03D8A4FF405BD23A1BBE /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20D79192ED714D12E5DDD2C /* VaultStore.swift */; };
 		B8652CF81B83FAF0B22DDF21 /* VaultIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5C1D8108B4B288493A5A0D /* VaultIndex.swift */; };
 		B9DCF248ECBEC4260E00AF27 /* ServerMemoSaveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB29B336B607DE5530B679D2 /* ServerMemoSaveService.swift */; };
@@ -55,6 +57,7 @@
 		C6BDA696B44AE642A3799A83 /* NoteDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3060E6C9EEB8D3D24C6E6EF0 /* NoteDestination.swift */; };
 		C8BB1B187A9DF063E76A1180 /* ServerMemoEditDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB98FD9D9F1F9AB00BD2D868 /* ServerMemoEditDraft.swift */; };
 		CA5F5EDA5398E9C0DBF6A417 /* DraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94101A71EB26ADE3EAB50F73 /* DraftStore.swift */; };
+		CFD4FC81F55747BFD319FA7B /* NoteExcerptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965F67343F7951522A027F8C /* NoteExcerptTests.swift */; };
 		D41C5EF73ABA8384BF0579EA /* ComposeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57B045ABA11EE0C51E8902B /* ComposeRootView.swift */; };
 		D657D03D51660CA54BD642AD /* NoteDateGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94FE3A3FFAA20FF0C3CADF8B /* NoteDateGrouping.swift */; };
 		E8BBD2F4C298D21A1D7ACC6E /* ChatAppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9777ED7EECB2921282B60C0 /* ChatAppContainer.swift */; };
@@ -81,6 +84,7 @@
 		0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteQueueTests.swift; sourceTree = "<group>"; };
 		06D71F419E70B9079F12570F /* ServerMemoSaveQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoSaveQueueTests.swift; sourceTree = "<group>"; };
 		0C436A0FBD7111C09185E02C /* VaultTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultTemplate.swift; sourceTree = "<group>"; };
+		0E11BA6574365BE10C1FA1D7 /* PinnedNotesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedNotesStoreTests.swift; sourceTree = "<group>"; };
 		0EFBD7414B72573F3646117B /* KeychainTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTokenStore.swift; sourceTree = "<group>"; };
 		1083AC872C36EE0F032ED26D /* MemosClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClient.swift; sourceTree = "<group>"; };
 		13A975412D77652ED447A2BB /* PinnedNotesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedNotesStore.swift; sourceTree = "<group>"; };
@@ -90,6 +94,7 @@
 		20F1F8FD1F6549D7D9AF4428 /* NoteRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRowView.swift; sourceTree = "<group>"; };
 		232FF5DC1B1442AB3E9A70D7 /* UnifiedNoteVaultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNoteVaultTests.swift; sourceTree = "<group>"; };
 		259CEB7B4BD1575F84D9D5AC /* ModelContext+Persist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+Persist.swift"; sourceTree = "<group>"; };
+		2E5276365CC8B1E9A9D8ECAB /* NoteExcerpt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteExcerpt.swift; sourceTree = "<group>"; };
 		3060E6C9EEB8D3D24C6E6EF0 /* NoteDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDestination.swift; sourceTree = "<group>"; };
 		314274C9F9FC7211ED610923 /* Draft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Draft.swift; sourceTree = "<group>"; };
 		314F0A31877B0266D4365219 /* PlainNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlainNoteEditor.swift; sourceTree = "<group>"; };
@@ -111,6 +116,7 @@
 		9402EFB7E5837FF74E182198 /* UnifiedNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedNote.swift; sourceTree = "<group>"; };
 		94101A71EB26ADE3EAB50F73 /* DraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftStore.swift; sourceTree = "<group>"; };
 		94FE3A3FFAA20FF0C3CADF8B /* NoteDateGrouping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteDateGrouping.swift; sourceTree = "<group>"; };
+		965F67343F7951522A027F8C /* NoteExcerptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteExcerptTests.swift; sourceTree = "<group>"; };
 		A6A3638D8A4EB1A997EB0A0C /* FrontmatterPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterPreviewSheet.swift; sourceTree = "<group>"; };
 		AA8AA90676036B41F333EF70 /* SpeechTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionService.swift; sourceTree = "<group>"; };
 		AF5C1D8108B4B288493A5A0D /* VaultIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndex.swift; sourceTree = "<group>"; };
@@ -210,7 +216,9 @@
 				350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */,
 				EB22F14C563C717107686A52 /* FrontmatterTests.swift */,
 				64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */,
+				965F67343F7951522A027F8C /* NoteExcerptTests.swift */,
 				FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */,
+				0E11BA6574365BE10C1FA1D7 /* PinnedNotesStoreTests.swift */,
 				0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */,
 				06D71F419E70B9079F12570F /* ServerMemoSaveQueueTests.swift */,
 				232FF5DC1B1442AB3E9A70D7 /* UnifiedNoteVaultTests.swift */,
@@ -243,6 +251,7 @@
 		99E4F4C2E57AEF787E6867E7 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				2E5276365CC8B1E9A9D8ECAB /* NoteExcerpt.swift */,
 				13A975412D77652ED447A2BB /* PinnedNotesStore.swift */,
 				B500C334B926323FB0A1BF9D /* TagExtractor.swift */,
 				9402EFB7E5837FF74E182198 /* UnifiedNote.swift */,
@@ -411,6 +420,7 @@
 				D657D03D51660CA54BD642AD /* NoteDateGrouping.swift in Sources */,
 				C6BDA696B44AE642A3799A83 /* NoteDestination.swift in Sources */,
 				81D598B3E1020FFA8F67311D /* NoteEditorView.swift in Sources */,
+				B343767D78F4B6FD8436ACD7 /* NoteExcerpt.swift in Sources */,
 				EFF60B5D84803147AE3512C7 /* NoteListEditing.swift in Sources */,
 				9D2FEF1E13793CDB882CE08E /* NoteRowView.swift in Sources */,
 				3B60732A3EB2E327D1D90601 /* NotesListView.swift in Sources */,
@@ -448,7 +458,9 @@
 				5D2E4CA21535F70984A8145C /* DraftBehaviorTests.swift in Sources */,
 				9381D37D0FC10BB1BBE4B33E /* FrontmatterTests.swift in Sources */,
 				9E1A85D61011236DED24C200 /* MemosClientParsingTests.swift in Sources */,
+				CFD4FC81F55747BFD319FA7B /* NoteExcerptTests.swift in Sources */,
 				5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */,
+				45E152C17AC73909B77FB275 /* PinnedNotesStoreTests.swift in Sources */,
 				A54F61303467CE8F94E96A05 /* ServerMemoDeleteQueueTests.swift in Sources */,
 				A5279A0E21FCCCBEBE149898 /* ServerMemoSaveQueueTests.swift in Sources */,
 				AC5A09537C4183121427C8B4 /* UnifiedNoteVaultTests.swift in Sources */,

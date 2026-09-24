@@ -2,9 +2,9 @@ import SwiftUI
 import UIKit
 
 /// A deliberately minimal note editor: plain text with two smart behaviors —
-/// Markdown list auto-continuation and `#tag` autocomplete. No live styling,
-/// no interactive ranges, no tappable checkboxes. `- [ ]` is plain text that
-/// still continues on Return.
+/// Markdown list auto-continuation and `#tag` autocomplete. The only styling is
+/// `#tags` drawn in the accent color; no interactive ranges, no tappable
+/// checkboxes. `- [ ]` is plain text that still continues on Return.
 ///
 /// The list-continuation logic is shared with the rest of the app via
 /// `NoteTextViewListEditing`; the tag-completion logic lives here.
@@ -13,8 +13,12 @@ struct PlainNoteEditor: UIViewRepresentable {
     @Binding var isFocused: Bool
     var focusRequestID: UUID
     var extraBottomPadding: CGFloat = 0
+    /// Space above the first line that the text can still scroll up into.
+    var extraTopPadding: CGFloat = 0
     var tagSuggestions: [String] = []
     var onTagAccepted: (String) -> Void = { _ in }
+    /// Handle for edits that come from outside the keyboard (toolbar, dictation).
+    var controller: PlainNoteEditorController?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -29,17 +33,20 @@ struct PlainNoteEditor: UIViewRepresentable {
         textView.alwaysBounceVertical = true
         textView.keyboardDismissMode = .interactive
         textView.textContainer.lineFragmentPadding = 0
-        textView.textContainerInset = UIEdgeInsets(top: 0, left: 0, bottom: extraBottomPadding, right: 0)
-        textView.verticalScrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: extraBottomPadding, right: 0)
+        textView.textContainerInset = UIEdgeInsets(top: extraTopPadding, left: 0, bottom: extraBottomPadding, right: 0)
+        textView.verticalScrollIndicatorInsets = UIEdgeInsets(top: extraTopPadding, left: 0, bottom: extraBottomPadding, right: 0)
         textView.allowsEditingTextAttributes = false
         textView.text = text
         context.coordinator.configureCompletionLabel(in: textView)
+        context.coordinator.applyTagStyling(textView)
+        controller?.attach(textView, coordinator: context.coordinator)
         return textView
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.updateTagSuggestions(tagSuggestions)
+        controller?.attach(uiView, coordinator: context.coordinator)
 
         if uiView.textContainerInset.bottom != extraBottomPadding {
             uiView.textContainerInset.bottom = extraBottomPadding
@@ -48,6 +55,7 @@ struct PlainNoteEditor: UIViewRepresentable {
 
         if uiView.text != text {
             uiView.text = text
+            context.coordinator.applyTagStyling(uiView)
         }
 
         if context.coordinator.lastFocusRequestID != focusRequestID {
@@ -113,6 +121,7 @@ struct PlainNoteEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             parent.text = textView.text ?? ""
+            applyTagStyling(textView)
             refreshTagPreview(in: textView)
         }
 
@@ -210,13 +219,39 @@ struct PlainNoteEditor: UIViewRepresentable {
             applyReplacement(textView, newText: replaced, caretOffset: caret)
         }
 
-        private func applyReplacement(_ textView: UITextView, newText: String, caretOffset: Int) {
+        func applyReplacement(_ textView: UITextView, newText: String, caretOffset: Int) {
             textView.text = newText
+            applyTagStyling(textView)
             parent.text = newText
             if let cursor = textView.position(from: textView.beginningOfDocument, offset: caretOffset) {
                 textView.selectedTextRange = textView.textRange(from: cursor, to: cursor)
             }
             refreshTagPreview(in: textView)
+        }
+
+        // MARK: Tag styling
+
+        private static let tagRegex = try! NSRegularExpression(pattern: #"(?<![A-Za-z0-9_-])#[A-Za-z0-9_-]+"#)
+        private static let tagColor = UIColor(appAccent)
+
+        /// Colors every `#tag`. Attributes only — the characters and selection are
+        /// untouched. Skipped mid-composition so marked (IME) text isn't disturbed.
+        func applyTagStyling(_ textView: UITextView) {
+            guard textView.markedTextRange == nil else { return }
+            let storage = textView.textStorage
+            let fullRange = NSRange(location: 0, length: storage.length)
+            let base: [NSAttributedString.Key: Any] = [
+                .font: textView.font ?? UIFont.preferredFont(forTextStyle: .body),
+                .foregroundColor: UIColor.label,
+            ]
+            storage.beginEditing()
+            storage.setAttributes(base, range: fullRange)
+            for match in Self.tagRegex.matches(in: storage.string, range: fullRange) {
+                storage.addAttribute(.foregroundColor, value: Self.tagColor, range: match.range)
+            }
+            storage.endEditing()
+            // Typing right after a tag must not inherit its color.
+            textView.typingAttributes = base
         }
 
         // MARK: Tag completion
@@ -328,5 +363,64 @@ struct PlainNoteEditor: UIViewRepresentable {
                 || scalar.value == 95  // _
                 || scalar.value == 45  // -
         }
+    }
+}
+
+/// Lets the editor's surroundings edit the text the way the keyboard would — at the
+/// caret, through the same delegate path, so the binding and tag styling follow.
+@MainActor
+final class PlainNoteEditorController {
+    private weak var textView: UITextView?
+    private weak var coordinator: PlainNoteEditor.Coordinator?
+
+    /// The span the in-progress dictation occupies; rewritten on every partial result.
+    private var dictationRange: NSRange?
+    private var dictationPrefix = ""
+
+    fileprivate func attach(_ textView: UITextView, coordinator: PlainNoteEditor.Coordinator) {
+        self.textView = textView
+        self.coordinator = coordinator
+    }
+
+    /// Inserts `#` at the caret, spaced off from a preceding word so it starts a tag.
+    func insertTagMarker() {
+        guard let textView else { return }
+        textView.insertText(needsLeadingSpace(in: textView) ? " #" : "#")
+        if !textView.isFirstResponder { textView.becomeFirstResponder() }
+    }
+
+    func beginDictation() {
+        guard let textView else { return }
+        let caret = textView.selectedRange
+        dictationRange = NSRange(location: caret.location, length: caret.length)
+        dictationPrefix = needsLeadingSpace(in: textView) ? " " : ""
+    }
+
+    /// Replaces what dictation has written so far with the latest transcript.
+    func updateDictation(_ transcript: String) {
+        guard let textView, let coordinator, let range = dictationRange, !transcript.isEmpty else { return }
+        let current = (textView.text ?? "") as NSString
+        guard NSMaxRange(range) <= current.length else {
+            // The text moved under us (edited mid-dictation) — stop rewriting.
+            dictationRange = nil
+            return
+        }
+        let insertion = dictationPrefix + transcript
+        let length = (insertion as NSString).length
+        let newText = current.replacingCharacters(in: range, with: insertion)
+        coordinator.applyReplacement(textView, newText: newText, caretOffset: range.location + length)
+        dictationRange = NSRange(location: range.location, length: length)
+    }
+
+    func endDictation() {
+        dictationRange = nil
+        dictationPrefix = ""
+    }
+
+    private func needsLeadingSpace(in textView: UITextView) -> Bool {
+        let location = textView.selectedRange.location
+        guard location > 0, let text = textView.text else { return false }
+        let previous = (text as NSString).substring(with: NSRange(location: location - 1, length: 1))
+        return !(previous.first?.isWhitespace ?? true)
     }
 }

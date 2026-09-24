@@ -80,7 +80,7 @@ final class VaultIndexTests: XCTestCase {
         let made = VaultIndexEntry.make(from: note)
         XCTAssertEqual(made.title, "My Note")
         XCTAssertEqual(made.tags, ["inbox"])
-        XCTAssertEqual(made.preview, "Second line with #inbox")
+        XCTAssertEqual(made.preview, "First line Second line with #inbox")
         XCTAssertEqual(made.fileSize, 42)
     }
 

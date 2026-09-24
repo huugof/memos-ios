@@ -40,9 +40,10 @@ enum UnifiedNote: Identifiable {
             }
             return memo.preferredDisplayText
         case .vault(let entry):
-            // The index holds no body — the list only needs title and preview,
-            // and reading content here would force an iCloud download per row.
-            return "\(entry.title)\n\(entry.preview)"
+            // The index holds no body — only a flattened excerpt, which already
+            // leads with the title line. Reading the file here would force an
+            // iCloud download per row.
+            return entry.preview.isEmpty ? entry.title : entry.preview
         }
     }
 
@@ -56,19 +57,11 @@ enum UnifiedNote: Identifiable {
         return line.isEmpty ? "New Note" : line
     }
 
-    var preview: String {
-        if case .vault(let entry) = self { return entry.preview }
-        let lines = content.components(separatedBy: "\n")
-        var pastTitle = false
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if !pastTitle {
-                if !trimmed.isEmpty { pastTitle = true }
-                continue
-            }
-            if !trimmed.isEmpty { return trimmed }
-        }
-        return "No additional text"
+    /// The note flattened for a history row. A vault note's content is already the
+    /// index's flattened excerpt.
+    var excerpt: String {
+        if case .vault = self { return content }
+        return NoteExcerpt.make(from: content)
     }
 
     var date: Date {

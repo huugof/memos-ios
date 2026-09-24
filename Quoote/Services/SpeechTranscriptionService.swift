@@ -25,6 +25,7 @@ final class SpeechTranscriptionService: ObservableObject {
 
     func startTranscription() {
         guard !isTranscribing else { return }
+        transcribedText = ""
 
         let recognizer = SFSpeechRecognizer(locale: Locale.current)
         guard let recognizer, recognizer.isAvailable else {

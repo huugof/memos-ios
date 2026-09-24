@@ -4,6 +4,7 @@ import Foundation
 struct VaultIndexEntry: Codable, Equatable, Identifiable {
     let relativePath: String
     let title: String
+    /// The body flattened for a history row (`NoteExcerpt`), title line included.
     let preview: String
     let tags: [String]
     let modifiedAt: Date
@@ -42,25 +43,11 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
         VaultIndexEntry(
             relativePath: note.relativePath,
             title: note.title,
-            preview: Self.preview(forBody: note.body),
+            preview: NoteExcerpt.make(from: note.body),
             tags: note.tags,
             modifiedAt: note.modifiedAt,
             fileSize: note.fileSize
         )
-    }
-
-    /// The first body line after the title line, matching UnifiedNote.preview.
-    private static func preview(forBody body: String) -> String {
-        var pastTitle = false
-        for line in body.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if !pastTitle {
-                if !trimmed.isEmpty { pastTitle = true }
-                continue
-            }
-            if !trimmed.isEmpty { return trimmed }
-        }
-        return "No additional text"
     }
 }
 
@@ -76,7 +63,7 @@ struct VaultIndexDiff: Equatable {
 /// In an iCloud vault a file may be `.notDownloaded`; reading its content
 /// forces a download. Diffing on cheap metadata keeps that to the minimum.
 enum VaultIndex {
-    private static let filename = "vault_index_v1.json"
+    private static let filename = "vault_index_v2.json"
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
 

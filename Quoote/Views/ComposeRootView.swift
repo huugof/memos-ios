@@ -1,16 +1,17 @@
 import SwiftUI
 import SwiftData
 
-/// App root: launch lands directly on a focused compose screen. History is one
-/// tap (or a left-edge swipe) away — it slides over the compose screen as a drawer,
-/// which keeps the in-progress note alive underneath. Local-first, invisible sync.
+/// App root: history is the screen underneath, and every note is edited on a sheet
+/// over it. Launch opens the sheet on a focused capture note (or the pinned note).
+/// Dragging the sheet down commits the note — sends a new one, saves an existing
+/// one — and reveals history. Local-first, invisible sync.
 struct ComposeRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var showMenu = false
-    /// Bumped to spin up a fresh compose draft (the "+" / quick-capture reset).
-    @State private var composeResetID = UUID()
+    /// The note on the sheet; nil while the sheet is down. A new value — even for
+    /// the same target — is a new sheet, so the old editor commits on disappear.
+    @State private var sheetNote: SheetNote?
 
     @StateObject private var serverMemosStore = ServerMemosStore()
     @StateObject private var sendQueue = DraftSendQueueController()
@@ -28,23 +29,16 @@ struct ComposeRootView: View {
     @State private var memosPrimed = false
 
     var body: some View {
-        ZStack {
-            NavigationStack {
-                NoteEditorView(
-                    target: .newNote,
-                    isHome: true,
-                    isMenuOpen: showMenu,
-                    onNewNote: newNote,
-                    onOpenMenu: openMenu
-                )
-                .id(composeResetID)
-            }
-
-            if showMenu {
-                NotesMenuRoot(onClose: closeMenu)
-                    .transition(.move(edge: .leading))
-                    .zIndex(1)  // stays on top while sliding back out, too
-            }
+        NavigationStack {
+            NotesListView(onOpen: openSheet, onCompose: openCompose)
+        }
+        // Full height: with the keyboard up, iOS lifts any shorter detent to the top anyway.
+        .sheet(item: $sheetNote) { note in
+            NoteEditorView(target: note.target)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .tint(appAccent)
+                .preferredColorScheme(.dark)
         }
         .tint(appAccent)
         .environmentObject(serverMemosStore)
@@ -60,9 +54,11 @@ struct ComposeRootView: View {
                 serverMemosStore.loadFromCache(MemoCache.load())
                 serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
                 memosPrimed = true
+                openCompose()  // after the cache load, so a pinned memo resolves
                 await serverMemosStore.refresh(force: true)
             case .vault:
                 vaultStore.loadFromIndex()
+                openCompose()
                 await vaultStore.refresh()
             }
         }
@@ -104,6 +100,10 @@ struct ComposeRootView: View {
         .onChange(of: sendQueue.lastCreatedMemo) { _, memo in
             guard let memo else { return }
             serverMemosStore.upsertMemo(memo)
+            // A pinned note stays pinned once sent: follow it from draft to memo.
+            if let draftID = sendQueue.lastSentDraftID {
+                pinnedStore.migrate(fromDraft: draftID, to: "m-\(memo.id)")
+            }
         }
         .onChange(of: saveQueue.lastSuccessfulMemo) { _, memo in
             guard let memo else { return }
@@ -138,21 +138,34 @@ struct ComposeRootView: View {
         }
     }
 
-    private func newNote() {
-        composeResetID = UUID()
+    private func openSheet(_ target: NoteEditorTarget) {
+        sheetNote = SheetNote(target: target)
     }
 
-    private func openMenu() {
-        guard !showMenu else { return }
-        withAnimation(.easeOut(duration: 0.28)) { showMenu = true }
+    private func openCompose() {
+        openSheet(composeTarget())
     }
 
-    private func closeMenu() {
-        withAnimation(.easeIn(duration: 0.25)) { showMenu = false }
+    /// The pinned note when there is one, else a fresh capture note.
+    private func composeTarget() -> NoteEditorTarget {
+        guard let pinned = pinnedStore.target else { return .newNote }
+        if case .localDraft(let id) = pinned {
+            let draft = try? modelContext.fetch(
+                FetchDescriptor<Draft>(predicate: #Predicate { $0.id == id })
+            ).first
+            // Deleted, or sent without the pin following it (e.g. the app was killed
+            // before the memo came back) — nothing left to reopen.
+            guard let draft, !(draft.isArchived && draft.sendState == .sent) else {
+                pinnedStore.unpin()
+                return .newNote
+            }
+        }
+        return pinned
     }
 
     /// Quick capture: after being away longer than the configured delay, come back to a
-    /// blank note — from wherever the user left off, an open editor included.
+    /// blank note (or the pinned one) — from wherever the user left off, an open
+    /// editor included.
     private func handleForegroundResume() {
         guard let backgroundAt = AppSettings.lastBackgroundAt else { return }
         guard let delaySeconds = AppSettings.newNoteDelay.delaySeconds else { return }
@@ -160,18 +173,14 @@ struct ComposeRootView: View {
         guard elapsed >= TimeInterval(delaySeconds) else { return }
         AppSettings.lastBackgroundAt = nil
 
-        guard showMenu else {
-            composeResetID = UUID()
-            return
-        }
-
-        // Tearing the drawer down runs the onDisappear of whatever it held, which flushes
+        // Swapping the sheet's note runs the old editor's onDisappear, which flushes
         // that text and enqueues the send/save; flushStagedServerEdits covers anything
-        // staged but not yet queued.
-        showMenu = false
-        flushStagedServerEdits()
-        // Defer the reset a runloop so the new editor doesn't grab focus mid-transition.
-        Task { @MainActor in composeResetID = UUID() }
+        // staged but not yet queued. Already on the pinned note: leave it be.
+        let target = composeTarget()
+        if let current = sheetNote, current.target == target, target != .newNote { return }
+        let hadSheet = sheetNote != nil
+        openSheet(target)
+        if hadSheet { flushStagedServerEdits() }
     }
 
     /// Enqueue every server note carrying unsaved local edits.
@@ -197,21 +206,8 @@ struct ComposeRootView: View {
     }
 }
 
-/// The menu layer. It carries its own navigation stack so tapping a note still pushes
-/// the editor and Back still lands on the list — the same flow as when the list lived
-/// on the compose stack, just hosted inside the drawer.
-private struct NotesMenuRoot: View {
-    let onClose: () -> Void
-
-    @State private var path: [NoteEditorTarget] = []
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            NotesListView(onClose: onClose)
-                .navigationDestination(for: NoteEditorTarget.self) { target in
-                    NoteEditorView(target: target)
-                }
-        }
-        .background(Color(uiColor: .systemBackground))  // opaque while sliding
-    }
+/// One presentation of the note sheet.
+private struct SheetNote: Identifiable {
+    let id = UUID()
+    let target: NoteEditorTarget
 }

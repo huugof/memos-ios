@@ -2,18 +2,14 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 import UniformTypeIdentifiers
+import AVFoundation
 
+/// The note editor, shown on the compose sheet. A `.newNote` target is the capture
+/// screen: Send hands back a blank note in place. Any other target — or a pinned
+/// note — commits and closes the sheet instead. Closing the sheet any other way
+/// (dragging it down) commits too, via `onDisappear`.
 struct NoteEditorView: View {
     let target: NoteEditorTarget
-    /// When true, this is the compose-first home screen (its own chrome: history, send, new).
-    var isHome: Bool = false
-    /// Home only: true while the notes drawer covers this screen. The compose screen stays
-    /// mounted underneath it, so focus has to be handed over explicitly.
-    var isMenuOpen: Bool = false
-    /// Invoked by the home "+" button to start a fresh note.
-    var onNewNote: () -> Void = {}
-    /// Invoked by the ☰ button and the home left-edge swipe to open the notes drawer.
-    var onOpenMenu: () -> Void = {}
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -44,10 +40,10 @@ struct NoteEditorView: View {
     /// The note couldn't be loaded — nothing to edit, so this blocks the
     /// editor the same way `serverMemoError` does.
     @State private var vaultLoadError: String?
-    /// A save conflict or write failure. Non-blocking — shown as a
-    /// dismissible banner over the still-editable text, never full-screen,
-    /// so it never interrupts typing.
-    @State private var vaultSaveMessage: String?
+    /// A vault save conflict or write failure, or a dictation problem.
+    /// Non-blocking — shown as a dismissible banner over the still-editable
+    /// text, never full-screen, so it never interrupts typing.
+    @State private var noticeMessage: String?
 
     // Attachment state
     @State private var pendingImages: [PendingImage] = []
@@ -64,9 +60,14 @@ struct NoteEditorView: View {
     @State private var persistDebounceTask: Task<Void, Never>?
     @State private var vaultSaveTask: Task<Void, Never>?
 
+    @State private var editorController = PlainNoteEditorController()
+    @StateObject private var speech = SpeechTranscriptionService()
+
     @State private var showAttachMenu = false
     @State private var frontmatterPreview: Result<String, Error>?
     @State private var didTapDone = false
+    /// The sheet is on its way down — losing focus now is expected, not a cue to close.
+    @State private var isClosing = false
     /// Last text sent via the home Send button — gates the button and double-sends.
     @State private var lastSentText = ""
 
@@ -105,6 +106,7 @@ struct NoteEditorView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding()
+                    .padding(.top, Self.topFade)
                 Spacer()
             } else if isLoadingServerMemo {
                 Spacer()
@@ -114,20 +116,18 @@ struct NoteEditorView: View {
                 editorBody
             }
         }
-        .navigationBarBackButtonHidden(true)
-        .toolbar { toolbarContent }
-        .overlay(alignment: .top) {
-            if let message = vaultSaveMessage {
-                vaultSaveBanner(message)
+        .overlay(alignment: .bottom) {
+            // Floats over the text, which scrolls on under the glass.
+            VStack(spacing: 0) {
+                if hasPendingAttachments {
+                    pendingAttachmentsBar
+                }
+                editorBar
             }
         }
-        .background {
-            if isHome {
-                // Root screen: the left edge opens the notes list (the system pop
-                // gesture is inert here anyway — nothing to pop back to).
-                NavigationGestures(edge: .left) { onOpenMenu() }
-            } else {
-                NavigationGestures()
+        .overlay(alignment: .top) {
+            if let message = noticeMessage {
+                noticeBanner(message)
             }
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotoItems,
@@ -179,19 +179,33 @@ struct NoteEditorView: View {
             scheduleVaultSave()
         }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background { saveCurrentState() }
-        }
-        .onChange(of: isMenuOpen) { _, open in
-            // Hand the keyboard to the drawer and take it back on close — this screen
-            // never unmounts, so nothing else resigns first responder for us.
-            if open {
-                isFocused = false
-            } else {
-                isFocused = true
-                focusRequestID = UUID()
+            if newPhase == .background {
+                stopDictation()
+                saveCurrentState()
             }
         }
+        .onChange(of: speech.transcribedText) { _, transcript in
+            editorController.updateDictation(transcript)
+        }
+        .onChange(of: speech.isTranscribing) { _, transcribing in
+            // The recognizer can end on its own (silence, final result, error). The
+            // final transcript lands in the same update, so let it apply first.
+            if !transcribing { Task { @MainActor in editorController.endDictation() } }
+        }
+        .onChange(of: speech.error) { _, error in
+            if let error { noticeMessage = error }
+        }
+        .onChange(of: isFocused) { _, focused in
+            // The sheet only stays up with the keyboard: putting the keyboard away
+            // closes it (which commits, via onDisappear) — unless something the
+            // editor presented is what took the keyboard.
+            if !focused, !isCoveredByPresentation { closeSheet() }
+        }
+        .onChange(of: isCoveredByPresentation) { _, covered in
+            if !covered { focusEditor() }
+        }
         .onDisappear {
+            stopDictation()
             persistDebounceTask?.cancel()
             persistDraftText()  // flush any pending debounced save before committing
             if !didTapDone { commitCurrent() }
@@ -203,48 +217,48 @@ struct NoteEditorView: View {
     // MARK: Editor body
 
     private var editorBody: some View {
-        ZStack(alignment: .bottom) {
-            PlainNoteEditor(
-                text: textBinding,
-                isFocused: $isFocused,
-                focusRequestID: focusRequestID,
-                extraBottomPadding: pendingAttachmentsHeight + 100,
-                tagSuggestions: tagSuggestions,
-                onTagAccepted: { rememberTag($0) }
-            )
-            .padding(.horizontal, 20)
-
-            if !pendingImages.isEmpty || !pendingFiles.isEmpty {
-                pendingAttachmentsBar
+        PlainNoteEditor(
+            text: textBinding,
+            isFocused: $isFocused,
+            focusRequestID: focusRequestID,
+            extraBottomPadding: Self.editorBarHeight + 16
+                + (hasPendingAttachments ? Self.attachmentsBarHeight : 0),
+            extraTopPadding: Self.topFade,
+            tagSuggestions: tagSuggestions,
+            onTagAccepted: { rememberTag($0) },
+            controller: editorController
+        )
+        .padding(.horizontal, 20)
+        // Text scrolling up fades out under the sheet's drag indicator.
+        .mask {
+            VStack(spacing: 0) {
+                // Eased, and never fully transparent: text stays faintly visible right
+                // up to the sheet's edge.
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.2), location: 0),
+                        .init(color: .black.opacity(0.45), location: 0.35),
+                        .init(color: .black.opacity(0.8), location: 0.7),
+                        .init(color: .black, location: 1),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: Self.topFade)
+                Color.black
             }
-
-            // Bottom fade — inside the ZStack so it shares the extended frame
-            LinearGradient(
-                colors: [.clear, Color(uiColor: .systemBackground).opacity(0.35)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 80)
-            .allowsHitTesting(false)
         }
-        .ignoresSafeArea(edges: .top)
-        .ignoresSafeArea(.container, edges: .bottom)
-        .overlay(alignment: .top) {
-            LinearGradient(
-                colors: [Color(uiColor: .systemBackground).opacity(0.6), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 80)
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-        }
+        // The sheet's content starts a little above its visible (rounded) top edge.
+        .padding(.top, 12)
     }
 
-    /// Non-blocking, dismissible banner for a vault save conflict/failure.
-    /// Sits over the editor without hiding it — a save problem must never
-    /// interrupt typing.
-    private func vaultSaveBanner(_ message: String) -> some View {
+    /// The strip at the top of the sheet that holds the drag indicator. The text starts
+    /// below it, so the fade only touches text that has scrolled up into it.
+    private static let topFade: CGFloat = 44
+
+    /// Non-blocking, dismissible banner for a vault save conflict/failure or a
+    /// dictation problem. Sits over the editor without hiding it — neither must
+    /// ever interrupt typing.
+    private func noticeBanner(_ message: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(message)
                 .font(.footnote)
@@ -252,7 +266,7 @@ struct NoteEditorView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             Button {
-                vaultSaveMessage = nil
+                noticeMessage = nil
             } label: {
                 Image(systemName: "xmark")
                     .font(.footnote.weight(.semibold))
@@ -263,7 +277,7 @@ struct NoteEditorView: View {
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.top, Self.topFade)
     }
 
     private var textBinding: Binding<String> {
@@ -275,10 +289,6 @@ struct NoteEditorView: View {
         case .vaultFile:
             return $vaultNoteBody
         }
-    }
-
-    private var pendingAttachmentsHeight: CGFloat {
-        pendingImages.isEmpty && pendingFiles.isEmpty ? 0 : 72
     }
 
     private var pendingAttachmentsBar: some View {
@@ -338,63 +348,73 @@ struct NoteEditorView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
         }
-        .frame(height: 72)
-        .background(.ultraThinMaterial)
+        .frame(height: Self.attachmentsBarHeight)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .padding(.horizontal, 16)
     }
 
-    // MARK: Toolbar
+    private static let attachmentsBarHeight: CGFloat = 72
+    /// Button height plus the bar's vertical padding.
+    private static let editorBarHeight: CGFloat = 48 + 16
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if isHome {
-            homeToolbarContent
-        } else {
-            editToolbarContent
-        }
+    private var hasPendingAttachments: Bool {
+        !pendingImages.isEmpty || !pendingFiles.isEmpty
     }
 
-    @ToolbarContentBuilder
-    private var homeToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button { onOpenMenu() } label: {
-                Image(systemName: "line.3.horizontal")
-                    .fontWeight(.semibold)
+    // MARK: Editor bar
+
+    /// Rides above the keyboard: note tools on the left, send/confirm on the right.
+    private var editorBar: some View {
+        GlassEffectContainer {
+            HStack(spacing: 12) {
+                HStack(spacing: 0) {
+                    barButton("number") { editorController.insertTagMarker() }
+                    barButton("paperclip") { showAttachMenu = true }
+                        .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
+                            Button("Photo Library") { showPhotoPicker = true }
+                            Button("Choose File") { showFilePicker = true }
+                            Button("Cancel", role: .cancel) {}
+                        }
+                    barButton(speech.isTranscribing ? "mic.fill" : "mic",
+                              highlighted: speech.isTranscribing) { toggleDictation() }
+                    barButton(isPinned ? "pin.fill" : "pin", highlighted: isPinned) { togglePin() }
+                        .disabled(!canPin)
+                    if showsFrontmatterButton {
+                        barButton("curlybraces") { showFrontmatterPreview() }
+                    }
+                }
+                .padding(.horizontal, 4)
+                .glassEffect(.regular.interactive(), in: Capsule())
+
+                Spacer(minLength: 0)
+
+                Button { closesOnSend ? sendAndClose() : sendHome() } label: {
+                    Image(systemName: closesOnSend ? "checkmark" : "arrow.up")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(canSend ? Color.black : Color.secondary)
+                        .frame(width: 48, height: 48)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(canSend ? .regular.tint(appAccent).interactive() : .regular.interactive(),
+                             in: Circle())
+                .disabled(!canSend)
             }
-            .tint(.primary)
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            HStack(spacing: 0) {
-                Button { showAttachMenu = true } label: {
-                    Image(systemName: "paperclip")
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                }
-                .tint(.primary)
-                .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
-                    Button("Photo Library") { showPhotoPicker = true }
-                    Button("Choose File") { showFilePicker = true }
-                    Button("Cancel", role: .cancel) {}
-                }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
 
-                if showsFrontmatterButton {
-                    frontmatterButton
-                }
-
-                Divider().frame(height: 16)
-
-                Button { resetToNewNote() } label: {
-                    Image(systemName: "square.and.pencil")
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                }
-                .tint(.primary)
-            }
-            .fixedSize()
-            .glassToolbarCapsule()
+    private func barButton(_ systemName: String, highlighted: Bool = false,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 17))
+                .foregroundStyle(highlighted ? appAccent : .primary)
+                .frame(width: 44, height: 48)
+                .contentShape(Rectangle())
         }
-        sendToolbarItem { sendHome() }
+        .buttonStyle(.plain)
     }
 
     /// Vault notes only: a Memos memo has no frontmatter to show.
@@ -404,17 +424,6 @@ struct NoteEditorView: View {
         case .serverMemo: return false
         case .newNote, .localDraft: return AppSettings.destinationKind == .vault
         }
-    }
-
-    private var frontmatterButton: some View {
-        Button { showFrontmatterPreview() } label: {
-            Image(systemName: "curlybraces")
-                .font(.system(size: 15))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-        }
-        .tint(.primary)
     }
 
     /// Renders what the next save would write, from the same inputs it would use.
@@ -430,71 +439,41 @@ struct NoteEditorView: View {
         }
     }
 
-    /// The ↑ send button — identical on both screens so it stays in the same spot.
-    @ToolbarContentBuilder
-    private func sendToolbarItem(action: @escaping () -> Void) -> some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button(action: action) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(canSend ? appAccent : Color.secondary)
-            }
-            .disabled(!canSend)
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var editToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button { handleBack() } label: {
-                Image(systemName: "chevron.left")
-                    .fontWeight(.semibold)
-            }
-            .tint(.primary)
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            HStack(spacing: 0) {
-                Button { togglePin() } label: {
-                    Image(systemName: isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 15))
-                        .foregroundStyle(isPinned ? appAccent : .primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                }
-                .disabled(noteID == nil)
-
-                if showsFrontmatterButton {
-                    Divider().frame(height: 16)
-                    frontmatterButton
-                }
-
-                Divider()
-                    .frame(height: 16)
-
-                Button {
-                    showAttachMenu = true
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                }
-                .tint(.primary)
-                .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
-                    Button("Photo Library") { showPhotoPicker = true }
-                    Button("Choose File") { showFilePicker = true }
-                    Button("Cancel", role: .cancel) {}
-                }
-            }
-            .fixedSize()
-            .glassToolbarCapsule()
-        }
-        sendToolbarItem { sendEdit() }
+    /// A blank capture note has nothing to keep in front yet.
+    private var canPin: Bool {
+        guard noteID != nil else { return false }
+        if case .newNote = target { return isPinned || !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return true
     }
 
     private func togglePin() {
         guard let id = noteID else { return }
         pinnedStore.toggle(id)
+    }
+
+    // MARK: Dictation
+
+    private func toggleDictation() {
+        if speech.isTranscribing {
+            stopDictation()
+            return
+        }
+        Task {
+            guard await SpeechTranscriptionService.requestAuthorization(),
+                  await AVAudioApplication.requestRecordPermission() else {
+                noticeMessage = "Allow Microphone and Speech Recognition for Quoote in Settings to dictate."
+                return
+            }
+            editorController.beginDictation()
+            speech.startTranscription()
+            if !speech.isTranscribing { editorController.endDictation() }
+        }
+    }
+
+    private func stopDictation() {
+        guard speech.isTranscribing else { return }
+        speech.stopTranscription()
+        editorController.endDictation()
     }
 
     // MARK: Send
@@ -510,6 +489,7 @@ struct NoteEditorView: View {
     /// see `dispatchSend`.
     private func sendHome() {
         guard canSend, let draft = currentDraft else { return }
+        stopDictation()
         persistDraftText()
         appendPendingAttachments(to: draft)
         guard dispatchSend(draft) else {
@@ -523,13 +503,47 @@ struct NoteEditorView: View {
         resetToNewNote()
     }
 
-    /// Edit screen: push the change to the server, then pop back where we came from.
-    private func sendEdit() {
+    /// An existing note, or the pinned one, is confirmed rather than sent-and-reset:
+    /// commit it and close the sheet. Reopening lands on the pinned note again.
+    private var closesOnSend: Bool {
+        if case .newNote = target { return isPinned }
+        return true
+    }
+
+    /// Commit, then close the sheet. A failed vault write for a new note keeps the
+    /// sheet open with its text, as `sendHome` does.
+    private func sendAndClose() {
         guard canSend else { return }
+        stopDictation()
+        if case .newNote = target {
+            guard let draft = currentDraft else { return }
+            persistDraftText()
+            appendPendingAttachments(to: draft)
+            guard dispatchSend(draft) else { return }
+        } else {
+            commitCurrent()
+        }
         didTapDone = true
         lastSentText = textBinding.wrappedValue
-        commitCurrent()
+        closeSheet()
+    }
+
+    private func closeSheet() {
+        guard !isClosing else { return }
+        isClosing = true
         dismiss()
+    }
+
+    private func focusEditor() {
+        isFocused = true
+        focusRequestID = UUID()
+    }
+
+    /// Something the editor presented is covering it — the keyboard is down because
+    /// of that, and comes back when it's gone.
+    private var isCoveredByPresentation: Bool {
+        showAttachMenu || showPhotoPicker || showFilePicker
+            || uploadError != nil || frontmatterPreview != nil
     }
 
     /// Swap the editor onto a fresh blank draft without rebuilding the view — the
@@ -544,17 +558,10 @@ struct NoteEditorView: View {
         didTapDone = false
         pendingImages = []
         pendingFiles = []
-        isFocused = true
-        focusRequestID = UUID()
+        focusEditor()
     }
 
     // MARK: Actions
-
-    private func handleBack() {
-        didTapDone = true
-        commitCurrent()
-        dismiss()
-    }
 
     private func commitCurrent() {
         switch target {
@@ -582,7 +589,7 @@ struct NoteEditorView: View {
     /// path keeps its queue; the vault path writes the file immediately.
     /// Returns `false` only when a vault write failed, so callers (namely
     /// `sendHome()`) know not to archive/reset — the draft and its text stay
-    /// on screen, with the failure surfaced via `vaultSaveMessage`, for a
+    /// on screen, with the failure surfaced via `noticeMessage`, for a
     /// retry.
     @discardableResult
     private func dispatchSend(_ draft: Draft) -> Bool {
@@ -601,13 +608,14 @@ struct NoteEditorView: View {
                 return true
             }
             do {
-                try vaultStore.create(body: draft.text)
+                let entry = try vaultStore.create(body: draft.text)
+                pinnedStore.migrate(fromDraft: draft.id, to: "v-\(entry.relativePath)")
                 draft.isArchived = true
                 draft.lastSentAt = Date()
                 draft.sendState = .sent
                 draft.lastError = nil
                 modelContext.saveOrAssert()
-                vaultSaveMessage = nil
+                noticeMessage = nil
                 return true
             } catch {
                 // Leave the draft unarchived so no text is lost.
@@ -617,7 +625,7 @@ struct NoteEditorView: View {
                 modelContext.saveOrAssert()
                 // Surface on this screen (non-blocking banner) and in the
                 // list's error row — a failed vault send must never be silent.
-                vaultSaveMessage = message
+                noticeMessage = message
                 vaultStore.errorMessage = message
                 return false
             }
@@ -683,8 +691,6 @@ struct NoteEditorView: View {
             let draft = DraftStore.createDraft(in: modelContext)
             localDraftID = draft.id
             draftText = ""
-            isFocused = true
-            focusRequestID = UUID()
         case .localDraft(let id):
             localDraftID = id
             if let draft = allDrafts.first(where: { $0.id == id }) {
@@ -695,6 +701,8 @@ struct NoteEditorView: View {
         case .vaultFile(let path):
             loadVaultNote(path)
         }
+        // Every note opens with the keyboard up — the sheet never sits without it.
+        if serverMemoError == nil, vaultLoadError == nil { focusEditor() }
         fetchRemoteTagsOnce()
         refreshTagSuggestions()
     }
@@ -754,12 +762,12 @@ struct NoteEditorView: View {
             loadedVaultNote = outcome.note
             switch outcome.result {
             case .written:
-                vaultSaveMessage = nil
+                noticeMessage = nil
             case .conflictCopy(let path, _):
-                vaultSaveMessage = "This note changed elsewhere. Your version was saved as \(path)."
+                noticeMessage = "This note changed elsewhere. Your version was saved as \(path)."
             }
         } catch {
-            vaultSaveMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            noticeMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
@@ -975,126 +983,6 @@ struct NoteEditorView: View {
         var v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if v.hasPrefix("#") { v.removeFirst() }
         return v.filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }
-    }
-}
-
-/// Two jobs on the enclosing `UINavigationController`:
-///
-/// 1. Keeps the system swipe-back alive on screens that hide the back button, while
-///    refusing it at the stack root (a `nil` delegate there can strand the stack).
-/// 2. Optionally installs a screen-edge pan that runs `action` — the compose home uses
-///    the left edge to open the notes list, the list uses the right edge to close.
-///
-/// The recognizer lives on the nav controller's view, so it stays attached while the
-/// screen sits underneath a pushed one; `action` therefore only fires when this
-/// screen is the visible one.
-struct NavigationGestures: UIViewControllerRepresentable {
-    var edge: UIRectEdge?
-    var action: () -> Void = {}
-
-    init(edge: UIRectEdge? = nil, action: @escaping () -> Void = {}) {
-        self.edge = edge
-        self.action = action
-    }
-
-    func makeUIViewController(context: Context) -> HostController {
-        let controller = HostController()
-        let coordinator = context.coordinator
-        let edge = edge
-        // viewDidAppear is the first moment the navigation controller is reachable, and
-        // it fires again on every pop back — which re-claims the pop gesture's delegate.
-        controller.onAppear = { [weak controller] in
-            guard let controller, let nav = controller.navigationController else { return }
-            coordinator.adopt(nav: nav, host: controller, edge: edge)
-        }
-        return controller
-    }
-
-    func updateUIViewController(_ vc: HostController, context: Context) {
-        context.coordinator.action = action
-        if let nav = vc.navigationController {
-            context.coordinator.adopt(nav: nav, host: vc, edge: edge)
-        }
-    }
-
-    static func dismantleUIViewController(_ vc: HostController, coordinator: Coordinator) {
-        coordinator.detach()
-    }
-
-    final class HostController: UIViewController {
-        var onAppear: (() -> Void)?
-
-        override func viewDidAppear(_ animated: Bool) {
-            super.viewDidAppear(animated)
-            onAppear?()
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
-
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var action: () -> Void
-        private weak var navigationController: UINavigationController?
-        private weak var host: UIViewController?
-        private var edgeRecognizer: UIScreenEdgePanGestureRecognizer?
-
-        init(action: @escaping () -> Void) {
-            self.action = action
-        }
-
-        func adopt(nav: UINavigationController, host: UIViewController, edge: UIRectEdge?) {
-            navigationController = nav
-            self.host = host
-            nav.interactivePopGestureRecognizer?.delegate = self
-
-            guard let edge, edgeRecognizer == nil else { return }
-            let recognizer = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleEdgePan(_:)))
-            recognizer.edges = edge
-            recognizer.delegate = self
-            nav.view.addGestureRecognizer(recognizer)
-            edgeRecognizer = recognizer
-        }
-
-        func detach() {
-            if let recognizer = edgeRecognizer {
-                recognizer.view?.removeGestureRecognizer(recognizer)
-                edgeRecognizer = nil
-            }
-            if navigationController?.interactivePopGestureRecognizer?.delegate === self {
-                navigationController?.interactivePopGestureRecognizer?.delegate = nil
-            }
-        }
-
-        @objc private func handleEdgePan(_ recognizer: UIScreenEdgePanGestureRecognizer) {
-            guard recognizer.state == .began, isHostVisible else { return }
-            action()
-        }
-
-        /// True when the screen that owns this coordinator is the one on screen — the
-        /// recognizer outlives a push, and must go quiet while covered.
-        private var isHostVisible: Bool {
-            guard let top = navigationController?.topViewController else { return false }
-            var node = host
-            while let current = node {
-                if current === top { return true }
-                node = current.parent
-            }
-            return false
-        }
-
-        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-            if recognizer === navigationController?.interactivePopGestureRecognizer {
-                return (navigationController?.viewControllers.count ?? 0) > 1
-            }
-            return true
-        }
-
-        func gestureRecognizer(
-            _ recognizer: UIGestureRecognizer,
-            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
-        ) -> Bool {
-            true
-        }
     }
 }
 
