@@ -389,7 +389,7 @@ struct NoteEditorView: View {
                 Spacer(minLength: 0)
 
                 Button { closesOnSend ? sendAndClose() : sendHome() } label: {
-                    Image(systemName: closesOnSend ? "checkmark" : "arrow.up")
+                    Image(systemName: isNewCapture ? "arrow.up" : "checkmark")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(canSend ? Color.black : Color.secondary)
                         .frame(width: 48, height: 48)
@@ -503,11 +503,17 @@ struct NoteEditorView: View {
         resetToNewNote()
     }
 
+    /// A fresh capture note is sent (↑); an existing or pinned note is confirmed (✓).
+    private var isNewCapture: Bool {
+        if case .newNote = target { return !isPinned }
+        return false
+    }
+
     /// An existing note, or the pinned one, is confirmed rather than sent-and-reset:
     /// commit it and close the sheet. Reopening lands on the pinned note again.
+    /// A capture note closes too when Settings asks for history after sending.
     private var closesOnSend: Bool {
-        if case .newNote = target { return isPinned }
-        return true
+        !isNewCapture || AppSettings.showHistoryAfterSend
     }
 
     /// Commit, then close the sheet. A failed vault write for a new note keeps the
@@ -932,6 +938,7 @@ struct NoteEditorView: View {
 
     private func fetchRemoteTagsOnce() {
         remoteTagTask?.cancel()
+        guard AppSettings.destinationKind == .memos else { return }
         remoteTagTask = Task { @MainActor in
             do {
                 let tags = try await MemosClient().fetchTags(
@@ -949,8 +956,10 @@ struct NoteEditorView: View {
     private func refreshTagSuggestions() {
         let currentText = textBinding.wrappedValue
         let localTags = extractTagsFromTexts(allDrafts.map(\.text) + [currentText])
+        // A vault has no tag endpoint; its index already holds every file's tags.
+        let vaultTags = AppSettings.destinationKind == .vault ? vaultStore.entries.flatMap(\.tags) : []
         var canonicalByLower: [String: String] = [:]
-        for tag in localTags + remoteTags {
+        for tag in AppSettings.customTags + localTags + remoteTags + vaultTags {
             let key = normalizeTag(tag).lowercased()
             guard !key.isEmpty, canonicalByLower[key] == nil else { continue }
             canonicalByLower[key] = normalizeTag(tag)

@@ -33,7 +33,11 @@ struct PlainNoteEditor: UIViewRepresentable {
         textView.alwaysBounceVertical = true
         textView.keyboardDismissMode = .interactive
         textView.textContainer.lineFragmentPadding = 0
-        textView.textContainerInset = UIEdgeInsets(top: extraTopPadding, left: 0, bottom: extraBottomPadding, right: 0)
+        textView.textContainerInset = UIEdgeInsets(top: extraTopPadding, left: 0, bottom: 0, right: 0)
+        // A content inset, not a text-container one: UITextView keeps the caret clear of
+        // content insets as you type, so the line being written stays above the bar
+        // floating over the bottom of the editor.
+        textView.contentInset.bottom = extraBottomPadding
         textView.verticalScrollIndicatorInsets = UIEdgeInsets(top: extraTopPadding, left: 0, bottom: extraBottomPadding, right: 0)
         textView.allowsEditingTextAttributes = false
         textView.text = text
@@ -48,9 +52,10 @@ struct PlainNoteEditor: UIViewRepresentable {
         context.coordinator.updateTagSuggestions(tagSuggestions)
         controller?.attach(uiView, coordinator: context.coordinator)
 
-        if uiView.textContainerInset.bottom != extraBottomPadding {
-            uiView.textContainerInset.bottom = extraBottomPadding
+        if uiView.contentInset.bottom != extraBottomPadding {
+            uiView.contentInset.bottom = extraBottomPadding
             uiView.verticalScrollIndicatorInsets.bottom = extraBottomPadding
+            context.coordinator.scrollCaretIntoView(uiView)
         }
 
         if uiView.text != text {
@@ -123,6 +128,22 @@ struct PlainNoteEditor: UIViewRepresentable {
             parent.text = textView.text ?? ""
             applyTagStyling(textView)
             refreshTagPreview(in: textView)
+            scrollCaretIntoView(textView)
+        }
+
+        /// Keeps the caret above the bottom inset (the editor bar). UIKit's own
+        /// scroll-to-caret misses edits it didn't type itself (list continuation,
+        /// dictation) and can run before the text has been laid out.
+        func scrollCaretIntoView(_ textView: UITextView) {
+            DispatchQueue.main.async {
+                guard textView.isFirstResponder, let end = textView.selectedTextRange?.end else { return }
+                let caret = textView.caretRect(for: end)
+                guard !caret.isNull, !caret.isInfinite else { return }
+                let visibleBottom = textView.contentOffset.y + textView.bounds.height
+                    - textView.adjustedContentInset.bottom
+                guard caret.maxY > visibleBottom else { return }
+                textView.contentOffset.y += caret.maxY - visibleBottom
+            }
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
@@ -227,6 +248,7 @@ struct PlainNoteEditor: UIViewRepresentable {
                 textView.selectedTextRange = textView.textRange(from: cursor, to: cursor)
             }
             refreshTagPreview(in: textView)
+            scrollCaretIntoView(textView)
         }
 
         // MARK: Tag styling

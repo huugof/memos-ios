@@ -20,6 +20,8 @@ enum AppSettings {
         static let vaultAttachmentsFolder = "vaultAttachmentsFolder"
         static let vaultTemplatePath = "vaultTemplatePath"
         static let vaultDateFormat = "vaultDateFormat"
+        static let showHistoryAfterSend = "showHistoryAfterSend"
+        static let customTags = "customTags"
     }
 
     private static let defaults = UserDefaults.standard
@@ -107,6 +109,19 @@ enum AppSettings {
     static var recentAcceptedTags: [String] {
         get { defaults.stringArray(forKey: Keys.recentAcceptedTags) ?? [] }
         set { defaults.set(Array(newValue.prefix(100)), forKey: Keys.recentAcceptedTags) }
+    }
+
+    /// Send closes the sheet onto history instead of handing back a blank note.
+    static var showHistoryAfterSend: Bool {
+        get { defaults.object(forKey: Keys.showHistoryAfterSend) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Keys.showHistoryAfterSend) }
+    }
+
+    /// Tags the user typed into Settings, offered for completion alongside the ones
+    /// found in notes — the only source a vault has beyond its own files.
+    static var customTags: [String] {
+        get { defaults.stringArray(forKey: Keys.customTags) ?? [] }
+        set { defaults.set(newValue, forKey: Keys.customTags) }
     }
 
     static var newNoteDelay: NewNoteDelay {

@@ -11,6 +11,8 @@ struct SettingsView: View {
     @State private var clearErrorOnEdit = AppSettings.clearErrorOnEdit
     @State private var quickCaptureMode = AppSettings.quickCaptureMode
     @State private var newNoteDelay = AppSettings.newNoteDelay
+    @State private var showHistoryAfterSend = AppSettings.showHistoryAfterSend
+    @State private var customTags = AppSettings.customTags.map { "#\($0)" }.joined(separator: " ")
     @State private var tokenStatus = ""
     @State private var showingDeleteTokenConfirmation = false
 
@@ -80,7 +82,25 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    TextField("#work #ideas #todo", text: $customTags, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .onChange(of: customTags) { _, value in
+                            AppSettings.customTags = Self.parseTags(value)
+                        }
+                } header: {
+                    Text("Tags")
+                } footer: {
+                    Text("Suggested while typing a #tag, along with tags already in your notes.")
+                }
+
                 Section("Behavior") {
+                    Toggle("Show history after sending", isOn: $showHistoryAfterSend)
+                        .onChange(of: showHistoryAfterSend) { _, value in
+                            AppSettings.showHistoryAfterSend = value
+                        }
+
                     Toggle("Quick Capture Mode", isOn: $quickCaptureMode)
                         .onChange(of: quickCaptureMode) { _, value in
                             AppSettings.quickCaptureMode = value
@@ -181,6 +201,15 @@ struct SettingsView: View {
         } catch {
             tokenStatus = (error as? LocalizedError)?.errorDescription ?? "Failed to delete token"
         }
+    }
+
+    /// Space- or comma-separated, `#` optional; duplicates dropped, first spelling kept.
+    private static func parseTags(_ text: String) -> [String] {
+        var seen: Set<String> = []
+        return text.split(whereSeparator: { $0.isWhitespace || $0 == "," })
+            .map { $0.drop(while: { $0 == "#" }) }
+            .map { String($0.filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 
     private var trimmedToken: String {

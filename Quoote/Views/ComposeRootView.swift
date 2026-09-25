@@ -12,6 +12,10 @@ struct ComposeRootView: View {
     /// The note on the sheet; nil while the sheet is down. A new value — even for
     /// the same target — is a new sheet, so the old editor commits on disappear.
     @State private var sheetNote: SheetNote?
+    /// Waits for the current sheet to finish going down. Swapping `sheetNote` while a
+    /// sheet is up makes SwiftUI dismiss and present at once, and the outgoing
+    /// editor's own close-on-blur can then take the incoming sheet down with it.
+    @State private var queuedSheet: SheetNote?
 
     @StateObject private var serverMemosStore = ServerMemosStore()
     @StateObject private var sendQueue = DraftSendQueueController()
@@ -33,7 +37,7 @@ struct ComposeRootView: View {
             NotesListView(onOpen: openSheet, onCompose: openCompose)
         }
         // Full height: with the keyboard up, iOS lifts any shorter detent to the top anyway.
-        .sheet(item: $sheetNote) { note in
+        .sheet(item: $sheetNote, onDismiss: presentQueuedSheet) { note in
             NoteEditorView(target: note.target)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -54,11 +58,11 @@ struct ComposeRootView: View {
                 serverMemosStore.loadFromCache(MemoCache.load())
                 serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
                 memosPrimed = true
-                openCompose()  // after the cache load, so a pinned memo resolves
+                if sheetNote == nil { openCompose() }  // after the cache load, so a pinned memo resolves
                 await serverMemosStore.refresh(force: true)
             case .vault:
                 vaultStore.loadFromIndex()
-                openCompose()
+                if sheetNote == nil { openCompose() }
                 await vaultStore.refresh()
             }
         }
@@ -93,6 +97,9 @@ struct ComposeRootView: View {
             Task { await vaultStore.refresh() }
         }
         .onAppear {
+            // A cold launch opens the capture sheet itself; a background stamp left by
+            // the previous run would make quick capture open it a second time.
+            AppSettings.lastBackgroundAt = nil
             sendQueue.startProcessing(in: modelContext)
             serverDeleteQueue.startProcessing(in: modelContext)
             saveQueue.startProcessing(in: modelContext)
@@ -139,7 +146,19 @@ struct ComposeRootView: View {
     }
 
     private func openSheet(_ target: NoteEditorTarget) {
-        sheetNote = SheetNote(target: target)
+        let note = SheetNote(target: target)
+        if sheetNote == nil {
+            sheetNote = note
+        } else {
+            queuedSheet = note
+            sheetNote = nil
+        }
+    }
+
+    private func presentQueuedSheet() {
+        guard let next = queuedSheet else { return }
+        queuedSheet = nil
+        sheetNote = next
     }
 
     private func openCompose() {

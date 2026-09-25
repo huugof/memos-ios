@@ -28,21 +28,16 @@ struct NoteRowView: View {
         return Text(verbatim: "  \(joined)").foregroundStyle(appAccent)
     }
 
+    /// Always carries the time; the day is spelled out only when it isn't today.
     private var dateString: String {
         let cal = Calendar.current
-        let now = Date()
         let date = note.date
-        if cal.isDateInToday(date) {
-            return Self.timeFormatter.string(from: date)
-        } else if cal.isDateInYesterday(date) {
-            return "Yesterday"
-        }
-        let noteYear = cal.component(.year, from: date)
-        let nowYear = cal.component(.year, from: now)
-        if noteYear == nowYear {
-            return Self.shortDateFormatter.string(from: date)
-        }
-        return Self.fullDateFormatter.string(from: date)
+        let time = Self.timeFormatter.string(from: date)
+        if cal.isDateInToday(date) { return time }
+        if cal.isDateInYesterday(date) { return "Yesterday \(time)" }
+        let sameYear = cal.component(.year, from: date) == cal.component(.year, from: Date())
+        let day = (sameYear ? Self.shortDateFormatter : Self.fullDateFormatter).string(from: date)
+        return "\(day) \(time)"
     }
 
     private static let timeFormatter: DateFormatter = {
