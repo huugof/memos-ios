@@ -19,6 +19,8 @@ struct NotesListView: View {
     @AppStorage("destinationKind") private var destinationRaw = DestinationKind.memos.rawValue
 
     @State private var showSettings = false
+    /// Status bar height: the list runs up under it and fades out there.
+    @State private var topInset: CGFloat = 0
 
     private var destination: DestinationKind {
         DestinationKind(rawValue: destinationRaw) ?? .memos
@@ -62,6 +64,12 @@ struct NotesListView: View {
         let groups = NoteDateGrouping.group(notes.filter { !pinnedStore.isPinned($0.id) })
 
         List {
+            Text("Notes")
+                .font(.largeTitle.bold())
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 64))
+                .listRowSeparator(.hidden)
+
             if let msg = activeErrorMessage {
                 Section {
                     Text(msg).font(.footnote).foregroundStyle(.secondary)
@@ -106,6 +114,25 @@ struct NotesListView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Scroll all the way up to the screen's edge, fading out as the sheet's text does.
+        .contentMargins(.top, topInset, for: .scrollContent)
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0), location: 0),
+                        .init(color: .black.opacity(0.25), location: 0.35),
+                        .init(color: .black.opacity(0.7), location: 0.7),
+                        .init(color: .black, location: 1),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: topInset + Self.topFade)
+                Color.black
+            }
+        }
+        .ignoresSafeArea(.container, edges: .top)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { topInset = $0 }
         .refreshable {
             switch destination {
             case .memos: await serverMemosStore.loadAllPages()
@@ -122,25 +149,31 @@ struct NotesListView: View {
                     .foregroundStyle(appAccent)
                     .frame(width: 60, height: 60)
                     .glassCircle()
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .padding(.trailing, 20)
             .padding(.bottom, 12)
         }
-        .navigationTitle("Notes")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                }
-                .tint(.primary)
+        .overlay(alignment: .topTrailing) {
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 32, height: 32)
             }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(.primary)
+            .padding(.trailing, 20)
         }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showSettings) {
             SettingsView(onBack: { showSettings = false })
         }
     }
+
+    /// How far below the status bar the fade reaches — short, so the title isn't dimmed at rest.
+    private static let topFade: CGFloat = 12
 
     @ViewBuilder
     private func noteRow(for note: UnifiedNote) -> some View {

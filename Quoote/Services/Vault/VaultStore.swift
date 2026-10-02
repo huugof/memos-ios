@@ -232,16 +232,23 @@ final class VaultStore: ObservableObject {
 
     @discardableResult
     func create(body: String, now: Date = Date()) throws -> VaultIndexEntry {
-        try withFileStore { fileStore in
+        // An `@3pm` / `@2 hours ago` first line backdates the note and is dropped.
+        var body = body
+        var created = now
+        if let directive = TimeDirective.parse(body, now: now) {
+            body = directive.body
+            created = directive.date
+        }
+        return try withFileStore { fileStore in
             let folder = AppSettings.vaultNotesFolder
             let existing = try fileStore.existingFilenames(inSubfolder: folder)
-            let filename = VaultNoteSerializer.filename(for: now, existing: existing)
+            let filename = VaultNoteSerializer.filename(for: created, existing: existing)
             let relativePath = folder.isEmpty ? filename : "\(folder)/\(filename)"
 
-            let seed = Self.templateSeed(from: fileStore, body: body, now: now)
+            let seed = Self.templateSeed(from: fileStore, body: body, now: created)
             let text = VaultNoteSerializer.render(
                 body: body, existing: seed.frontmatter, loadedBody: nil,
-                created: now, updated: now, style: seed.style)
+                created: created, updated: now, style: seed.style)
             let metadata = try fileStore.write(text, to: relativePath)
 
             let entry = VaultIndexEntry.make(from: Self.note(from: text, path: metadata.relativePath, metadata: metadata))

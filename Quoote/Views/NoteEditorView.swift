@@ -10,6 +10,9 @@ import AVFoundation
 /// (dragging it down) commits too, via `onDisappear`.
 struct NoteEditorView: View {
     let target: NoteEditorTarget
+    /// Reports whether the note holds nothing to commit, so quick capture can leave a
+    /// blank capture note alone instead of swapping it for another blank one.
+    var onBlankChange: (Bool) -> Void = { _ in }
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -64,7 +67,6 @@ struct NoteEditorView: View {
     @StateObject private var speech = SpeechTranscriptionService()
 
     @State private var showAttachMenu = false
-    @State private var frontmatterPreview: Result<String, Error>?
     @State private var didTapDone = false
     /// The sheet is on its way down — losing focus now is expected, not a cue to close.
     @State private var isClosing = false
@@ -157,15 +159,8 @@ struct NoteEditorView: View {
         } message: {
             if let err = uploadError { Text(err) }
         }
-        .sheet(isPresented: .init(
-            get: { frontmatterPreview != nil },
-            set: { if !$0 { frontmatterPreview = nil } }
-        )) {
-            if let frontmatterPreview {
-                FrontmatterPreviewSheet(result: frontmatterPreview)
-            }
-        }
         .task { await setup() }
+        .onChange(of: isBlank, initial: true) { _, blank in onBlankChange(blank) }
         .onChange(of: draftText) { _, _ in
             schedulePersist()
             // Editing after a send re-arms auto-commit so leaving captures the new text.
@@ -361,6 +356,13 @@ struct NoteEditorView: View {
         !pendingImages.isEmpty || !pendingFiles.isEmpty
     }
 
+    /// A capture note with no text and no attachments — closing it would send nothing.
+    private var isBlank: Bool {
+        guard case .newNote = target else { return false }
+        return draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !hasPendingAttachments
+    }
+
     // MARK: Editor bar
 
     /// Rides above the keyboard: note tools on the left, send/confirm on the right.
@@ -369,19 +371,15 @@ struct NoteEditorView: View {
             HStack(spacing: 12) {
                 HStack(spacing: 0) {
                     barButton("number") { editorController.insertTagMarker() }
+                    barButton("checklist") { editorController.insertTaskMarker() }
                     barButton("paperclip") { showAttachMenu = true }
                         .confirmationDialog("Add Attachment", isPresented: $showAttachMenu) {
                             Button("Photo Library") { showPhotoPicker = true }
                             Button("Choose File") { showFilePicker = true }
                             Button("Cancel", role: .cancel) {}
                         }
-                    barButton(speech.isTranscribing ? "mic.fill" : "mic",
-                              highlighted: speech.isTranscribing) { toggleDictation() }
                     barButton(isPinned ? "pin.fill" : "pin", highlighted: isPinned) { togglePin() }
                         .disabled(!canPin)
-                    if showsFrontmatterButton {
-                        barButton("curlybraces") { showFrontmatterPreview() }
-                    }
                 }
                 .padding(.horizontal, 4)
                 .glassEffect(.regular.interactive(), in: Capsule())
@@ -415,28 +413,6 @@ struct NoteEditorView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    /// Vault notes only: a Memos memo has no frontmatter to show.
-    private var showsFrontmatterButton: Bool {
-        switch target {
-        case .vaultFile: return true
-        case .serverMemo: return false
-        case .newNote, .localDraft: return AppSettings.destinationKind == .vault
-        }
-    }
-
-    /// Renders what the next save would write, from the same inputs it would use.
-    private func showFrontmatterPreview() {
-        let isExisting: Bool
-        if case .vaultFile = target { isExisting = true } else { isExisting = false }
-        guard !isExisting || loadedVaultNote != nil else { return }
-        frontmatterPreview = Result {
-            try vaultStore.previewFrontmatter(
-                body: isExisting ? vaultNoteBody : draftText,
-                note: isExisting ? loadedVaultNote : nil
-            )
-        }
     }
 
     /// A blank capture note has nothing to keep in front yet.
@@ -549,7 +525,7 @@ struct NoteEditorView: View {
     /// of that, and comes back when it's gone.
     private var isCoveredByPresentation: Bool {
         showAttachMenu || showPhotoPicker || showFilePicker
-            || uploadError != nil || frontmatterPreview != nil
+            || uploadError != nil
     }
 
     /// Swap the editor onto a fresh blank draft without rebuilding the view — the

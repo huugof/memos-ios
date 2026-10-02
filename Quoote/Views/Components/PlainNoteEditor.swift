@@ -271,9 +271,24 @@ struct PlainNoteEditor: UIViewRepresentable {
             for match in Self.tagRegex.matches(in: storage.string, range: fullRange) {
                 storage.addAttribute(.foregroundColor, value: Self.tagColor, range: match.range)
             }
+            if let range = Self.timeDirectiveRange(in: storage.string as NSString) {
+                storage.addAttributes([
+                    .foregroundColor: UIColor.systemBlue,
+                    .backgroundColor: UIColor.systemBlue.withAlphaComponent(0.15),
+                ], range: range)
+            }
             storage.endEditing()
             // Typing right after a tag must not inherit its color.
             textView.typingAttributes = base
+        }
+
+        /// A first line that `TimeDirective` will turn into the note's date.
+        private static func timeDirectiveRange(in text: NSString) -> NSRange? {
+            guard text.hasPrefix("@") else { return nil }
+            let end = text.range(of: "\n").location
+            let range = NSRange(location: 0, length: end == NSNotFound ? text.length : end)
+            let phrase = text.substring(with: range).dropFirst()
+            return TimeDirective.date(from: String(phrase), now: Date()) == nil ? nil : range
         }
 
         // MARK: Tag completion
@@ -408,6 +423,29 @@ final class PlainNoteEditorController {
     func insertTagMarker() {
         guard let textView else { return }
         textView.insertText(needsLeadingSpace(in: textView) ? " #" : "#")
+        if !textView.isFirstResponder { textView.becomeFirstResponder() }
+    }
+
+    /// Starts the caret's line as a `- [ ] ` task, or adds a new task line below it.
+    func insertTaskMarker() {
+        guard let textView, let coordinator else { return }
+        let text = (textView.text ?? "") as NSString
+        let caret = textView.selectedRange.location
+        let line = text.lineRange(for: NSRange(location: caret, length: 0))
+        let content = text.substring(with: line).trimmingCharacters(in: .newlines)
+        let newText: String
+        let caretOffset: Int
+        if content.trimmingCharacters(in: .whitespaces).isEmpty {
+            newText = text.replacingCharacters(in: NSRange(location: line.location, length: (content as NSString).length), with: "- [ ] ")
+            caretOffset = line.location + 6
+        } else if content.hasPrefix("- [ ] ") || content.hasPrefix("- [x] ") {
+            return
+        } else {
+            let end = line.location + (content as NSString).length
+            newText = text.replacingCharacters(in: NSRange(location: end, length: 0), with: "\n- [ ] ")
+            caretOffset = end + 7
+        }
+        coordinator.applyReplacement(textView, newText: newText, caretOffset: caretOffset)
         if !textView.isFirstResponder { textView.becomeFirstResponder() }
     }
 

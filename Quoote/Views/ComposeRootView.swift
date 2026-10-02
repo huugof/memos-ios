@@ -16,6 +16,8 @@ struct ComposeRootView: View {
     /// sheet is up makes SwiftUI dismiss and present at once, and the outgoing
     /// editor's own close-on-blur can then take the incoming sheet down with it.
     @State private var queuedSheet: SheetNote?
+    /// The sheet's note has nothing to commit (a capture note with no text yet).
+    @State private var sheetIsBlank = false
 
     @StateObject private var serverMemosStore = ServerMemosStore()
     @StateObject private var sendQueue = DraftSendQueueController()
@@ -38,7 +40,7 @@ struct ComposeRootView: View {
         }
         // Full height: with the keyboard up, iOS lifts any shorter detent to the top anyway.
         .sheet(item: $sheetNote, onDismiss: presentQueuedSheet) { note in
-            NoteEditorView(target: note.target)
+            NoteEditorView(target: note.target, onBlankChange: { sheetIsBlank = $0 })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .tint(appAccent)
@@ -194,9 +196,11 @@ struct ComposeRootView: View {
 
         // Swapping the sheet's note runs the old editor's onDisappear, which flushes
         // that text and enqueues the send/save; flushStagedServerEdits covers anything
-        // staged but not yet queued. Already on the pinned note: leave it be.
+        // staged but not yet queued. Already on the pinned note, or on a capture note
+        // that's still blank (swapping would just close and reopen the sheet): leave it be.
         let target = composeTarget()
-        if let current = sheetNote, current.target == target, target != .newNote { return }
+        if let current = sheetNote, current.target == target,
+           target != .newNote || sheetIsBlank { return }
         let hadSheet = sheetNote != nil
         openSheet(target)
         if hadSheet { flushStagedServerEdits() }
