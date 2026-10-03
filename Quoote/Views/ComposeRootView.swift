@@ -2,7 +2,8 @@ import SwiftUI
 import SwiftData
 
 /// App root: history is the screen underneath, and every note is edited on a sheet
-/// over it. Launch opens the sheet on a focused capture note (or the pinned note).
+/// over it. With quick capture on, launch opens the sheet on a focused capture note
+/// (or the pinned note); with it off, launch lands on history.
 /// Dragging the sheet down commits the note — sends a new one, saves an existing
 /// one — and reveals history. Local-first, invisible sync.
 struct ComposeRootView: View {
@@ -60,11 +61,11 @@ struct ComposeRootView: View {
                 serverMemosStore.loadFromCache(MemoCache.load())
                 serverMemosStore.onFirstPageFetched = { MemoCache.save($0) }
                 memosPrimed = true
-                if sheetNote == nil { openCompose() }  // after the cache load, so a pinned memo resolves
+                if sheetNote == nil, AppSettings.quickCaptureMode { openCompose() }  // after the cache load, so a pinned memo resolves
                 await serverMemosStore.refresh(force: true)
             case .vault:
                 vaultStore.loadFromIndex()
-                if sheetNote == nil { openCompose() }
+                if sheetNote == nil, AppSettings.quickCaptureMode { openCompose() }
                 await vaultStore.refresh()
             }
         }
@@ -187,7 +188,16 @@ struct ComposeRootView: View {
     /// Quick capture: after being away longer than the configured delay, come back to a
     /// blank note (or the pinned one) — from wherever the user left off, an open
     /// editor included.
+    /// With quick capture off, nothing new ever pops up: an open note stays put, and
+    /// a blank capture note just gives way to history.
     private func handleForegroundResume() {
+        guard AppSettings.quickCaptureMode else {
+            AppSettings.lastBackgroundAt = nil
+            if let current = sheetNote, current.target == .newNote, sheetIsBlank {
+                sheetNote = nil
+            }
+            return
+        }
         guard let backgroundAt = AppSettings.lastBackgroundAt else { return }
         guard let delaySeconds = AppSettings.newNoteDelay.delaySeconds else { return }
         let elapsed = Date().timeIntervalSince(backgroundAt)
