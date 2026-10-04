@@ -1,7 +1,7 @@
 # Attachment Thumbnails — Design
 
 **Date:** 2026-10-03
-**Status:** Implemented — device checklist pending
+**Status:** Implemented — device checklist pending. Tap-to-preview for vault attachments added 2026-10-04 (see the last section).
 **Scope:** One feature, one plan.
 
 ## Goal
@@ -28,8 +28,9 @@ the editor strip still need an on-demand path.
 
 ## Non-goals
 
-- Tapping a tile (full-size preview). Tiles are display-only.
-- Real previews of PDFs/documents (QuickLook), audio/video posters.
+- Tapping a history-row tile. Row tiles are display-only.
+- Previews of Memos attachments, and audio/video posters. (Vault attachments in the editor strip preview
+  when tapped — see the last section.)
 - Attaching non-image files to vault notes (still declined: "File attachments aren't
   supported for vault notes yet.").
 - Animated GIFs (first frame only). SVG is shown as a file tile.
@@ -243,7 +244,7 @@ narrows beside it. Notes without attachments render exactly as today.
 
 **`AttachmentBar`** — `Views/Components/`, extracted from
 `NoteEditorView.pendingAttachmentsBar` (the view is 984 lines). One horizontally scrolling
-glass bar, 72 pt as now: existing attachments first (read-only), then pending images and
+glass bar, 72 pt as now: existing attachments first (a vault file previews when tapped), then pending images and
 files (✕ and upload spinner as now). Images are the same 56 pt tiles; files the same chip
 (type icon + name, two lines, 80 pt max). It shows when either list is non-empty, and the
 editor's bottom padding follows.
@@ -252,7 +253,8 @@ Existing attachments = `parse(current text)`, merged with `memo.attachments` for
 note (looked up in `ServerMemosStore`). Recomputed when the text changes, debounced 300 ms,
 so deleting a line removes its tile.
 
-**Display only.** Tapping a row opens the note as before; tiles take no taps.
+**Display only in the history row.** Tapping a row opens the note as before; row tiles take no taps. In the
+editor strip a vault attachment opens a preview when tapped (last section).
 
 ## New and changed files
 
@@ -316,3 +318,23 @@ is today's behaviour.
 
 None blocking. The plan decides how the in-flight/concurrency gate is built and which
 mechanism enforces the download cap (a delegate or a streamed read).
+
+## Follow-up: tap to preview a vault attachment (2026-10-04)
+
+Tapping an existing vault attachment in the editor's strip opens it in QuickLook over the editor. Memos
+attachments, the history-row tile, and unsent attachments are not tappable yet.
+
+- QuickLook reads from another process, and the vault is only open inside `VaultBookmarkStore.withAccess`, so the
+  file is copied first: `VaultFileStore.copyAttachment(at:into:)` into `tmp/AttachmentPreviews/<uuid>/<name>`,
+  driven by `AttachmentPreviewFiles` (locate as the thumbnails do, wait for an evicted iCloud file — polling, 30 s —
+  and delete the copy when the preview closes; copies left by a crashed run are swept after an hour).
+- `AttachmentPreviewer` is the state the editor binds to `.quickLookPreview`: the copy being shown, the tile to put a
+  spinner on once a load takes over 250 ms, and a sentence for the editor's banner on failure. The last tap wins.
+- The editor treats the preview as something it presented. Its text view losing focus closes the sheet and commits,
+  unless something it presented took the keyboard, so `isCoveredByPresentation` includes the preview and the editor
+  drops focus when it opens (the keyboard would otherwise stay over it). SwiftUI presents QuickLook `overFullScreen`,
+  so the sheet does not disappear and its `onDisappear` commit does not run; `AttachmentPreviewPresentationTests`
+  fails if a system update changes that.
+- Not verified without a phone: an evicted iCloud file, the keyboard going away and coming back, VoiceOver.
+- Left for later: Memos attachments (an authenticated download of the full file; an S3-backed server redirects off
+  the configured host, which the thumbnails also refuse), the history-row tile, unsent attachments.

@@ -23,7 +23,7 @@ enum AttachmentFileIcon {
 }
 
 /// A 56 pt square standing for one attachment: the picture for an image, a type icon and extension for a file.
-/// Display only — it takes no taps of its own.
+/// Display only — it takes no taps of its own; `AttachmentBar` wraps one in a button where a preview can open.
 struct AttachmentTile: View {
     static let size: CGFloat = 56
     private static let corner: CGFloat = 8
