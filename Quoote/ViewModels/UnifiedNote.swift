@@ -59,9 +59,22 @@ enum UnifiedNote: Identifiable {
 
     /// The note flattened for a history row. A vault note's content is already the
     /// index's flattened excerpt.
+    ///
+    /// A note that is only attachments has no text. An image-only vault note shows its tile alone rather
+    /// than the raw `![[x.jpg]]` its title falls back to; a note holding just a file shows the file's name.
     var excerpt: String {
-        if case .vault = self { return content }
-        return NoteExcerpt.make(from: content)
+        let text: String
+        switch self {
+        case .vault(let entry):
+            let holdsAttachments = !(entry.attachments ?? []).isEmpty
+            text = entry.preview.isEmpty && holdsAttachments ? "" : content
+        case .local, .server:
+            text = NoteExcerpt.make(from: content)
+        }
+        guard text.isEmpty,
+              let tile = NoteAttachments.tile(from: attachments),
+              tile.attachment.kind == .file else { return text }
+        return tile.attachment.name
     }
 
     var date: Date {
@@ -77,23 +90,24 @@ enum UnifiedNote: Identifiable {
         return TagExtractor.tags(in: content)
     }
 
-    var hasAttachments: Bool {
+    /// What the note holds, for its row's tile: embedded in its text, plus — for a Memos note — what the
+    /// server lists on the memo itself (text first, duplicates dropped). A vault row has no body to read, so
+    /// it takes the list from its index entry.
+    var attachments: [NoteAttachment] {
         switch self {
-        case .local(let draft): return draft.text.contains("![")
-        case .server(let memo, _): return memo.hasAttachments || memo.content.contains("![")
-        case .vault: return false
+        case .local(let draft):
+            return NoteAttachments.parse(draft.text)
+        case .server(let memo, _):
+            return NoteAttachments.merged(NoteAttachments.parse(content), memo.attachments ?? [])
+        case .vault(let entry):
+            return entry.attachments ?? []
         }
     }
 
-    var hasImages: Bool {
-        content.contains("![")
-    }
-
-    var hasFiles: Bool {
-        switch self {
-        case .local, .vault: return false
-        case .server(let memo, _): return memo.attachmentCount > 0
-        }
+    /// The vault-relative path of the note, so `![[picture.png]]` can be found beside it. `nil` unless it is a vault note.
+    var vaultPath: String? {
+        if case .vault(let entry) = self { return entry.relativePath }
+        return nil
     }
 
     var hasChecklists: Bool {
