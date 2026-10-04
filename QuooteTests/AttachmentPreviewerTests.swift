@@ -210,14 +210,29 @@ final class AttachmentPreviewerTests: XCTestCase {
 
     // MARK: Cleaning up
 
-    func testClosingThePreviewDeletesTheCopy() async throws {
+    /// The sheet is told to close before it has finished sliding away, and QuickLook is still showing the file then.
+    func testClosingThePreviewDeletesTheCopyOnceTheSheetHasGone() async throws {
         try put("attachments/Report.pdf")
         let previewer = makePreviewer()
         open(file("Report.pdf"), in: previewer)
         await waitUntil("the preview") { previewer.previewURL != nil }
         XCTAssertEqual(previewFolders().count, 1)
 
-        previewer.previewURL = nil   // what QuickLook does when it closes
+        previewer.previewURL = nil   // the sheet is told to close
+        XCTAssertEqual(previewFolders().count, 1, "the copy stays while the sheet slides away")
+
+        previewer.previewDidClose()  // and it has gone
+        XCTAssertEqual(previewFolders(), [])
+    }
+
+    func testCancellingLetsGoOfACopyStillWaitingForItsSheet() async throws {
+        try put("attachments/Report.pdf")
+        let previewer = makePreviewer()
+        open(file("Report.pdf"), in: previewer)
+        await waitUntil("the preview") { previewer.previewURL != nil }
+        previewer.previewURL = nil
+
+        previewer.cancel()   // the editor is going away, and its sheet's callback may never come
 
         XCTAssertEqual(previewFolders(), [])
     }
@@ -232,9 +247,10 @@ final class AttachmentPreviewerTests: XCTestCase {
 
         open(file("B.pdf"), in: previewer)
         await waitUntil("the second preview") { previewer.previewURL != nil && previewer.previewURL != first }
+        previewer.previewDidClose()   // the sheet showing the first has gone
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
-        XCTAssertEqual(previewFolders().count, 1)
+        XCTAssertEqual(previewFolders().count, 1, "the one being shown stays")
     }
 
     // MARK: When it goes wrong

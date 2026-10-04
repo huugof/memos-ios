@@ -3,7 +3,6 @@ import SwiftData
 import PhotosUI
 import UniformTypeIdentifiers
 import AVFoundation
-import QuickLook
 
 /// The note editor, shown on the compose sheet. A `.newNote` target is the capture
 /// screen: Send hands back a blank note in place. Any other target — or a pinned
@@ -167,7 +166,9 @@ struct NoteEditorView: View {
             guard case .success(let urls) = result, let url = urls.first else { return }
             handleFileSelected(url: url)
         }
-        .quickLookPreview($attachmentPreviewer.previewURL)
+        .sheet(item: previewItem, onDismiss: { attachmentPreviewer.previewDidClose() }) { item in
+            AttachmentPreviewSheet(url: item.url).ignoresSafeArea()
+        }
         .alert("Upload Failed", isPresented: .init(
             get: { uploadError != nil },
             set: { if !$0 { uploadError = nil } }
@@ -216,11 +217,13 @@ struct NoteEditorView: View {
             // editor presented is what took the keyboard.
             if !focused, !isCoveredByPresentation { closeSheet() }
         }
-        .onChange(of: isCoveredByPresentation) { _, covered in
+        .onChange(of: isCoveredByMenuOrPicker) { _, covered in
             if !covered { focusEditor() }
         }
         .onChange(of: attachmentPreviewer.previewURL) { _, url in
-            // The preview is full screen: put the keyboard away rather than leave it over the preview.
+            // The keyboard would sit over the preview, so it goes. It stays down when the preview closes, as in
+            // Notes: bringing it back made the editor move twice, once as the sheet left and again as the keyboard
+            // rose. A tap in the text brings it up.
             if url != nil { isFocused = false }
         }
         .onDisappear {
@@ -494,12 +497,29 @@ struct NoteEditorView: View {
         focusRequestID = UUID()
     }
 
-    /// Something the editor presented is covering it — the keyboard is down because
-    /// of that, and comes back when it's gone.
+    /// A menu, picker or alert the editor presented — the keyboard is down because of
+    /// that, and comes back when it's gone.
+    private var isCoveredByMenuOrPicker: Bool {
+        showAttachMenu || showPhotoPicker || showFilePicker || uploadError != nil
+    }
+
+    /// Something the editor presented is covering it, so the keyboard being down is no
+    /// reason to close.
     private var isCoveredByPresentation: Bool {
-        showAttachMenu || showPhotoPicker || showFilePicker
-            || uploadError != nil
-            || attachmentPreviewer.previewURL != nil
+        isCoveredByMenuOrPicker || attachmentPreviewer.previewURL != nil
+    }
+
+    /// What the preview sheet shows. Closing the sheet, by swipe or Close, clears it; the copy goes once the sheet has left.
+    private var previewItem: Binding<PreviewItem?> {
+        Binding(
+            get: { attachmentPreviewer.previewURL.map(PreviewItem.init) },
+            set: { if $0 == nil { attachmentPreviewer.previewURL = nil } }
+        )
+    }
+
+    private struct PreviewItem: Identifiable {
+        let url: URL
+        var id: URL { url }
     }
 
     /// Swap the editor onto a fresh blank draft without rebuilding the view — the

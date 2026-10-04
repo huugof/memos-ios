@@ -8,11 +8,12 @@ import Foundation
 @MainActor
 final class AttachmentPreviewer: ObservableObject {
 
-    /// The copy being shown. Bound to `.quickLookPreview`, which sets it back to `nil` when the preview closes.
-    /// A copy that is closed or replaced is deleted.
+    /// The copy being shown. Bound to the editor's preview sheet, which sets it back to `nil` when the sheet closes:
+    /// as it starts to slide away if Close was tapped, after it has gone if it was swiped. A copy that is closed or
+    /// replaced is deleted by `previewDidClose()`, once the sheet that showed it has left.
     @Published var previewURL: URL? {
         didSet {
-            if let old = oldValue, old != previewURL { files.discard(old) }
+            if let old = oldValue, old != previewURL { leaving.append(old) }
         }
     }
 
@@ -30,6 +31,8 @@ final class AttachmentPreviewer: ObservableObject {
     private let files: AttachmentPreviewFiles
     private let graceDelay: Duration
     private var opening: Opening?
+    /// Copies whose sheet has been told to close. QuickLook can still be showing one, sliding away.
+    private var leaving: [URL] = []
 
     init(files: AttachmentPreviewFiles = .shared, graceDelay: Duration = .milliseconds(250)) {
         self.files = files
@@ -72,12 +75,20 @@ final class AttachmentPreviewer: ObservableObject {
         opening = current
     }
 
-    /// Drops a load still in progress, because the note it was for is gone. A preview already showing is left to
-    /// close itself.
+    /// The preview sheet has finished leaving the screen: the copies it showed can go.
+    func previewDidClose() {
+        let gone = leaving
+        leaving = []
+        gone.forEach(files.discard)
+    }
+
+    /// Drops a load still in progress, because the note it was for is gone, and lets go of copies still waiting for
+    /// their sheet (its callback may never come). A preview already showing is left to close itself.
     func cancel() {
         opening?.task?.cancel()
         opening = nil
         loadingIdentity = nil
+        previewDidClose()
     }
 
     // MARK: - Helpers
