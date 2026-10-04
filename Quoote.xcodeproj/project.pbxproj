@@ -38,6 +38,7 @@
 		5D2E4CA21535F70984A8145C /* DraftBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */; };
 		5FFC8D7218BA549CA1D92A7E /* AttachmentThumbnailLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413BE8DECCFDED84DE73EA6C /* AttachmentThumbnailLoaderTests.swift */; };
 		66EA40237E7BC12F6A62F2DE /* MemosAttachmentFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A1D0CA5AAEA48F32FB90B2 /* MemosAttachmentFetcherTests.swift */; };
+		6A36A58626E46256F43A3103 /* NoteRowViewLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF761E93D1F5F352C6CC5598 /* NoteRowViewLayoutTests.swift */; };
 		6AFED01041C3FBF245A36295 /* ThumbnailDiskCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B5BCFDC890E42BEF872905E /* ThumbnailDiskCacheTests.swift */; };
 		75B502BCCCE1E36630C798D2 /* TagExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B500C334B926323FB0A1BF9D /* TagExtractor.swift */; };
 		78394F3BE191208471A727AA /* MemoCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF648FBB039B64367F21768 /* MemoCache.swift */; };
@@ -172,6 +173,7 @@
 		D9777ED7EECB2921282B60C0 /* ChatAppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAppContainer.swift; sourceTree = "<group>"; };
 		DEB6B4F805F6E27869F1578C /* AttachmentMarkdownBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentMarkdownBuilderTests.swift; sourceTree = "<group>"; };
 		DEF72158DC6D05BD3468A2C1 /* ThumbnailDiskCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailDiskCache.swift; sourceTree = "<group>"; };
+		DF761E93D1F5F352C6CC5598 /* NoteRowViewLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRowViewLayoutTests.swift; sourceTree = "<group>"; };
 		E4DB5839A1ED3672B00F7A62 /* ServerMemoDeleteTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoDeleteTask.swift; sourceTree = "<group>"; };
 		E6FAA2AA16E6FEA853D8D146 /* VaultBookmarkStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStoreTests.swift; sourceTree = "<group>"; };
 		E737A81B48DD54AD5B9A1A94 /* VaultFileStore+Attachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VaultFileStore+Attachments.swift"; sourceTree = "<group>"; };
@@ -271,6 +273,7 @@
 				64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */,
 				5BF149A6FF78A533E9C9F97A /* NoteAttachmentsTests.swift */,
 				965F67343F7951522A027F8C /* NoteExcerptTests.swift */,
+				DF761E93D1F5F352C6CC5598 /* NoteRowViewLayoutTests.swift */,
 				FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */,
 				0E11BA6574365BE10C1FA1D7 /* PinnedNotesStoreTests.swift */,
 				0158DFAF344A170BFAD1F5C4 /* ServerMemoDeleteQueueTests.swift */,
@@ -537,6 +540,7 @@
 				9E1A85D61011236DED24C200 /* MemosClientParsingTests.swift in Sources */,
 				0B24EA5617312D6DD06E58A2 /* NoteAttachmentsTests.swift in Sources */,
 				CFD4FC81F55747BFD319FA7B /* NoteExcerptTests.swift in Sources */,
+				6A36A58626E46256F43A3103 /* NoteRowViewLayoutTests.swift in Sources */,
 				5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */,
 				45E152C17AC73909B77FB275 /* PinnedNotesStoreTests.swift in Sources */,
 				A54F61303467CE8F94E96A05 /* ServerMemoDeleteQueueTests.swift in Sources */,

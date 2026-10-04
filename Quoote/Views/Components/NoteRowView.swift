@@ -4,18 +4,26 @@ struct NoteRowView: View {
     let note: UnifiedNote
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(note.excerpt)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .lineLimit(3)
-                .truncationMode(.tail)
+        let tile = NoteAttachments.tile(from: note.attachments)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(note.excerpt)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(3)
+                    .truncationMode(.tail)
 
-            // One Text so date and tags truncate together on a single line.
-            Text("\(Text(dateString).foregroundStyle(.secondary))\(tagsText)")
-                .font(.footnote)
-                .lineLimit(1)
-                .truncationMode(.tail)
+                // One Text so date and tags truncate together on a single line.
+                Text("\(Text(dateString).foregroundStyle(.secondary))\(tagsText)")
+                    .font(.footnote)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let tile {
+                AttachmentTile(attachment: tile.attachment, notePath: note.vaultPath, extra: tile.extra)
+            }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
