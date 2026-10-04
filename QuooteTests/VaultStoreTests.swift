@@ -285,6 +285,54 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(placeholder?.needsContent, true)
     }
 
+    /// A note indexed before attachments were recorded has `attachments == nil` and is read once more, so its
+    /// row can show a tile — whatever its modification date and size say.
+    func testRefreshBackfillsAttachmentsForANoteIndexedBeforeTheFieldExisted() async throws {
+        try "Look at this\n![[trip.jpg]]\n"
+            .write(to: root.appendingPathComponent("a.md"), atomically: true, encoding: .utf8)
+        let onDisk = try XCTUnwrap(try VaultFileStore(root: root).listMarkdownFiles().first)
+        VaultIndex.save([VaultIndexEntry(
+            relativePath: "a.md", title: "Look at this", preview: "Look at this", tags: [],
+            modifiedAt: onDisk.modifiedAt, fileSize: onDisk.fileSize, attachments: nil
+        )])
+
+        await store.refresh()
+
+        XCTAssertEqual(store.entries.first?.attachments?.map(\.name), ["trip.jpg"])
+    }
+
+    /// Once scanned, a note whose file hasn't changed is left alone: the backfill is a one-time cost.
+    func testRefreshDoesNotReReadANoteThatWasAlreadyScanned() async throws {
+        try "Look\n![[trip.jpg]]\n"
+            .write(to: root.appendingPathComponent("a.md"), atomically: true, encoding: .utf8)
+        let onDisk = try XCTUnwrap(try VaultFileStore(root: root).listMarkdownFiles().first)
+        VaultIndex.save([VaultIndexEntry(
+            relativePath: "a.md", title: "Look", preview: "Look", tags: [],
+            modifiedAt: onDisk.modifiedAt, fileSize: onDisk.fileSize, attachments: []
+        )])
+
+        await store.refresh()
+
+        XCTAssertEqual(store.entries.first?.attachments, [], "same date, same size, already scanned: not read again")
+    }
+
+    /// The placeholder for an evicted iCloud note keeps what the index already knew, so its row keeps its tile.
+    func testAnEvictedNotesPlaceholderKeepsItsPriorAttachments() async throws {
+        let prior = [NoteAttachment(target: "trip.jpg", name: "trip.jpg", kind: .image)]
+        VaultIndex.save([VaultIndexEntry(
+            relativePath: "Foo.md", title: "Foo", preview: "Foo", tags: [],
+            modifiedAt: Date(timeIntervalSince1970: 100), fileSize: 10, attachments: prior
+        )])
+        try "placeholder"
+            .write(to: root.appendingPathComponent(".Foo.md.icloud"), atomically: true, encoding: .utf8)
+
+        await store.refresh()
+
+        let entry = try XCTUnwrap(store.entries.first)
+        XCTAssertEqual(entry.needsContent, true)
+        XCTAssertEqual(entry.attachments, prior)
+    }
+
     /// Minor 5: a genuine permission failure while writing must surface as
     /// `VaultAccessError.stale` — the "Reconnect Vault" message — not a raw
     /// Cocoa error. This must NOT be triggered merely by

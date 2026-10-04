@@ -194,7 +194,8 @@ final class VaultStore: ObservableObject {
                                 tags: prior.tags,
                                 modifiedAt: prior.modifiedAt,
                                 fileSize: prior.fileSize,
-                                needsContent: true
+                                needsContent: true,
+                                attachments: prior.attachments
                             ))
                         } else {
                             let filename = (path as NSString).lastPathComponent

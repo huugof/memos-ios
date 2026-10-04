@@ -18,6 +18,11 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
     /// existed still decodes — absent means "no", correct for every
     /// pre-existing entry, all of which were read from real content.
     let needsContent: Bool?
+    /// The pictures and files the note's body embeds (`NoteAttachments.parse`), for its row's tile. `nil` means
+    /// "not scanned": an index persisted before this field existed. `VaultIndex.diff` re-reads such an entry
+    /// once, in the background, while its row keeps rendering from the old data. `[]` means scanned, none found.
+    /// Optional (not defaulted) so that old index still decodes, as with `needsContent`.
+    let attachments: [NoteAttachment]?
 
     var id: String { relativePath }
 
@@ -28,7 +33,8 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
         tags: [String],
         modifiedAt: Date,
         fileSize: Int,
-        needsContent: Bool? = nil
+        needsContent: Bool? = nil,
+        attachments: [NoteAttachment]? = nil
     ) {
         self.relativePath = relativePath
         self.title = title
@@ -37,6 +43,7 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
         self.modifiedAt = modifiedAt
         self.fileSize = fileSize
         self.needsContent = needsContent
+        self.attachments = attachments
     }
 
     static func make(from note: VaultNote) -> VaultIndexEntry {
@@ -46,7 +53,8 @@ struct VaultIndexEntry: Codable, Equatable, Identifiable {
             preview: NoteExcerpt.make(from: note.body),
             tags: note.tags,
             modifiedAt: note.modifiedAt,
-            fileSize: note.fileSize
+            fileSize: note.fileSize,
+            attachments: NoteAttachments.parse(note.body)
         )
     }
 }
@@ -113,6 +121,11 @@ enum VaultIndex {
             // mtime/size — those may not have changed at all while the file
             // was still downloading, but the content still needs a read.
             if existing.needsContent == true {
+                needsRead.append(file.relativePath)
+                continue
+            }
+            // An entry from before attachments were indexed is read once more, whatever its mtime and size say.
+            if existing.attachments == nil {
                 needsRead.append(file.relativePath)
                 continue
             }

@@ -22,7 +22,8 @@ final class VaultIndexTests: XCTestCase {
             preview: "Preview",
             tags: [],
             modifiedAt: Date(timeIntervalSince1970: modified),
-            fileSize: size
+            fileSize: size,
+            attachments: []
         )
     }
 
@@ -133,5 +134,69 @@ final class VaultIndexTests: XCTestCase {
         let decoded = try JSONDecoder().decode(VaultIndexEntry.self, from: oldJSON)
         XCTAssertEqual(decoded.relativePath, "a.md")
         XCTAssertNil(decoded.needsContent)
+    }
+
+    func testEntryFromNoteListsTheAttachmentsInItsBody() {
+        let note = VaultNote(
+            relativePath: "a.md",
+            frontmatter: nil,
+            body: "Trip\n![[beach.jpg]]\n![[notes.pdf]]\n[[Another Note]]\n",
+            modifiedAt: Date(timeIntervalSince1970: 100),
+            fileSize: 42
+        )
+        let made = VaultIndexEntry.make(from: note)
+        XCTAssertEqual(made.attachments?.map(\.name), ["beach.jpg", "notes.pdf"])
+        XCTAssertEqual(made.attachments?.map(\.kind), [.image, .file])
+    }
+
+    func testEntryFromNoteWithNoAttachmentsRecordsThatItWasScanned() {
+        let note = VaultNote(
+            relativePath: "a.md", frontmatter: nil, body: "Just words\n",
+            modifiedAt: Date(timeIntervalSince1970: 100), fileSize: 11
+        )
+        XCTAssertEqual(VaultIndexEntry.make(from: note).attachments, [])
+    }
+
+    /// An index persisted before attachments were recorded has `nil` for every entry. Each is read once more,
+    /// whatever its modification date and size say; afterwards the usual cheap diff applies.
+    func testEntryNeverScannedForAttachmentsIsReadAgain() {
+        let unscanned = VaultIndexEntry(
+            relativePath: "a.md", title: "T", preview: "P", tags: [],
+            modifiedAt: Date(timeIntervalSince1970: 100), fileSize: 10
+        )
+        XCTAssertNil(unscanned.attachments)
+
+        let diff = VaultIndex.diff(index: [unscanned], disk: [metadata("a.md", modified: 100, size: 10)])
+
+        XCTAssertEqual(diff.needsRead, ["a.md"])
+        XCTAssertTrue(diff.unchanged.isEmpty)
+    }
+
+    func testEntryScannedWithNoAttachmentsIsNotReadAgain() {
+        let diff = VaultIndex.diff(
+            index: [entry("a.md", modified: 100, size: 10)],
+            disk: [metadata("a.md", modified: 100, size: 10)]
+        )
+        XCTAssertTrue(diff.needsRead.isEmpty)
+        XCTAssertEqual(diff.unchanged.map(\.relativePath), ["a.md"])
+    }
+
+    func testVaultIndexEntryDecodesOldJSONWithoutAttachments() throws {
+        let oldJSON = """
+        {"relativePath":"a.md","title":"A","preview":"P","tags":[],"modifiedAt":719000000,"fileSize":10}
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(VaultIndexEntry.self, from: oldJSON)
+        XCTAssertNil(decoded.attachments)
+    }
+
+    func testAttachmentsSurviveASaveAndLoad() {
+        let entries = [VaultIndexEntry(
+            relativePath: "a.md", title: "T", preview: "P", tags: [],
+            modifiedAt: Date(timeIntervalSince1970: 100), fileSize: 10,
+            attachments: [NoteAttachment(target: "a.png", name: "a.png", kind: .image)]
+        )]
+        VaultIndex.save(entries)
+        XCTAssertEqual(VaultIndex.load(), entries)
     }
 }
