@@ -230,6 +230,43 @@ final class NoteAttachmentsTests: XCTestCase {
         XCTAssertEqual(NoteAttachments.tile(from: [image("a.png")])?.extra, 0)
     }
 
+    // MARK: What Quoote can show
+
+    private var memosFiles: [NoteAttachment] {
+        [
+            image("https://memos.example.com/file/attachments/u/a.jpg", name: "a.jpg"),
+            file("/file/attachments/u/b.pdf", name: "b.pdf"),
+            image("/o/r/12/c.png", name: "c.png"),
+            // A server installed under a path of its own.
+            image("https://host.example.com/memos/file/resources/7/d.jpg", name: "d.jpg"),
+        ]
+    }
+
+    func testFilesInTheVaultAndOnTheMemosServerAreShown() {
+        let all = [image("trip.jpg"), file("Report.pdf"), file("attachments/trip/a.pdf", name: "a.pdf")] + memosFiles
+        XCTAssertEqual(NoteAttachments.shown(all), all)
+    }
+
+    /// Quoote loads nothing from another site, so a picture or a video linked from one could be neither shown nor
+    /// opened: it isn't an attachment, whatever the parser makes of the embed.
+    func testAWebClippingsPicturesAndVideosAreNotAttachments() {
+        let clipping = NoteAttachments.parse("""
+            ![](https://cdn.example.com/uploads/11/hero.png?auto=compress%2Cformat&w=728)
+            ![](https://www.youtube.com/watch?v=abc123)
+            ![](https://x.com/i/status/1234567890)
+            ![](https://secure.gravatar.com/avatar/0123abcd?s=36&d=https%3A%2F%2Fimages.example.com%2Fa.png)
+            ![](https://x.test/report.pdf)
+            ![[trip.jpg]]
+            """)
+        XCTAssertEqual(clipping.count, 6, "the parser still finds every embed")
+        XCTAssertEqual(NoteAttachments.shown(clipping), [image("trip.jpg")])
+    }
+
+    func testShownKeepsTheOrderItIsGiven() {
+        let mixed = [image("https://x.test/a.png"), file("b.pdf")] + memosFiles + [image("c.png")]
+        XCTAssertEqual(NoteAttachments.shown(mixed).map(\.name), ["b.pdf", "a.jpg", "b.pdf", "c.png", "d.jpg", "c.png"])
+    }
+
     // MARK: Excerpt support
 
     func testRemovingMemosFileLinksKeepsOrdinaryLinks() {

@@ -776,8 +776,10 @@ struct NoteEditorView: View {
     /// server keeps on the memo itself.
     private func currentAttachments() -> [NoteAttachment] {
         let embedded = NoteAttachments.parse(textBinding.wrappedValue)
-        guard case .serverMemo(let memoID) = target else { return embedded }
-        return NoteAttachments.merged(embedded, serverMemosStore.memo(memoID: memoID)?.attachments ?? [])
+        guard case .serverMemo(let memoID) = target else { return NoteAttachments.shown(embedded) }
+        return NoteAttachments.shown(
+            NoteAttachments.merged(embedded, serverMemosStore.memo(memoID: memoID)?.attachments ?? [])
+        )
     }
 
     /// Rescans for attachments. Debounced so typing doesn't run the parser on every keystroke;

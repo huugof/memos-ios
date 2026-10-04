@@ -124,6 +124,28 @@ final class UnifiedNoteVaultTests: XCTestCase {
         XCTAssertEqual(UnifiedNote.vault(entry("b.md", title: "B", modified: 1, attachments: nil)).attachments, [])
     }
 
+    func testAClippingsWebEmbedsAreNotAmongItsRowsAttachments() {
+        let video = NoteAttachment(target: "https://www.youtube.com/watch?v=abc", name: "watch", kind: .image)
+        let hero = NoteAttachment(target: "https://cdn.example.com/hero.png", name: "hero.png", kind: .image)
+        let note = UnifiedNote.vault(entry("clip.md", title: "A clipping", modified: 1, attachments: [video, photo, hero]))
+        XCTAssertEqual(note.attachments, [photo])
+    }
+
+    /// Leaving the embed out of the tile must not leave the row with nothing: a note that is only a video link has
+    /// its title for text, as it did before there were tiles.
+    func testANoteWhoseOnlyAttachmentIsAVideoLinkKeepsItsTitleAsRowText() {
+        let video = NoteAttachment(target: "https://www.youtube.com/watch?v=abc", name: "watch", kind: .image)
+        let title = "![](https://www.youtube.com/watch?v=abc)"
+        let note = UnifiedNote.vault(entry("clip.md", title: title, modified: 1, preview: "", attachments: [video]))
+        XCTAssertEqual(note.attachments, [])
+        XCTAssertEqual(note.excerpt, title)
+    }
+
+    func testALocalDraftIgnoresWebEmbeds() {
+        let note = UnifiedNote.local(Draft(text: "Look ![](https://example.com/p.png) ![[beach.jpg]]"))
+        XCTAssertEqual(note.attachments.map(\.name), ["beach.jpg"])
+    }
+
     func testALocalDraftFindsItsAttachmentsInItsText() {
         let note = UnifiedNote.local(Draft(text: "Beach day ![[beach.jpg]]"))
         XCTAssertEqual(note.attachments.map(\.name), ["beach.jpg"])

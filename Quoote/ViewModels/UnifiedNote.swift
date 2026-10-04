@@ -66,7 +66,7 @@ enum UnifiedNote: Identifiable {
         let text: String
         switch self {
         case .vault(let entry):
-            let holdsAttachments = !(entry.attachments ?? []).isEmpty
+            let holdsAttachments = !attachments.isEmpty
             text = entry.preview.isEmpty && holdsAttachments ? "" : content
         case .local, .server:
             text = NoteExcerpt.make(from: content)
@@ -94,14 +94,16 @@ enum UnifiedNote: Identifiable {
     /// server lists on the memo itself (text first, duplicates dropped). A vault row has no body to read, so
     /// it takes the list from its index entry.
     var attachments: [NoteAttachment] {
+        let found: [NoteAttachment]
         switch self {
         case .local(let draft):
-            return NoteAttachments.parse(draft.text)
+            found = NoteAttachments.parse(draft.text)
         case .server(let memo, _):
-            return NoteAttachments.merged(NoteAttachments.parse(content), memo.attachments ?? [])
+            found = NoteAttachments.merged(NoteAttachments.parse(content), memo.attachments ?? [])
         case .vault(let entry):
-            return entry.attachments ?? []
+            found = entry.attachments ?? []
         }
+        return NoteAttachments.shown(found)
     }
 
     /// The vault-relative path of the note, so `![[picture.png]]` can be found beside it. `nil` unless it is a vault note.

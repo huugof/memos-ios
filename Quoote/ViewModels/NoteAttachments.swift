@@ -96,6 +96,24 @@ enum NoteAttachments {
         return result as String
     }
 
+    // MARK: What can be shown
+
+    /// `attachments` without those Quoote can neither show nor open: a picture or video linked from another site —
+    /// a web clipping's images, a YouTube embed. Quoote asks no other site for anything, so such a link would be a
+    /// tile that never fills in and can't be tapped. It stays in the text where it is; it just isn't an attachment.
+    /// Files in the vault and on a Memos server are.
+    static func shown(_ attachments: [NoteAttachment]) -> [NoteAttachment] {
+        attachments.filter(isShown)
+    }
+
+    /// A vault file, a Memos-relative path, or an absolute URL whose path is a Memos file's — wherever the server
+    /// is installed (`/file/attachments/…`, `/file/resources/…`, `/o/r/…`).
+    static func isShown(_ attachment: NoteAttachment) -> Bool {
+        guard attachment.isRemote, !isMemosRelative(attachment.target) else { return true }
+        guard let path = urlPath(of: attachment.target) else { return false }
+        return path.contains("/file/attachments/") || path.contains("/file/resources/") || path.contains("/o/r/")
+    }
+
     // MARK: Server list
 
     /// The attachments a Memos server lists on a memo: `attachments`, or `resources` / `resourceList` on older
