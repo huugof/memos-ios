@@ -1,7 +1,7 @@
 # Attachment Thumbnails — Design
 
 **Date:** 2026-10-03
-**Status:** Awaiting review
+**Status:** Implemented — device checklist pending
 **Scope:** One feature, one plan.
 
 ## Goal
