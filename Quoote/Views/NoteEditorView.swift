@@ -3,6 +3,7 @@ import SwiftData
 import PhotosUI
 import UniformTypeIdentifiers
 import AVFoundation
+import QuickLook
 
 /// The note editor, shown on the compose sheet. A `.newNote` target is the capture
 /// screen: Send hands back a blank note in place. Any other target — or a pinned
@@ -56,9 +57,11 @@ struct NoteEditorView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var uploadError: String?
     /// What the note already holds: pictures and files embedded in its text and, for a Memos note, those the
-    /// server lists on the memo. Shown read-only at the front of the attachment strip.
+    /// server lists on the memo. Shown at the front of the attachment strip; a vault file previews when tapped.
     @State private var existingAttachments: [NoteAttachment] = []
     @State private var attachmentScanTask: Task<Void, Never>?
+    /// Opens a tapped vault attachment in the system previewer, over the editor.
+    @StateObject private var attachmentPreviewer = AttachmentPreviewer()
 
     // Tag suggestions
     @State private var remoteTags: [String] = []
@@ -130,7 +133,11 @@ struct NoteEditorView: View {
                         existing: existingAttachments,
                         notePath: vaultNotePath,
                         pendingImages: $pendingImages,
-                        pendingFiles: $pendingFiles
+                        pendingFiles: $pendingFiles,
+                        openingIdentity: attachmentPreviewer.loadingIdentity,
+                        onOpen: { attachment in
+                            attachmentPreviewer.open(attachment, notePath: vaultNotePath) { noticeMessage = $0 }
+                        }
                     )
                 }
                 editorBar
@@ -160,6 +167,7 @@ struct NoteEditorView: View {
             guard case .success(let urls) = result, let url = urls.first else { return }
             handleFileSelected(url: url)
         }
+        .quickLookPreview($attachmentPreviewer.previewURL)
         .alert("Upload Failed", isPresented: .init(
             get: { uploadError != nil },
             set: { if !$0 { uploadError = nil } }
@@ -211,6 +219,10 @@ struct NoteEditorView: View {
         .onChange(of: isCoveredByPresentation) { _, covered in
             if !covered { focusEditor() }
         }
+        .onChange(of: attachmentPreviewer.previewURL) { _, url in
+            // The preview is full screen: put the keyboard away rather than leave it over the preview.
+            if url != nil { isFocused = false }
+        }
         .onDisappear {
             stopDictation()
             persistDebounceTask?.cancel()
@@ -219,6 +231,7 @@ struct NoteEditorView: View {
             cleanupBlankDraft()
             remoteTagTask?.cancel()
             attachmentScanTask?.cancel()
+            attachmentPreviewer.cancel()
         }
     }
 
@@ -486,6 +499,7 @@ struct NoteEditorView: View {
     private var isCoveredByPresentation: Bool {
         showAttachMenu || showPhotoPicker || showFilePicker
             || uploadError != nil
+            || attachmentPreviewer.previewURL != nil
     }
 
     /// Swap the editor onto a fresh blank draft without rebuilding the view — the
@@ -501,6 +515,7 @@ struct NoteEditorView: View {
         pendingImages = []
         pendingFiles = []
         existingAttachments = []
+        attachmentPreviewer.cancel()
         focusEditor()
     }
 

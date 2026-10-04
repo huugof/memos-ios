@@ -72,6 +72,14 @@ final class AttachmentPreviewer: ObservableObject {
         opening = current
     }
 
+    /// Drops a load still in progress, because the note it was for is gone. A preview already showing is left to
+    /// close itself.
+    func cancel() {
+        opening?.task?.cancel()
+        opening = nil
+        loadingIdentity = nil
+    }
+
     // MARK: - Helpers
 
     private func showSpinner(token: UUID, identity: String) {

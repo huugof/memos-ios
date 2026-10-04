@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The strip above the editor bar: what the note already holds (read-only), then what is waiting to be sent
-/// (with ✕, or a spinner while it uploads). Existing attachments go away by deleting their line in the text.
+/// The strip above the editor bar: what the note already holds (tap to preview, where that is supported), then what
+/// is waiting to be sent (with ✕, or a spinner while it uploads). Existing attachments go away by deleting their
+/// line in the text.
 struct AttachmentBar: View {
     static let height: CGFloat = 72
 
@@ -10,17 +11,16 @@ struct AttachmentBar: View {
     var notePath: String? = nil
     @Binding var pendingImages: [PendingImage]
     @Binding var pendingFiles: [PendingFile]
+    /// The existing attachment being fetched for a preview, which shows a spinner.
+    var openingIdentity: String? = nil
+    /// What tapping an existing attachment does, for those that can be previewed. `nil` leaves the strip display-only.
+    var onOpen: ((NoteAttachment) -> Void)? = nil
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(existing, id: \.identity) { attachment in
-                    switch attachment.kind {
-                    case .image:
-                        AttachmentTile(attachment: attachment, notePath: notePath)
-                    case .file:
-                        FileChip(name: attachment.name)
-                    }
+                    existingView(attachment)
                 }
                 ForEach(pendingImages) { p in
                     ZStack(alignment: .topTrailing) {
@@ -69,6 +69,42 @@ struct AttachmentBar: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .padding(.horizontal, 16)
     }
+
+    /// An existing attachment: a button when it can be previewed, the plain tile or chip otherwise.
+    @ViewBuilder
+    private func existingView(_ attachment: NoteAttachment) -> some View {
+        if let onOpen, AttachmentPreviewer.canPreview(attachment) {
+            Button { onOpen(attachment) } label: {
+                tileOrChip(attachment)
+                    .overlay {
+                        if openingIdentity == attachment.identity { OpeningSpinner() }
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens a preview")
+        } else {
+            tileOrChip(attachment)
+        }
+    }
+
+    @ViewBuilder
+    private func tileOrChip(_ attachment: NoteAttachment) -> some View {
+        switch attachment.kind {
+        case .image:
+            AttachmentTile(attachment: attachment, notePath: notePath)
+        case .file:
+            FileChip(name: attachment.name)
+        }
+    }
+}
+
+/// Covers the tile or chip it is laid over while its file is fetched.
+private struct OpeningSpinner: View {
+    var body: some View {
+        ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
 }
 
 /// A file as a chip: its type icon and its name, two lines at most.
@@ -87,5 +123,7 @@ private struct FileChip: View {
         .padding(8)
         .frame(height: 56)
         .background(Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("File: \(name)")
     }
 }

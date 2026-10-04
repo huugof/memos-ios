@@ -190,6 +190,24 @@ final class AttachmentPreviewerTests: XCTestCase {
         XCTAssertEqual(previewFolders().count, 1)
     }
 
+    func testCancellingDropsALoadInProgress() async throws {
+        try put("attachments/.Report.pdf.icloud", Data("placeholder".utf8))
+        let previewer = makePreviewer(graceDelay: .zero)
+        let attachment = file("Report.pdf")
+        open(attachment, in: previewer)
+        await waitUntil("the spinner") { previewer.loadingIdentity == attachment.identity }
+
+        previewer.cancel()
+        XCTAssertNil(previewer.loadingIdentity)
+
+        // The file turns up afterwards: nothing opens, nothing is left behind, nobody is told.
+        try deliver("attachments/Report.pdf", Data("%PDF".utf8))
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertNil(previewer.previewURL)
+        XCTAssertEqual(previewFolders(), [])
+        XCTAssertEqual(notices.messages, [])
+    }
+
     // MARK: Cleaning up
 
     func testClosingThePreviewDeletesTheCopy() async throws {

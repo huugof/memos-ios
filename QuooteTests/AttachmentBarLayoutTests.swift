@@ -24,4 +24,17 @@ final class AttachmentBarLayoutTests: XCTestCase {
         let bar = AttachmentBar(existing: [photo], pendingImages: .constant([]), pendingFiles: .constant([pending]))
         XCTAssertEqual(height(of: bar), AttachmentBar.height)
     }
+
+    func testTappableTilesAndASpinnerOnOneOfThemKeepTheStripsHeight() {
+        let photo = NoteAttachment(target: "trip.jpg", name: "trip.jpg", kind: .image)
+        let file = NoteAttachment(target: "Report.pdf", name: "Report.pdf", kind: .file)
+        let bar = AttachmentBar(
+            existing: [photo, file],
+            pendingImages: .constant([]),
+            pendingFiles: .constant([]),
+            openingIdentity: file.identity,
+            onOpen: { _ in }
+        )
+        XCTAssertEqual(height(of: bar), AttachmentBar.height)
+    }
 }
