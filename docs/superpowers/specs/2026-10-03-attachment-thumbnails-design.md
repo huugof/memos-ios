@@ -346,8 +346,8 @@ attachments, the history-row tile, and unsent attachments are not tappable yet.
 a PDF, and a `QLPreviewController` presented as a page sheet answers none at all (tried in a throwaway app: a drag
 scrolls a PDF and leaves a picture where it is). QuickLook is now the *content* of a SwiftUI sheet
 (`AttachmentPreviewSheet`: a `QLPreviewController` in a navigation controller, Close at the top left, markup off). A
-swipe closes it from anywhere on a picture and from the top bar of a PDF; inside a PDF page a downward drag scrolls
-the page, as it should. SwiftUI clears the binding as the sheet starts to slide away when Close is tapped, and
+swipe closes it from anywhere on a picture, and from the top bar or the drag indicator on a PDF; inside a PDF page a
+downward drag scrolls the page, as it should. SwiftUI clears the binding as the sheet starts to slide away when Close is tapped, and
 after it has gone when it is swiped, so the copy is deleted from the sheet's `onDismiss`
 (`AttachmentPreviewer.previewDidClose`), not when the binding clears: QuickLook is still showing the file for a
 moment after Close (`testTheCopyIsKeptUntilTheSheetShowingItHasLeft`).

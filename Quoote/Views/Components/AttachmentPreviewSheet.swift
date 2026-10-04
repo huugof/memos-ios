@@ -5,8 +5,19 @@ import QuickLook
 ///
 /// QuickLook is the sheet's content rather than the thing presented. A `QLPreviewController` presented on its own
 /// answers no swipe down — it scrolls a PDF and leaves a picture where it is — but a SwiftUI sheet's own swipe works
-/// over it, from the top or the middle, on pictures and PDFs alike. The Close button is for anyone who would rather tap.
-struct AttachmentPreviewSheet: UIViewControllerRepresentable {
+/// over it: from anywhere on a picture, from the top bar or the drag indicator on a PDF (a drag inside a page scrolls
+/// the page). The Close button is for anyone who would rather tap.
+struct AttachmentPreviewSheet: View {
+    let url: URL
+
+    var body: some View {
+        QuickLookContent(url: url)
+            .ignoresSafeArea()
+            .presentationDragIndicator(.visible)
+    }
+}
+
+private struct QuickLookContent: UIViewControllerRepresentable {
     let url: URL
 
     @Environment(\.dismiss) private var dismiss

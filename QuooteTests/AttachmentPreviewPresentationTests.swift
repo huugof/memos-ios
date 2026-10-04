@@ -34,7 +34,7 @@ final class AttachmentPreviewPresentationTests: XCTestCase {
                         get: { previewer.previewURL.map(PreviewItem.init) },
                         set: { if $0 == nil { previewer.previewURL = nil } }
                     ), onDismiss: { previewer.previewDidClose() }) { item in
-                        AttachmentPreviewSheet(url: item.url).ignoresSafeArea()
+                        AttachmentPreviewSheet(url: item.url)
                     }
             }
         }

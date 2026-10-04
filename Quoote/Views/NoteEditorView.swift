@@ -167,7 +167,7 @@ struct NoteEditorView: View {
             handleFileSelected(url: url)
         }
         .sheet(item: previewItem, onDismiss: { attachmentPreviewer.previewDidClose() }) { item in
-            AttachmentPreviewSheet(url: item.url).ignoresSafeArea()
+            AttachmentPreviewSheet(url: item.url)
         }
         .alert("Upload Failed", isPresented: .init(
             get: { uploadError != nil },
