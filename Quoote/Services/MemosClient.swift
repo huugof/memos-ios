@@ -39,6 +39,10 @@ struct ServerMemoSummary: Identifiable, Equatable, Codable {
     let snippet: String?
     let attachmentCount: Int
     let hasFullContent: Bool
+    /// What the server lists on the memo, mapped to attachments. A picture added in the Memos web app is only
+    /// here, not in `content`. `nil` when the response carried no list (a cache from before this field, an
+    /// older server), so a merge keeps what it already knows; `[]` is the server saying "none".
+    let attachments: [NoteAttachment]?
 
     init(
         id: String,
@@ -47,7 +51,8 @@ struct ServerMemoSummary: Identifiable, Equatable, Codable {
         updatedAt: Date?,
         snippet: String? = nil,
         attachmentCount: Int = 0,
-        hasFullContent: Bool? = nil
+        hasFullContent: Bool? = nil,
+        attachments: [NoteAttachment]? = nil
     ) {
         self.id = id
         self.resourceName = resourceName
@@ -55,6 +60,7 @@ struct ServerMemoSummary: Identifiable, Equatable, Codable {
         self.updatedAt = updatedAt
         self.snippet = snippet
         self.attachmentCount = max(0, attachmentCount)
+        self.attachments = attachments
         if let hasFullContent {
             self.hasFullContent = hasFullContent
         } else {
@@ -802,7 +808,8 @@ struct MemosClient {
             updatedAt: updatedAt,
             snippet: snippet,
             attachmentCount: attachmentCount,
-            hasFullContent: hasFullContent
+            hasFullContent: hasFullContent,
+            attachments: NoteAttachments.fromServerList(memo: memo, fallback: memoEnvelope)
         )
     }
 

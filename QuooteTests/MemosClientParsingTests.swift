@@ -133,6 +133,104 @@ final class MemosClientParsingTests: XCTestCase {
         XCTAssertTrue(memo.hasFullContent)
     }
 
+    func testFetchMemosPageMapsTheServersAttachmentListToAttachments() async throws {
+        let client = makeClient { _ in
+            let body = """
+            {
+              "memos": [
+                {
+                  "name": "memos/trip",
+                  "content": "Trip",
+                  "attachments": [
+                    { "name": "attachments/abc", "filename": "image.jpg", "type": "image/jpeg" },
+                    { "name": "attachments/def", "filename": "Report.pdf", "type": "application/pdf" }
+                  ]
+                }
+              ]
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(url: URL(string: "https://example.com/api/v1/memos")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, body)
+        }
+
+        let page = try await client.fetchMemosPage(
+            baseURLString: "https://example.com", token: "token", allowInsecureHTTP: false, pageSize: 30, pageToken: nil
+        )
+
+        let memo = try XCTUnwrap(page.memos.first)
+        XCTAssertEqual(memo.attachmentCount, 2)
+        XCTAssertEqual(memo.attachments, [
+            NoteAttachment(target: "/file/attachments/abc/image.jpg", name: "image.jpg", kind: .image),
+            NoteAttachment(target: "/file/attachments/def/Report.pdf", name: "Report.pdf", kind: .file),
+        ])
+    }
+
+    func testFetchMemosPageReadsAnOlderServersResourcesByNumericID() async throws {
+        let client = makeClient { _ in
+            let body = """
+            {
+              "memos": [
+                {
+                  "name": "memos/old",
+                  "content": "Old server",
+                  "resources": [ { "id": 12, "filename": "b.png", "type": "image/png" } ]
+                }
+              ]
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(url: URL(string: "https://example.com/api/v1/memos")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, body)
+        }
+
+        let page = try await client.fetchMemosPage(
+            baseURLString: "https://example.com", token: "token", allowInsecureHTTP: false, pageSize: 30, pageToken: nil
+        )
+
+        XCTAssertEqual(page.memos.first?.attachments, [
+            NoteAttachment(target: "/o/r/12/b.png", name: "b.png", kind: .image),
+        ])
+    }
+
+    func testAMemoWithoutAListHasNilAttachmentsAndAnEmptyListIsEmpty() async throws {
+        let client = makeClient { _ in
+            let body = """
+            {
+              "memos": [
+                { "name": "memos/silent", "content": "No list in this reply" },
+                { "name": "memos/none", "content": "Server says none", "attachments": [] }
+              ]
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(url: URL(string: "https://example.com/api/v1/memos")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, body)
+        }
+
+        let page = try await client.fetchMemosPage(
+            baseURLString: "https://example.com", token: "token", allowInsecureHTTP: false, pageSize: 30, pageToken: nil
+        )
+
+        let byID = Dictionary(uniqueKeysWithValues: page.memos.map { ($0.id, $0) })
+        XCTAssertNil(byID["memos/silent"]?.attachments)
+        XCTAssertEqual(byID["memos/none"]?.attachments, [])
+    }
+
+    func testServerMemoSummaryRoundTripsItsAttachmentsAndAnOldCacheStillDecodes() throws {
+        let memo = ServerMemoSummary(
+            id: "memos/a", resourceName: "memos/a", content: "Hi", updatedAt: nil,
+            attachments: [NoteAttachment(target: "/file/attachments/u/a.jpg", name: "a.jpg", kind: .image)]
+        )
+        let data = try JSONEncoder().encode([memo])
+        XCTAssertEqual(try JSONDecoder().decode([ServerMemoSummary].self, from: data), [memo])
+
+        // memo_cache_v1.json written before the field existed.
+        let legacy = """
+        [{"id":"memos/a","resourceName":"memos/a","content":"Hi","attachmentCount":1,"hasFullContent":true}]
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode([ServerMemoSummary].self, from: legacy)
+        XCTAssertNil(decoded.first?.attachments)
+        XCTAssertEqual(decoded.first?.attachmentCount, 1)
+    }
+
     private func makeClient(handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)) -> MemosClient {
         ParsingMockURLProtocol.requestHandler = handler
         let configuration = URLSessionConfiguration.ephemeral

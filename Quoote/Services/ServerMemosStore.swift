@@ -285,7 +285,8 @@ final class ServerMemosStore: ObservableObject {
             updatedAt: preservedUpdatedAt,
             snippet: mergedSnippet,
             attachmentCount: mergedAttachmentCount,
-            hasFullContent: mergedHasFullContent
+            hasFullContent: mergedHasFullContent,
+            attachments: incoming.attachments ?? existing.attachments
         )
     }
 }
