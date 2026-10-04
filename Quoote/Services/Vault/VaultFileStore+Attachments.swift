@@ -14,6 +14,15 @@ extension VaultFileStore {
         case unreadable
     }
 
+    /// What copying an attachment out of the vault produced.
+    enum AttachmentCopy: Equatable {
+        case copied(URL)
+        /// iCloud has the file but not on this device. A download was requested and nothing was copied.
+        case notDownloaded
+        /// Missing, a folder, or unreadable.
+        case unreadable
+    }
+
     /// The vault-relative path of the file a wikilink or embed `target` names, or `nil`. Tried in order, each
     /// accepting the file or its iCloud placeholder:
     ///
@@ -48,31 +57,80 @@ extension VaultFileStore {
     /// A thumbnail of the picture at `relativePath`, at most `maxPixel` on its longest edge. The full-size bitmap
     /// is never held: ImageIO decodes straight to the thumbnail.
     func attachmentThumbnail(at relativePath: String, maxPixel: Int) -> AttachmentThumbnail {
-        let url = root.appendingPathComponent(relativePath)
-        let manager = FileManager.default
+        switch readiness(of: relativePath) {
+        case .missing:
+            return .unreadable
+        case .notDownloaded:
+            return .notDownloaded
+        case .ready(let url, let modifiedAt):
+            var coordinationError: NSError?
+            var image: CGImage?
+            NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
+                image = ThumbnailDownsampler.downsample(url: readURL, maxPixel: maxPixel)
+            }
+            guard coordinationError == nil, let image else { return .unreadable }
+            return .image(image, modifiedAt: modifiedAt ?? .distantPast)
+        }
+    }
 
-        guard manager.fileExists(atPath: url.path) else {
-            guard manager.fileExists(atPath: placeholderURL(for: relativePath).path) else { return .unreadable }
+    /// A copy of the file at `relativePath` inside `directory`, under the file's own name. The system previewer
+    /// reads from another process and the vault is only open while the caller holds its access, so it is handed a
+    /// copy. `directory` is created when there is something to put in it.
+    func copyAttachment(at relativePath: String, into directory: URL) -> AttachmentCopy {
+        switch readiness(of: relativePath) {
+        case .missing:
+            return .unreadable
+        case .notDownloaded:
+            return .notDownloaded
+        case .ready(let url, _):
+            var coordinationError: NSError?
+            var copy: URL?
+            NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
+                let destination = directory.appendingPathComponent(url.lastPathComponent)
+                do {
+                    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+                    if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
+                    try fileManager.copyItem(at: readURL, to: destination)
+                    copy = destination
+                } catch {
+                    copy = nil
+                }
+            }
+            guard coordinationError == nil, let copy else { return .unreadable }
+            return .copied(copy)
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Whether an attachment's bytes can be read now.
+    private enum Readiness {
+        /// A file, there to read. `modifiedAt` is `nil` when the file system doesn't say.
+        case ready(URL, modifiedAt: Date?)
+        /// iCloud has the file but not on this device. A download was requested; reading would block on it.
+        case notDownloaded
+        /// Not there, or a folder.
+        case missing
+    }
+
+    private func readiness(of relativePath: String) -> Readiness {
+        let url = root.appendingPathComponent(relativePath)
+        guard fileManager.fileExists(atPath: url.path) else {
+            guard fileManager.fileExists(atPath: placeholderURL(for: relativePath).path) else { return .missing }
             requestDownload(relativePath: relativePath)
             return .notDownloaded
         }
 
-        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .ubiquitousItemDownloadingStatusKey])
+        let values = try? url.resourceValues(forKeys: [
+            .isDirectoryKey, .contentModificationDateKey, .ubiquitousItemDownloadingStatusKey
+        ])
+        if values?.isDirectory == true { return .missing }
         if values?.ubiquitousItemDownloadingStatus == .notDownloaded {
             requestDownload(relativePath: relativePath)
             return .notDownloaded
         }
-
-        var coordinationError: NSError?
-        var image: CGImage?
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
-            image = ThumbnailDownsampler.downsample(url: readURL, maxPixel: maxPixel)
-        }
-        guard coordinationError == nil, let image else { return .unreadable }
-        return .image(image, modifiedAt: values?.contentModificationDate ?? .distantPast)
+        return .ready(url, modifiedAt: values?.contentModificationDate)
     }
-
-    // MARK: - Helpers
 
     /// `Docs/.report.pdf.icloud` for `Docs/report.pdf`: where iCloud leaves an evicted file.
     private func placeholderURL(for relativePath: String) -> URL {

@@ -46,10 +46,12 @@ enum VaultWriteResult: Equatable {
 struct VaultFileStore {
 
     let root: URL
-    private let fileManager = FileManager.default
+    /// Injected like `root`, so a test can see which iCloud downloads were asked for.
+    let fileManager: FileManager
 
-    init(root: URL) {
+    init(root: URL, fileManager: FileManager = .default) {
         self.root = root
+        self.fileManager = fileManager
     }
 
     // MARK: - Listing
