@@ -308,7 +308,8 @@ is today's behaviour.
 - A server older than the attachments API may serve thumbnails differently; the plain-URL
   fallback covers it. The Memos facts above were checked against `main`, not the user's
   server.
-- A picture linked from another host shows the generic tile — by design.
+- A picture or video linked from another site (a web clipping's images, a YouTube embed) is not an attachment — see
+  the last section.
 - **A Memos note with no text stays hidden from history, even if it has attachments.**
   `UnifiedNote.merge` drops text-less memos, and `memoForEditing` rejects them ("Full note
   content is unavailable for editing"). Showing them is a separate change touching both.
@@ -328,13 +329,45 @@ attachments, the history-row tile, and unsent attachments are not tappable yet.
   file is copied first: `VaultFileStore.copyAttachment(at:into:)` into `tmp/AttachmentPreviews/<uuid>/<name>`,
   driven by `AttachmentPreviewFiles` (locate as the thumbnails do, wait for an evicted iCloud file — polling, 30 s —
   and delete the copy when the preview closes; copies left by a crashed run are swept after an hour).
-- `AttachmentPreviewer` is the state the editor binds to `.quickLookPreview`: the copy being shown, the tile to put a
+- `AttachmentPreviewer` is the state the editor binds to its preview sheet: the copy being shown, the tile to put a
   spinner on once a load takes over 250 ms, and a sentence for the editor's banner on failure. The last tap wins.
 - The editor treats the preview as something it presented. Its text view losing focus closes the sheet and commits,
   unless something it presented took the keyboard, so `isCoveredByPresentation` includes the preview and the editor
-  drops focus when it opens (the keyboard would otherwise stay over it). SwiftUI presents QuickLook `overFullScreen`,
-  so the sheet does not disappear and its `onDisappear` commit does not run; `AttachmentPreviewPresentationTests`
-  fails if a system update changes that.
-- Not verified without a phone: an evicted iCloud file, the keyboard going away and coming back, VoiceOver.
+  drops focus when it opens (the keyboard would otherwise stay over it). A sheet over a sheet leaves the one beneath
+  in place, so its `onDisappear` commit does not run; `AttachmentPreviewPresentationTests` fails if a system update
+  changes that. (The first cut used `.quickLookPreview`; see the last section for why that changed.)
+- Not verified without a phone: an evicted iCloud file, VoiceOver.
 - Left for later: Memos attachments (an authenticated download of the full file; an S3-backed server redirects off
   the configured host, which the thumbnails also refuse), the history-row tile, unsent attachments.
+
+## Follow-up: what the first day on a phone showed (2026-10-04)
+
+**Closing a preview is a swipe down.** `.quickLookPreview` presents QuickLook full screen, which answers no swipe on
+a PDF, and a `QLPreviewController` presented as a page sheet answers none at all (tried in a throwaway app: a drag
+scrolls a PDF and leaves a picture where it is). QuickLook is now the *content* of a SwiftUI sheet
+(`AttachmentPreviewSheet`: a `QLPreviewController` in a navigation controller, Close at the top left, markup off). A
+swipe closes it from anywhere on a picture and from the top bar of a PDF; inside a PDF page a downward drag scrolls
+the page, as it should. SwiftUI clears the binding as the sheet starts to slide away when Close is tapped, and
+after it has gone when it is swiped, so the copy is deleted from the sheet's `onDismiss`
+(`AttachmentPreviewer.previewDidClose`), not when the binding clears: QuickLook is still showing the file for a
+moment after Close (`testTheCopyIsKeptUntilTheSheetShowingItHasLeft`).
+
+**The keyboard stays down after a preview closes.** Recorded in the simulator, handing the keyboard back — when the
+binding cleared, or the moment the swipe was released — left the editor with no keyboard for about a third of a
+second after the sheet had gone, then the keyboard rose and pushed the bar up: two movements where one will do.
+Holding the keyboard's place with an empty input view only made its keys pop in over the preview. So, as in Notes,
+the keyboard stays down until a tap in the text. Menus, pickers and alerts still hand it back
+(`isCoveredByMenuOrPicker`); the preview only counts toward not closing the sheet (`isCoveredByPresentation`).
+
+**Web embeds are not attachments.** The Web Clipper writes `![](https://…)` for a page's pictures and
+`![](https://www.youtube.com/watch?v=…)` for its videos. Quoote asks no other site for anything (a non-goal above), so
+each was a tile that never filled in and could not be tapped, and a clipping with a comment section made a strip of
+dozens of grey avatars. `NoteAttachments.shown` keeps vault files and Memos files (an absolute URL counts when its
+path holds `/file/attachments/`, `/file/resources/` or `/o/r/`, wherever the server is installed) and drops the rest;
+the history row and the editor's strip both go through it. The parser still finds the embeds and the index still
+records them, so nothing has to be re-scanned. A note whose only "attachment" was a video link shows its title as
+before.
+
+Not done: thumbnails and previews for web pictures. They need Quoote to fetch from the picture's own site (an
+anonymous request with a size cap and the disk cache; a tap would open an in-app browser sheet, and a video link
+would get a chip of its own), which reverses the non-goal above.
