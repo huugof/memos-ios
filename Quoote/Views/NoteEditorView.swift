@@ -55,6 +55,10 @@ struct NoteEditorView: View {
     @State private var showFilePicker = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var uploadError: String?
+    /// What the note already holds: pictures and files embedded in its text and, for a Memos note, those the
+    /// server lists on the memo. Shown read-only at the front of the attachment strip.
+    @State private var existingAttachments: [NoteAttachment] = []
+    @State private var attachmentScanTask: Task<Void, Never>?
 
     // Tag suggestions
     @State private var remoteTags: [String] = []
@@ -121,8 +125,13 @@ struct NoteEditorView: View {
         .overlay(alignment: .bottom) {
             // Floats over the text, which scrolls on under the glass.
             VStack(spacing: 0) {
-                if hasPendingAttachments {
-                    pendingAttachmentsBar
+                if showsAttachmentBar {
+                    AttachmentBar(
+                        existing: existingAttachments,
+                        notePath: vaultNotePath,
+                        pendingImages: $pendingImages,
+                        pendingFiles: $pendingFiles
+                    )
                 }
                 editorBar
             }
@@ -163,15 +172,18 @@ struct NoteEditorView: View {
         .onChange(of: isBlank, initial: true) { _, blank in onBlankChange(blank) }
         .onChange(of: draftText) { _, _ in
             schedulePersist()
+            scheduleAttachmentScan()
             // Editing after a send re-arms auto-commit so leaving captures the new text.
             if draftText != lastSentText { didTapDone = false }
         }
         .onChange(of: serverMemoContent) { _, _ in
             stageServerMemoContent()
+            scheduleAttachmentScan()
             if serverMemoContent != lastSentText { didTapDone = false }
         }
         .onChange(of: vaultNoteBody) { _, _ in
             scheduleVaultSave()
+            scheduleAttachmentScan()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
@@ -206,6 +218,7 @@ struct NoteEditorView: View {
             if !didTapDone { commitCurrent() }
             cleanupBlankDraft()
             remoteTagTask?.cancel()
+            attachmentScanTask?.cancel()
         }
     }
 
@@ -217,7 +230,7 @@ struct NoteEditorView: View {
             isFocused: $isFocused,
             focusRequestID: focusRequestID,
             extraBottomPadding: Self.editorBarHeight + 16
-                + (hasPendingAttachments ? Self.attachmentsBarHeight : 0),
+                + (showsAttachmentBar ? AttachmentBar.height : 0),
             extraTopPadding: Self.topFade,
             tagSuggestions: tagSuggestions,
             onTagAccepted: { rememberTag($0) },
@@ -286,69 +299,16 @@ struct NoteEditorView: View {
         }
     }
 
-    private var pendingAttachmentsBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(pendingImages) { p in
-                    ZStack(alignment: .topTrailing) {
-                        Image(uiImage: p.image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 56, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        if p.isUploading {
-                            ProgressView()
-                                .frame(width: 56, height: 56)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            Button { pendingImages.removeAll { $0.id == p.id } } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.white, .black)
-                                    .font(.caption)
-                            }
-                            .offset(x: 6, y: -6)
-                        }
-                    }
-                }
-                ForEach(pendingFiles) { f in
-                    ZStack(alignment: .topTrailing) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.fill")
-                                .font(.caption)
-                            Text(f.filename)
-                                .font(.caption)
-                                .lineLimit(2)
-                                .frame(maxWidth: 80)
-                        }
-                        .padding(8)
-                        .frame(height: 56)
-                        .background(Color(uiColor: .secondarySystemFill),
-                                    in: RoundedRectangle(cornerRadius: 8))
-                        if f.isUploading {
-                            ProgressView()
-                                .frame(height: 56)
-                                .frame(maxWidth: .infinity)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        } else {
-                            Button { pendingFiles.removeAll { $0.id == f.id } } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.white, .black)
-                                    .font(.caption)
-                            }
-                            .offset(x: 6, y: -6)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-        }
-        .frame(height: Self.attachmentsBarHeight)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
-        .padding(.horizontal, 16)
+    /// The strip shows when the note already holds attachments or some are waiting to be sent.
+    private var showsAttachmentBar: Bool {
+        !existingAttachments.isEmpty || hasPendingAttachments
     }
 
-    private static let attachmentsBarHeight: CGFloat = 72
+    /// The open note's vault-relative path, when it is a vault note: `![[a.png]]` may name a file beside it.
+    private var vaultNotePath: String? {
+        if case .vaultFile(let path) = target { return path }
+        return nil
+    }
     /// Button height plus the bar's vertical padding.
     private static let editorBarHeight: CGFloat = 48 + 16
 
@@ -540,6 +500,7 @@ struct NoteEditorView: View {
         didTapDone = false
         pendingImages = []
         pendingFiles = []
+        existingAttachments = []
         focusEditor()
     }
 
@@ -687,6 +648,7 @@ struct NoteEditorView: View {
         if serverMemoError == nil, vaultLoadError == nil { focusEditor() }
         fetchRemoteTagsOnce()
         refreshTagSuggestions()
+        scheduleAttachmentScan(immediately: true)
     }
 
     private func loadServerMemo(memoID: String) async {
@@ -771,6 +733,28 @@ struct NoteEditorView: View {
             return (path as NSString).lastPathComponent
         }
         return VaultNoteSerializer.filename(for: Date(), existing: [])
+    }
+
+    // MARK: Existing attachments
+
+    /// What the note already holds: attachments embedded in its text, plus — for a Memos note — those the
+    /// server keeps on the memo itself.
+    private func currentAttachments() -> [NoteAttachment] {
+        let embedded = NoteAttachments.parse(textBinding.wrappedValue)
+        guard case .serverMemo(let memoID) = target else { return embedded }
+        return NoteAttachments.merged(embedded, serverMemosStore.memo(memoID: memoID)?.attachments ?? [])
+    }
+
+    /// Rescans for attachments. Debounced so typing doesn't run the parser on every keystroke;
+    /// `immediately` is for opening a note, which should show its strip at once.
+    private func scheduleAttachmentScan(immediately: Bool = false) {
+        attachmentScanTask?.cancel()
+        attachmentScanTask = Task { @MainActor in
+            if !immediately { try? await Task.sleep(for: .milliseconds(300)) }
+            guard !Task.isCancelled else { return }
+            let found = currentAttachments()
+            if found != existingAttachments { existingAttachments = found }
+        }
     }
 
     // MARK: Attachment upload
