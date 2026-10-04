@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		00E33C579AE348BBB2E3A8F8 /* KeychainTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFBD7414B72573F3646117B /* KeychainTokenStore.swift */; };
 		0A1FF20B34D7E5957F342884 /* DraftResumeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B5843C412992177E3B848D /* DraftResumeCoordinator.swift */; };
+		0B24EA5617312D6DD06E58A2 /* NoteAttachmentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF149A6FF78A533E9C9F97A /* NoteAttachmentsTests.swift */; };
+		13916935B858EABD11C69197 /* NoteAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC224DE22F412C4005F39703 /* NoteAttachments.swift */; };
 		151BF0CE2B1DB6A97787E422 /* VaultTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C436A0FBD7111C09185E02C /* VaultTemplate.swift */; };
 		1D7BCB26205E023C7DCF75F7 /* VaultAttachmentWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 702F84A67872865E046A35EC /* VaultAttachmentWriterTests.swift */; };
 		1FE7311FC28E72F2560F102E /* SpeechTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA8AA90676036B41F333EF70 /* SpeechTranscriptionService.swift */; };
@@ -103,6 +105,7 @@
 		3562F614A494E389A80C9C1A /* TimeDirective.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeDirective.swift; sourceTree = "<group>"; };
 		4C36AC7C56C22B666C13A48C /* Frontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frontmatter.swift; sourceTree = "<group>"; };
 		53DC416904B915D0990DF67C /* QuooteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuooteApp.swift; sourceTree = "<group>"; };
+		5BF149A6FF78A533E9C9F97A /* NoteAttachmentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteAttachmentsTests.swift; sourceTree = "<group>"; };
 		5E4678F2263DE73528DB77B8 /* VaultNoteSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultNoteSerializerTests.swift; sourceTree = "<group>"; };
 		64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemosClientParsingTests.swift; sourceTree = "<group>"; };
 		67854A6CB41706651238437B /* Quoote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Quoote.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -141,6 +144,7 @@
 		EAAB97ADC079C72954ECE801 /* VaultBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultBookmarkStore.swift; sourceTree = "<group>"; };
 		EB22F14C563C717107686A52 /* FrontmatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmatterTests.swift; sourceTree = "<group>"; };
 		EB98FD9D9F1F9AB00BD2D868 /* ServerMemoEditDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerMemoEditDraft.swift; sourceTree = "<group>"; };
+		EC224DE22F412C4005F39703 /* NoteAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteAttachments.swift; sourceTree = "<group>"; };
 		F508C831CD24843EA58DB7C2 /* VaultStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultStoreTests.swift; sourceTree = "<group>"; };
 		F7959E1B71004BB40B039DEE /* VaultIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultIndexTests.swift; sourceTree = "<group>"; };
 		FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTextViewListEditingTests.swift; sourceTree = "<group>"; };
@@ -217,6 +221,7 @@
 				350C75EF4D6D6642F0473289 /* DraftBehaviorTests.swift */,
 				EB22F14C563C717107686A52 /* FrontmatterTests.swift */,
 				64E6DD198265D09A6BF3D9F2 /* MemosClientParsingTests.swift */,
+				5BF149A6FF78A533E9C9F97A /* NoteAttachmentsTests.swift */,
 				965F67343F7951522A027F8C /* NoteExcerptTests.swift */,
 				FABC5C44FC358192A17CFAB8 /* NoteTextViewListEditingTests.swift */,
 				0E11BA6574365BE10C1FA1D7 /* PinnedNotesStoreTests.swift */,
@@ -254,6 +259,7 @@
 		99E4F4C2E57AEF787E6867E7 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				EC224DE22F412C4005F39703 /* NoteAttachments.swift */,
 				2E5276365CC8B1E9A9D8ECAB /* NoteExcerpt.swift */,
 				13A975412D77652ED447A2BB /* PinnedNotesStore.swift */,
 				B500C334B926323FB0A1BF9D /* TagExtractor.swift */,
@@ -419,6 +425,7 @@
 				78394F3BE191208471A727AA /* MemoCache.swift in Sources */,
 				F4CB3524B62A399A2C1EFB00 /* MemosClient.swift in Sources */,
 				AF32F6D80D4F9D0E80E4F5C9 /* ModelContext+Persist.swift in Sources */,
+				13916935B858EABD11C69197 /* NoteAttachments.swift in Sources */,
 				D657D03D51660CA54BD642AD /* NoteDateGrouping.swift in Sources */,
 				C6BDA696B44AE642A3799A83 /* NoteDestination.swift in Sources */,
 				81D598B3E1020FFA8F67311D /* NoteEditorView.swift in Sources */,
@@ -461,6 +468,7 @@
 				5D2E4CA21535F70984A8145C /* DraftBehaviorTests.swift in Sources */,
 				9381D37D0FC10BB1BBE4B33E /* FrontmatterTests.swift in Sources */,
 				9E1A85D61011236DED24C200 /* MemosClientParsingTests.swift in Sources */,
+				0B24EA5617312D6DD06E58A2 /* NoteAttachmentsTests.swift in Sources */,
 				CFD4FC81F55747BFD319FA7B /* NoteExcerptTests.swift in Sources */,
 				5CD3707AB614A1DE1066A07F /* NoteTextViewListEditingTests.swift in Sources */,
 				45E152C17AC73909B77FB275 /* PinnedNotesStoreTests.swift in Sources */,
