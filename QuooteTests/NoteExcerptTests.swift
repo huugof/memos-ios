@@ -25,4 +25,22 @@ final class NoteExcerptTests: XCTestCase {
         let note = UnifiedNote.local(Draft(text: "# Title\nbody #tag"))
         XCTAssertEqual(note.excerpt, "Title body #tag")
     }
+
+    func testDropsLinksToMemosFilesButKeepsOrdinaryLinks() {
+        let text = """
+        Quarterly numbers
+        [Report.pdf](https://m.example.com/file/attachments/u/Report.pdf)
+        see [the site](https://example.com) too
+        """
+        XCTAssertEqual(NoteExcerpt.make(from: text), "Quarterly numbers see [the site](https://example.com) too")
+    }
+
+    func testANoteThatIsOnlyAFileLinkHasNoExcerpt() {
+        let link = "[My Doc.pdf](https://m.example.com/file/attachments/u/My Doc.pdf)"
+        XCTAssertEqual(NoteExcerpt.make(from: link), "")
+    }
+
+    func testDropsTheOlderMemosFilePathToo() {
+        XCTAssertEqual(NoteExcerpt.make(from: "Scan [x.pdf](/o/r/12/x.pdf)"), "Scan")
+    }
 }

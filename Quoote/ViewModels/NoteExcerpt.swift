@@ -18,6 +18,7 @@ enum NoteExcerpt {
         for rawLine in text.components(separatedBy: "\n") {
             var line = rawLine.trimmingCharacters(in: .whitespaces)
             line = replacing(embedRegex, in: line)
+            line = NoteAttachments.removingMemosFileLinks(from: line)
             line = replacing(headingRegex, in: line)
             // Collapses the gap a dropped inline image leaves, and tabs.
             line = line.split(whereSeparator: \.isWhitespace).joined(separator: " ")
