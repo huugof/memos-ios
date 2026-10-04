@@ -129,13 +129,15 @@ final class AttachmentPreviewFiles: Sendable {
             switch attempt {
             case nil: return .vaultUnavailable
             case .copied(let url)?: return .ready(url)
-            case .missing?: return .missing
-            case .unreadable?: return .failed
-            case .notDownloaded(let path)?:
-                guard environment.now() < deadline else { return .timedOut }
-                known = path
-                do { try await environment.sleep(environment.pollInterval) } catch { return .cancelled }
+            case .notDownloaded(let path)?: known = path
+            case .missing?: if known == nil { return .missing }
+            case .unreadable?: if known == nil { return .failed }
             }
+
+            // Only here while waiting on iCloud. Once the file has been seen evicted, one that then seems to vanish
+            // or fail to copy is more likely mid-swap (placeholder gone, real file not there yet) than gone for good.
+            guard environment.now() < deadline else { return .timedOut }
+            do { try await environment.sleep(environment.pollInterval) } catch { return .cancelled }
         }
     }
 

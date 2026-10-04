@@ -171,6 +171,31 @@ final class AttachmentPreviewFilesTests: XCTestCase {
         XCTAssertEqual(sleeps.value, 2)
     }
 
+    func testAFileThatBrieflyVanishesWhileItIsWaitedForIsStillWaitedFor() async throws {
+        try put("attachments/.Report.pdf.icloud", Data("placeholder".utf8))
+        let bytes = Data("%PDF the real bytes".utf8)
+        let clock = Clock()
+        let sleeps = Counter()
+        let root = vaultRoot!
+
+        let files = makeFiles(now: { clock.now }, sleep: { duration in
+            clock.advance(TimeInterval(duration.components.seconds))
+            switch sleeps.increment() {
+            case 1:   // the placeholder goes a moment before the real file lands: neither is there
+                try? FileManager.default.removeItem(at: root.appendingPathComponent("attachments/.Report.pdf.icloud"))
+            case 2:
+                try? bytes.write(to: root.appendingPathComponent("attachments/Report.pdf"), options: .atomic)
+            default:
+                break
+            }
+        })
+        let outcome = await files.localFile(for: file("Report.pdf"), notePath: nil)
+
+        guard case .ready(let url) = outcome else { return XCTFail("expected a copy, got \(outcome)") }
+        XCTAssertEqual(try Data(contentsOf: url), bytes)
+        XCTAssertEqual(sleeps.value, 2)
+    }
+
     func testAFileThatNeverArrivesTimesOutAfterThePatienceRunsOutAndLeavesNothingBehind() async throws {
         try put("attachments/.Report.pdf.icloud", Data("placeholder".utf8))
         let clock = Clock()
