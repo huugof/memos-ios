@@ -179,9 +179,14 @@ enum NoteAttachments {
 
     // MARK: Syntaxes
 
+    /// A link's `(destination)` as a regex fragment whose group 1 is the destination. It runs to the first `)` that
+    /// doesn't close a pair opened inside it, so `Scan (2).pdf` and `photo(1).png` stay whole: Quoote writes an
+    /// uploaded file's name into the link as it is. A destination never spans lines.
+    static let linkDestinationPattern = #"\(((?:[^()\n]|\([^()\n]*\))*)\)"#
+
     private static let wikilinkRegex = try! NSRegularExpression(pattern: #"!\[\[([^\]]*)\]\]"#)
-    private static let imageRegex = try! NSRegularExpression(pattern: #"!\[[^\]]*\]\(([^)]*)\)"#)
-    private static let linkRegex = try! NSRegularExpression(pattern: #"(?<!!)\[([^\]]*)\]\(([^)]*)\)"#)
+    private static let imageRegex = try! NSRegularExpression(pattern: #"!\[[^\]]*\]"# + linkDestinationPattern)
+    private static let linkRegex = try! NSRegularExpression(pattern: #"(?<!!)\[([^\]]*)\]"# + linkDestinationPattern)
 
     private static func blank(_ range: NSRange, in text: NSMutableString) {
         text.replaceCharacters(in: range, with: String(repeating: " ", count: range.length))

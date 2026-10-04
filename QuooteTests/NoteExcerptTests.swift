@@ -43,4 +43,20 @@ final class NoteExcerptTests: XCTestCase {
     func testDropsTheOlderMemosFilePathToo() {
         XCTAssertEqual(NoteExcerpt.make(from: "Scan [x.pdf](/o/r/12/x.pdf)"), "Scan")
     }
+
+    func testAFileNamedWithParenthesesIsDroppedWhole() {
+        // "Invoice (1).pdf" is the usual name of a second download of the same file.
+        let text = "Invoice [Invoice (1).pdf](https://m.example.com/file/attachments/u/Invoice (1).pdf)"
+        XCTAssertEqual(NoteExcerpt.make(from: text), "Invoice")
+    }
+
+    func testAnImageLinkWithParenthesesInItsNameIsDroppedWhole() {
+        let text = "Trip ![](https://m.example.com/file/attachments/u/photo(1).png)"
+        XCTAssertEqual(NoteExcerpt.make(from: text), "Trip")
+    }
+
+    func testAFileOnlyNoteWithParenthesesInTheNameShowsTheFileName() {
+        let link = "[Scan (2).pdf](https://m.example.com/file/attachments/u/Scan (2).pdf)"
+        XCTAssertEqual(UnifiedNote.local(Draft(text: link)).excerpt, "Scan (2).pdf")
+    }
 }

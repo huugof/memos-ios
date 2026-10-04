@@ -127,6 +127,20 @@ final class NoteAttachmentsTests: XCTestCase {
         XCTAssertEqual(NoteAttachments.parse("[](/file/attachments/u/a.jpg)").map(\.name), ["a.jpg"])
     }
 
+    func testALinkWhoseFilenameHasParenthesesIsKeptWhole() {
+        // "Scan (2).pdf" is what a second download of the same file is called, and Quoote writes the name raw.
+        let url = "https://m.example.com/file/attachments/u/Scan (2).pdf"
+        XCTAssertEqual(
+            NoteAttachments.parse("[Scan (2).pdf](\(url))"),
+            [NoteAttachment(target: url, name: "Scan (2).pdf", kind: .file)]
+        )
+    }
+
+    func testAMarkdownImageWhoseNameHasParenthesesIsKeptWhole() {
+        let url = "https://m.example.com/file/attachments/u/photo(1).png"
+        XCTAssertEqual(NoteAttachments.parse("![](\(url))"), [image(url, name: "photo(1).png")])
+    }
+
     func testOrdinaryLinksAreNotAttachments() {
         XCTAssertEqual(NoteAttachments.parse("[site](https://example.com/page)"), [])
         XCTAssertEqual(NoteAttachments.parse("[note](folder/note.md)"), [])

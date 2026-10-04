@@ -8,7 +8,7 @@ enum NoteExcerpt {
     static let maxLength = 300
 
     private static let embedRegex = try! NSRegularExpression(
-        pattern: #"!\[\[[^\]]*\]\]|!\[[^\]]*\]\([^)]*\)"#
+        pattern: #"!\[\[[^\]]*\]\]|!\[[^\]]*\]"# + NoteAttachments.linkDestinationPattern
     )
     private static let headingRegex = try! NSRegularExpression(pattern: #"^#{1,6}\s+"#)
 
